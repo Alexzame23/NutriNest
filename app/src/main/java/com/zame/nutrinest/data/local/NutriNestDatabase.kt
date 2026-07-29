@@ -219,9 +219,9 @@ abstract class NutriNestDatabase : RoomDatabase() {
          * swaps the fourteen ad-hoc food types for the dataset's twelve
          * categories.
          *
-         * Only the schema is set up here. The 35 000 rows of data arrive in
-         * `onOpen` via [FoodDatabaseImporter], because SQLite will not `ATTACH`
-         * a second database inside the transaction Room wraps migrations in.
+         * Only the schema is set up here; the 35 000 rows of data arrive in
+         * `onOpen` via [FoodDatabaseImporter], which also covers a fresh install
+         * and a later dataset refresh from a single place.
          */
         internal val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -461,10 +461,10 @@ abstract class NutriNestDatabase : RoomDatabase() {
     /**
      * Loads the shipped food database once the schema is ready.
      *
-     * `onOpen` rather than `onCreate` or the migration: those run inside a
-     * transaction, and SQLite will not `ATTACH` there. It costs one indexed
-     * lookup per launch and does real work only when the dataset version in the
-     * APK differs from the one already imported.
+     * `onOpen` rather than `onCreate` or the migration, so that a fresh install,
+     * an upgrade and a later dataset refresh all take the same path — the
+     * importer decides what is needed by comparing dataset versions. It costs one
+     * indexed lookup per launch and does real work only when they differ.
      */
     private class FoodImportCallback(private val context: Context) : Callback() {
         override fun onOpen(db: SupportSQLiteDatabase) {

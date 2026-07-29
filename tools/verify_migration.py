@@ -16,7 +16,12 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ksql import extract_exec_sql, extract_string_list  # noqa: E402
+from ksql import (  # noqa: E402
+    extract_copy_steps,
+    extract_exec_sql,
+    extract_sql_calls,
+    extract_string_list,
+)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = f"{REPO}/app/src/main/java/com/zame/nutrinest"
@@ -178,20 +183,24 @@ def _legacy_block(_: str) -> str:
 
 # ── Step 2: the import ──────────────────────────────────────────────────────
 
-def run_import(conn: sqlite3.Connection, expect_version: str) -> None:
-    source = open(IMPORTER_KT).read()
-    statements = extract_exec_sql(
-        source,
-        {"$ATTACH_ALIAS": "src", "$IMPORTED_ID_OFFSET": str(IMPORTED_ID_OFFSET)},
-    )
-    # The first is the ATTACH, whose path comes from Kotlin; the last is DETACH.
-    statements = [s for s in statements if not s.startswith(("ATTACH", "DETACH"))]
+def run_import(conn: sqlite3.Connection, expect_version: str) -> dict[str, tuple[int, int]]:
+    """Replay the importer step for step, using its own SQL.
 
-    conn.execute(f"ATTACH DATABASE '{ASSET}' AS src")
+    Mirrors FoodDatabaseImporter: read each table over a separate read-only
+    connection to the asset, then write the rows through the app's connection.
+    No ATTACH — that is what broke Room's per-connection invalidation tracker.
+    """
+    source = open(IMPORTER_KT).read()
+    substitutions = {"$IMPORTED_ID_OFFSET": str(IMPORTED_ID_OFFSET)}
+    statements = extract_exec_sql(source, substitutions)
+    # restoreUserState issues its UPDATE through a prepared statement.
+    statements += extract_sql_calls(source, "compileStatement", substitutions)
+    steps = extract_copy_steps(source, substitutions)
+
     now = int(time.time() * 1000)
     last_import_at = int(
         conn.execute(
-            "SELECT value FROM food_dataset_meta WHERE key = 'last_import_at'"
+            "SELECT COALESCE(value, '0') FROM food_dataset_meta WHERE key = 'last_import_at'"
         ).fetchone()[0]
         if conn.execute(
             "SELECT COUNT(*) FROM food_dataset_meta WHERE key = 'last_import_at'"
@@ -199,29 +208,52 @@ def run_import(conn: sqlite3.Connection, expect_version: str) -> None:
         else 0
     )
 
-    args_for = {
-        "DELETE FROM ingredients\nWHERE isCustom = 0": (last_import_at,),
-        "INSERT OR IGNORE INTO ingredients": (now, now),
-        "INSERT OR IGNORE INTO sqlite_sequence": (USER_ID_FLOOR,),
-        "UPDATE sqlite_sequence SET seq": (USER_ID_FLOOR, USER_ID_FLOOR),
-    }
+    # captureUserState, before anything is deleted.
+    user_state = conn.execute(
+        "SELECT id, isFavorite, usageCount, lastUsedAt, imagePath"
+        " FROM ingredients WHERE isCustom = 0"
+    ).fetchall()
 
+    # clearReferenceData + dropStaleImports, taken from the Kotlin verbatim.
     for statement in statements:
-        args: tuple = ()
-        for prefix, value in args_for.items():
-            if statement.startswith(prefix):
-                args = value
-                break
-        if statement.count("?") and not args:
-            continue  # writeMeta, driven explicitly below
-        conn.execute(statement, args)
+        if statement.startswith("DELETE FROM ingredient_categories") or \
+           statement.startswith("DELETE FROM shopping_aisles") or \
+           statement.startswith("DELETE FROM nutrient_defs"):
+            conn.execute(statement)
+    stale = next(s for s in statements if s.startswith("DELETE FROM ingredients"))
+    conn.execute(stale, (last_import_at,))
+
+    # Rows read vs rows actually written, per step. A gap means an INSERT OR
+    # IGNORE quietly dropped something — which is exactly how a missing NOT NULL
+    # column hides itself.
+    tally: dict[str, tuple[int, int]] = {}
+    asset = sqlite3.connect(f"file:{ASSET}?mode=ro", uri=True)
+    try:
+        for step in steps:
+            args = (str(now), str(now)) if step.get("readArgs") else ()
+            read = written = 0
+            for row in asset.execute(step["read"], args):
+                read += 1
+                written += conn.execute(step["write"], row).rowcount or 0
+            tally[step["label"]] = (read, written)
+    finally:
+        asset.close()
+
+    # restoreUserState
+    restore = next(s for s in statements if s.startswith("UPDATE ingredients"))
+    for row_id, favorite, usage, last_used, image in user_state:
+        conn.execute(restore, (favorite, usage, last_used, image, row_id))
+
+    # reserveUserIdRange
+    reserve = next(s for s in statements if s.startswith("UPDATE sqlite_sequence"))
+    conn.execute(reserve, (USER_ID_FLOOR, USER_ID_FLOOR))
 
     for key, value in (("dataset_version", expect_version), ("last_import_at", str(now))):
         conn.execute(
             "INSERT OR REPLACE INTO food_dataset_meta (`key`, value) VALUES (?, ?)", (key, value)
         )
     conn.commit()
-    conn.execute("DETACH DATABASE src")
+    return tally
 
 
 # ── Shared helpers ──────────────────────────────────────────────────────────
@@ -289,7 +321,10 @@ def main() -> None:
           conn.execute("SELECT COUNT(*) FROM ingredients WHERE createdAt = 0").fetchone()[0] == 0)
 
     print("\n2. import")
-    run_import(conn, version)
+    tally = run_import(conn, version)
+    for label, (read, written) in tally.items():
+        check(f"{label}: all {read} rows read were written", read == written,
+              f"read {read}, wrote {written}")
 
     imported = conn.execute("SELECT COUNT(*) FROM ingredients WHERE isCustom = 0").fetchone()[0]
     check(f"{expected_foods} active foods imported",

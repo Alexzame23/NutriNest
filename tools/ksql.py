@@ -74,8 +74,19 @@ def _split_top_level_args(text: str) -> list[str]:
 
 def extract_exec_sql(source: str, substitutions: dict[str, str] | None = None) -> list[str]:
     """Every `execSQL(...)` statement in a Kotlin file, in source order."""
+    return extract_sql_calls(source, "execSQL", substitutions)
+
+
+def extract_sql_calls(
+    source: str, call: str, substitutions: dict[str, str] | None = None
+) -> list[str]:
+    """The SQL passed to every `call(...)` in a Kotlin file, in source order.
+
+    Used for both `execSQL` and `compileStatement`, so the harness sees every
+    statement the app runs regardless of how it is issued.
+    """
     statements = []
-    for match in re.finditer(r"\bexecSQL\s*\(", source):
+    for match in re.finditer(rf"\b{re.escape(call)}\s*\(", source):
         i = match.end()
         depth, start, n = 1, i, len(source)
         while i < n and depth:
@@ -122,8 +133,76 @@ def extract_string_list(source: str, marker: str) -> list[str]:
     return re.findall(r'"((?:[^"\\]|\\.)*)"', source[open_paren:i])
 
 
+def _strip_line_comments(text: str) -> str:
+    """Drop whole-line `//` comments, whose prose can contain commas."""
+    return "\n".join(
+        "" if line.lstrip().startswith("//") else line
+        for line in text.splitlines()
+    )
+
+
 def _substitute(sql: str, substitutions: dict[str, str] | None) -> str:
     if substitutions:
         for key, value in substitutions.items():
             sql = sql.replace(key, value)
     return "\n".join(line.rstrip() for line in sql.strip().splitlines())
+
+
+def extract_copy_steps(source: str, substitutions: dict[str, str] | None = None) -> list[dict]:
+    """The importer's CopyStep list: its read/write SQL pairs, in order.
+
+    The harness replays exactly these statements, so a change to either column
+    list shows up as a failed check rather than as bad data on a device.
+    """
+    start = source.index("COPY_STEPS = listOf(")
+    open_paren = source.index("(", start + len("COPY_STEPS = listOf")) + 1
+    depth, i, n = 1, open_paren, len(source)
+    while i < n and depth:
+        if source.startswith('"""', i):
+            i = source.index('"""', i + 3) + 3
+            continue
+        if source[i] == '"':
+            i += 1
+            while i < n and source[i] != '"':
+                i += 2 if source[i] == "\\" else 1
+        elif source[i] == "(":
+            depth += 1
+        elif source[i] == ")":
+            depth -= 1
+            if depth == 0:
+                break
+        i += 1
+    block = source[open_paren:i]
+
+    steps = []
+    for match in re.finditer(r"\bCopyStep\s*\(", block):
+        j = match.end()
+        d, body_start = 1, j
+        while j < len(block) and d:
+            if block.startswith('"""', j):
+                j = block.index('"""', j + 3) + 3
+                continue
+            if block[j] == '"':
+                j += 1
+                while j < len(block) and block[j] != '"':
+                    j += 2 if block[j] == "\\" else 1
+            elif block[j] == "(":
+                d += 1
+            elif block[j] == ")":
+                d -= 1
+                if d == 0:
+                    break
+            j += 1
+        step = {}
+        for arg in _split_top_level_args(_strip_line_comments(block[body_start:j])):
+            name, _, expr = arg.partition("=")
+            name = name.strip()
+            if name in ("label", "read", "write"):
+                value = _parse_string_expr(expr)
+                if value is not None:
+                    step[name] = _substitute(value, substitutions)
+            elif name == "readArgs":
+                step["readArgs"] = True
+        if "read" in step and "write" in step:
+            steps.append(step)
+    return steps
