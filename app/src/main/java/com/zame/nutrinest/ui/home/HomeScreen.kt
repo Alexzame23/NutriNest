@@ -42,10 +42,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.zame.nutrinest.R
 import com.zame.nutrinest.ui.theme.NutritionAppTheme
 
 @Composable
@@ -74,7 +76,7 @@ fun HomeScreen(
             ) {
                 Icon(
                     Icons.Rounded.AccountCircle,
-                    contentDescription = "Profiles",
+                    contentDescription = stringResource(R.string.home_profiles),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(34.dp)
                 )
@@ -95,7 +97,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(20.dp))
 
                 Text(
-                    text = "Nutrition Planner",
+                    text = stringResource(R.string.home_title),
                     style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -103,7 +105,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = "Organize your meals and discover healthy, delicious recipes.",
+                    text = stringResource(R.string.home_subtitle),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.widthIn(max = 320.dp),
@@ -113,8 +115,8 @@ fun HomeScreen(
                 Spacer(Modifier.height(48.dp))
 
                 HomeActionCard(
-                    title = "Recipes",
-                    subtitle = "Browse and create your dishes",
+                    title = stringResource(R.string.home_recipes_ingredients_title),
+                    subtitle = stringResource(R.string.home_recipes_ingredients_subtitle),
                     icon = Icons.AutoMirrored.Rounded.MenuBook,
                     onClick = onRecipesClick
                 )
@@ -122,8 +124,8 @@ fun HomeScreen(
                 Spacer(Modifier.height(20.dp))
 
                 HomeActionCard(
-                    title = "Weekly Menu",
-                    subtitle = "Plan your meals for the week",
+                    title = stringResource(R.string.home_weekly_menu_title),
+                    subtitle = stringResource(R.string.home_weekly_menu_subtitle),
                     icon = Icons.Rounded.CalendarMonth,
                     onClick = onWeeklyMenuClick
                 )
@@ -142,6 +144,7 @@ private fun HomeActionCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val cardDescription = stringResource(R.string.home_card_description, title, subtitle)
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.97f else 1f,
         animationSpec = spring(
@@ -166,7 +169,7 @@ private fun HomeActionCard(
             .fillMaxWidth()
             .widthIn(max = 420.dp)
             .scale(scale)
-            .semantics { contentDescription = "$title. $subtitle" }
+            .semantics { contentDescription = cardDescription }
     ) {
         Row(
             modifier = Modifier

@@ -49,14 +49,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.zame.nutrinest.data.local.entity.FoodTypes
+import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
+import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.OptionDropdown
+import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.util.WeekUtils
 import kotlin.math.roundToInt
 
@@ -68,14 +73,18 @@ fun MenuConfigScreen(
     viewModel: MenuConfigViewModel = viewModel(factory = MenuConfigViewModel.Factory)
 ) {
     val state by viewModel.state.collectAsState()
+    val configuration = LocalConfiguration.current
+    val shortDays = remember(configuration) { WeekUtils.shortDayNames(configuration.locales[0]) }
     val recipes by viewModel.allRecipes.collectAsState()
     val folders by viewModel.allFolders.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showLockDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.done) { if (state.done) onGenerated() }
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let {
+    // The generator reports a code; the wording belongs to this layer.
+    val errorMessage = state.error?.let { stringResource(it.messageRes) }
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.dismissError()
         }
@@ -87,11 +96,17 @@ fun MenuConfigScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Plan the Week", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        stringResource(R.string.menu_config_title),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -103,7 +118,14 @@ fun MenuConfigScreen(
             ExtendedFloatingActionButton(
                 onClick = { if (!state.isGenerating) viewModel.generate() },
                 icon = { Icon(Icons.Rounded.AutoAwesome, null) },
-                text = { Text(if (state.isGenerating) "Generating…" else "Generate") },
+                text = {
+                    Text(
+                        stringResource(
+                            if (state.isGenerating) R.string.menu_config_generating
+                            else R.string.menu_config_generate
+                        )
+                    )
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )
@@ -117,7 +139,7 @@ fun MenuConfigScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ── Meals per day ───────────────────────────────────────
-            item { SectionTitle("Meals per day") }
+            item { SectionTitle(stringResource(R.string.menu_config_meals_per_day)) }
             item {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     listOf(3, 4, 5).forEachIndexed { index, count ->
@@ -131,7 +153,7 @@ fun MenuConfigScreen(
             }
 
             // ── Meal importance sliders ─────────────────────────────
-            item { SectionTitle("Meal size distribution") }
+            item { SectionTitle(stringResource(R.string.menu_config_meal_sizes)) }
             item {
                 Card(
                     shape = MaterialTheme.shapes.medium,
@@ -147,7 +169,7 @@ fun MenuConfigScreen(
                                 val percent = (weight / total * 100).roundToInt()
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        slot.label,
+                                        stringResource(slot.labelRes),
                                         style = MaterialTheme.typography.bodyLarge,
                                         modifier = Modifier.width(130.dp)
                                     )
@@ -168,7 +190,7 @@ fun MenuConfigScreen(
                                 }
                             }
                         Text(
-                            "Shares are relative — they always add up to 100%.",
+                            stringResource(R.string.menu_config_shares_note),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -180,13 +202,13 @@ fun MenuConfigScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Stepper(
-                        label = "Cheat meals",
+                        label = stringResource(R.string.menu_config_cheat_meals),
                         value = state.cheatMeals,
                         onChange = viewModel::onCheatMealsChange,
                         modifier = Modifier.weight(1f)
                     )
                     Stepper(
-                        label = "Max recipe repeats",
+                        label = stringResource(R.string.menu_config_max_repeats),
                         value = state.maxRepeats,
                         onChange = viewModel::onMaxRepeatsChange,
                         modifier = Modifier.weight(1f)
@@ -199,9 +221,12 @@ fun MenuConfigScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Avoid last week's recipes", style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "Skipped automatically if it would leave too few recipes",
+                            stringResource(R.string.menu_config_avoid_recent),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            stringResource(R.string.menu_config_avoid_recent_note),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -214,7 +239,7 @@ fun MenuConfigScreen(
             }
 
             // ── Exclusions ──────────────────────────────────────────
-            item { SectionTitle("Exclude categories") }
+            item { SectionTitle(stringResource(R.string.menu_config_exclude_categories)) }
             item {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RecipeCategories.ALL.forEach { category ->
@@ -226,20 +251,21 @@ fun MenuConfigScreen(
                     }
                 }
             }
-            item { SectionTitle("Exclude food types") }
+            item { SectionTitle(stringResource(R.string.menu_config_exclude_ingredients)) }
             item {
+                val spanish = rememberIsSpanish()
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FoodTypes.ALL.forEach { type ->
+                    IngredientCategories.ALL.forEach { key ->
                         FilterChip(
-                            selected = type in state.excludedFoodTypes,
-                            onClick = { viewModel.toggleFoodType(type) },
-                            label = { Text(type) }
+                            selected = key in state.excludedIngredientCategories,
+                            onClick = { viewModel.toggleIngredientCategory(key) },
+                            label = { Text(IngredientCategories.shortName(key, spanish)) }
                         )
                     }
                 }
             }
             if (folders.isNotEmpty()) {
-                item { SectionTitle("Use only these folders") }
+                item { SectionTitle(stringResource(R.string.menu_config_only_folders)) }
                 item {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         folders.forEach { folder ->
@@ -253,7 +279,7 @@ fun MenuConfigScreen(
                 }
             }
             if (recipes.isNotEmpty()) {
-                item { SectionTitle("Exclude specific recipes") }
+                item { SectionTitle(stringResource(R.string.menu_config_exclude_recipes)) }
                 item {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         recipes.forEach { recipe ->
@@ -268,10 +294,10 @@ fun MenuConfigScreen(
             }
 
             // ── Locks ───────────────────────────────────────────────
-            item { SectionTitle("Locked meals") }
+            item { SectionTitle(stringResource(R.string.menu_config_locked_meals)) }
             item {
                 Text(
-                    "Fix a recipe to specific days and meals — the generator plans around them.",
+                    stringResource(R.string.menu_config_locked_meals_note),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -296,8 +322,8 @@ fun MenuConfigScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                "${lock.slot.label} · " + lock.days.sorted()
-                                    .joinToString(", ") { WeekUtils.DAY_NAMES[it].take(3) },
+                                stringResource(lock.slot.labelRes) + " · " +
+                                    lock.days.sorted().joinToString(", ") { shortDays[it] },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -305,7 +331,7 @@ fun MenuConfigScreen(
                         IconButton(onClick = { viewModel.removeLock(index) }) {
                             Icon(
                                 Icons.Rounded.Delete,
-                                contentDescription = "Remove lock",
+                                contentDescription = stringResource(R.string.menu_config_remove_lock),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -321,7 +347,7 @@ fun MenuConfigScreen(
                 ) {
                     Icon(Icons.Rounded.Add, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add locked meal")
+                    Text(stringResource(R.string.menu_config_add_lock))
                 }
             }
         }
@@ -354,12 +380,16 @@ private fun AddLockDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Lock a meal") },
+        title = { Text(stringResource(R.string.menu_config_lock_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Days", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    stringResource(R.string.menu_config_days),
+                    style = MaterialTheme.typography.bodyLarge
+                )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    WeekUtils.DAY_NAMES.forEachIndexed { index, name ->
+                    // Short forms: seven full day names never fit on one row.
+                    WeekUtils.shortDayNames().forEachIndexed { index, name ->
                         FilterChip(
                             selected = index in selectedDays,
                             onClick = {
@@ -367,20 +397,18 @@ private fun AddLockDialog(
                                     if (index in selectedDays) selectedDays - index
                                     else selectedDays + index
                             },
-                            label = { Text(name.take(3)) }
+                            label = { Text(name) }
                         )
                     }
                 }
-                OptionDropdown(
-                    label = "Meal",
-                    options = slots.map { it.label },
-                    selected = selectedSlot.label,
-                    onSelected = { label ->
-                        slots.find { it.label == label }?.let { selectedSlot = it }
-                    }
+                KeyedDropdown(
+                    label = stringResource(R.string.menu_config_meal),
+                    options = slots.map { it to stringResource(it.labelRes) },
+                    selectedKey = selectedSlot,
+                    onSelected = { selectedSlot = it }
                 )
                 OptionDropdown(
-                    label = "Recipe",
+                    label = stringResource(R.string.menu_config_recipe),
                     options = recipes.map { it.name },
                     selected = selectedRecipe?.name,
                     onSelected = { name ->
@@ -395,9 +423,11 @@ private fun AddLockDialog(
                 onClick = {
                     selectedRecipe?.let { onConfirm(selectedDays, selectedSlot, it) }
                 }
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.action_add)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
     )
 }
 

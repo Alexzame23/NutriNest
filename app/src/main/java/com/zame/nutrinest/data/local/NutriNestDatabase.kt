@@ -450,7 +450,8 @@ abstract class NutriNestDatabase : RoomDatabase() {
                 instance ?: build(context.applicationContext).also { instance = it }
             }
 
-        private fun build(appContext: Context): NutriNestDatabase =
+        /** Internal so instrumented tests can open a fresh, uncached instance. */
+        internal fun build(appContext: Context): NutriNestDatabase =
             Room.databaseBuilder(appContext, NutriNestDatabase::class.java, "nutrinest.db")
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .addCallback(FoodImportCallback(appContext))

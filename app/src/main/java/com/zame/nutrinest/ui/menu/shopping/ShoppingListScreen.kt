@@ -33,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -43,9 +44,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.zame.nutrinest.NutriNestApp
+import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.ShoppingItemWithIngredient
 import com.zame.nutrinest.data.repository.MenuRepository
 import com.zame.nutrinest.ui.components.formatGrams
+import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.util.WeekUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,16 +70,21 @@ class ShoppingListViewModel(
         .map { it == WeekUtils.weekStartOf() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    /** foodType → items, sorted for stable display. */
+    /**
+     * Ingredient category → items, in the food dataset's own category order
+     * rather than alphabetically, so the list reads produce-first the way a
+     * shop is laid out.
+     */
     val groupedItems = viewingWeekStart
         .flatMapLatest { repository.observeShoppingItems(it) }
         .map { items ->
             items
                 .sortedBy { it.ingredient.name.lowercase() }
-                .groupBy { it.ingredient.foodType }
-                .toSortedMap()
+                .groupBy { it.ingredient.categoryKey }
+                .toList()
+                .sortedBy { (key, _) -> IngredientCategories.ALL.indexOf(key) }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), sortedMapOf())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun showCurrentWeek() { viewingWeekStart.value = WeekUtils.weekStartOf() }
     fun showNextWeek() { viewingWeekStart.value = WeekUtils.nextWeekStart() }
@@ -103,16 +112,25 @@ fun ShoppingListScreen(
     viewModel: ShoppingListViewModel = viewModel(factory = ShoppingListViewModel.Factory)
 ) {
     val grouped by viewModel.groupedItems.collectAsState()
+    val spanish = rememberIsSpanish()
     val isCurrentWeek by viewModel.isCurrentWeek.collectAsState()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Shopping List", style = MaterialTheme.typography.headlineSmall) },
+                title = {
+                    Text(
+                        stringResource(R.string.shopping_list_title),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -132,12 +150,12 @@ fun ShoppingListScreen(
                     selected = isCurrentWeek,
                     onClick = viewModel::showCurrentWeek,
                     shape = SegmentedButtonDefaults.itemShape(0, 2)
-                ) { Text("This week") }
+                ) { Text(stringResource(R.string.week_current)) }
                 SegmentedButton(
                     selected = !isCurrentWeek,
                     onClick = viewModel::showNextWeek,
                     shape = SegmentedButtonDefaults.itemShape(1, 2)
-                ) { Text("Next week") }
+                ) { Text(stringResource(R.string.week_next)) }
             }
             Spacer(Modifier.height(12.dp))
 
@@ -152,13 +170,13 @@ fun ShoppingListScreen(
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "Nothing to buy yet",
+                            stringResource(R.string.shopping_list_empty_title),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Generate a weekly menu and the list\nfills itself automatically.",
+                            stringResource(R.string.shopping_list_empty_body),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -170,10 +188,10 @@ fun ShoppingListScreen(
                     contentPadding = PaddingValues(bottom = 40.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    grouped.forEach { (foodType, items) ->
-                        item(key = "header_$foodType") {
+                    grouped.forEach { (categoryKey, items) ->
+                        item(key = "header_$categoryKey") {
                             Text(
-                                foodType,
+                                IngredientCategories.shortName(categoryKey, spanish),
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)

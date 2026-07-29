@@ -2,12 +2,14 @@ package com.zame.nutrinest.ui.recipes.create
 
 import android.app.Application
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.zame.nutrinest.NutriNestApp
+import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeCategories
@@ -32,6 +34,14 @@ data class DraftStep(
     val imagePath: String? = null
 )
 
+/** What is wrong with the form, as a code the UI layer translates. */
+enum class RecipeFormError(@StringRes val messageRes: Int) {
+    NAME_REQUIRED(R.string.recipe_error_name),
+    NO_INGREDIENTS(R.string.recipe_error_no_ingredients),
+    NO_STEPS(R.string.recipe_error_no_steps),
+    DUPLICATE_NAME(R.string.recipe_error_duplicate_name)
+}
+
 data class CreateRecipeUiState(
     val name: String = "",
     val category: String = RecipeCategories.ALL.first(),
@@ -40,7 +50,7 @@ data class CreateRecipeUiState(
     val ingredients: List<DraftIngredient> = emptyList(),
     val steps: List<DraftStep> = listOf(DraftStep()),
     val isSaving: Boolean = false,
-    val errorMessage: String? = null,
+    val error: RecipeFormError? = null,
     val saved: Boolean = false
 ) {
     val totalNutrition: NutritionValues
@@ -52,7 +62,7 @@ data class CreateRecipeUiState(
 class CreateRecipeViewModel(
     app: Application,
     private val recipeRepository: RecipeRepository,
-    ingredientRepository: IngredientRepository
+    private val ingredientRepository: IngredientRepository
 ) : AndroidViewModel(app) {
 
     private val _uiState = MutableStateFlow(CreateRecipeUiState())
@@ -117,7 +127,7 @@ class CreateRecipeViewModel(
         copy(steps = steps.filterIndexed { i, _ -> i != index }.ifEmpty { listOf(DraftStep()) })
     }
 
-    fun dismissError() = update { copy(errorMessage = null) }
+    fun dismissError() = update { copy(error = null) }
 
     fun save() {
         val state = _uiState.value
@@ -126,15 +136,14 @@ class CreateRecipeViewModel(
             val name = state.name.trim()
             val nonEmptySteps = state.steps.filter { it.text.isNotBlank() }
             val error = when {
-                name.isEmpty() -> "Please give your recipe a name."
-                state.ingredients.isEmpty() -> "Add at least one ingredient before saving."
-                nonEmptySteps.isEmpty() -> "Add at least one preparation step before saving."
-                recipeRepository.existsByName(name) ->
-                    "A recipe named \"$name\" already exists. Choose a different name."
+                name.isEmpty() -> RecipeFormError.NAME_REQUIRED
+                state.ingredients.isEmpty() -> RecipeFormError.NO_INGREDIENTS
+                nonEmptySteps.isEmpty() -> RecipeFormError.NO_STEPS
+                recipeRepository.existsByName(name) -> RecipeFormError.DUPLICATE_NAME
                 else -> null
             }
             if (error != null) {
-                update { copy(errorMessage = error) }
+                update { copy(error = error) }
                 return@launch
             }
 
@@ -149,6 +158,8 @@ class CreateRecipeViewModel(
                 ingredients = state.ingredients.map { it.ingredient.id to it.grams },
                 steps = nonEmptySteps.map { it.text.trim() to it.imagePath }
             )
+            // Feeds the Ingredients tab's "Recent" view and its usage counts.
+            state.ingredients.forEach { ingredientRepository.markUsed(it.ingredient.id) }
             update { copy(isSaving = false, saved = true) }
         }
     }

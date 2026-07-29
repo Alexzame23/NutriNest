@@ -1,32 +1,38 @@
 package com.zame.nutrinest.data.local.entity
 
+import androidx.annotation.StringRes
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
+import com.zame.nutrinest.R
 import java.util.Calendar
 
-enum class BiologicalSex(val label: String) {
-    MALE("Male"),
-    FEMALE("Female")
+enum class BiologicalSex(@StringRes val labelRes: Int) {
+    MALE(R.string.sex_male),
+    FEMALE(R.string.sex_female)
 }
 
 /** Weekly exercise level with the standard TDEE multipliers. */
-enum class ActivityLevel(val label: String, val description: String, val multiplier: Double) {
-    SEDENTARY("Sedentary", "Little or no exercise, desk job", 1.2),
-    LIGHT("Lightly active", "Light exercise 1–3 days/week", 1.375),
-    MODERATE("Moderately active", "Moderate exercise 3–5 days/week", 1.55),
-    ACTIVE("Very active", "Hard exercise 6–7 days/week", 1.725),
-    VERY_ACTIVE("Extremely active", "Hard daily exercise or physical job", 1.9)
+enum class ActivityLevel(
+    @StringRes val labelRes: Int,
+    @StringRes val descriptionRes: Int,
+    val multiplier: Double
+) {
+    SEDENTARY(R.string.activity_sedentary, R.string.activity_sedentary_detail, 1.2),
+    LIGHT(R.string.activity_light, R.string.activity_light_detail, 1.375),
+    MODERATE(R.string.activity_moderate, R.string.activity_moderate_detail, 1.55),
+    ACTIVE(R.string.activity_active, R.string.activity_active_detail, 1.725),
+    VERY_ACTIVE(R.string.activity_very_active, R.string.activity_very_active_detail, 1.9)
 }
 
-enum class Goal(val label: String) {
-    LOSE_WEIGHT("Lose weight"),
-    MAINTAIN("Maintain weight"),
-    GAIN_WEIGHT("Gain weight"),
-    BUILD_MUSCLE("Build muscle"),
-    IMPROVE_HEALTH("Improve overall health")
+enum class Goal(@StringRes val labelRes: Int) {
+    LOSE_WEIGHT(R.string.goal_lose_weight),
+    MAINTAIN(R.string.goal_maintain),
+    GAIN_WEIGHT(R.string.goal_gain_weight),
+    BUILD_MUSCLE(R.string.goal_build_muscle),
+    IMPROVE_HEALTH(R.string.goal_improve_health)
 }
 
 /**
@@ -34,23 +40,23 @@ enum class Goal(val label: String) {
  * Expressed as a daily deficit; the labels show the approximate weekly fat
  * loss (~7700 kcal per kg of body fat). Only applies to the losing goal.
  */
-enum class WeightLossRate(val label: String, val kcalPerDayDeficit: Int) {
-    GENTLE("Gentle · ~0.25 kg (0.5 lb)/week", 275),
-    MODERATE("Moderate · ~0.5 kg (1 lb)/week", 550),
-    AGGRESSIVE("Aggressive · ~0.75 kg (1.5 lb)/week", 825)
+enum class WeightLossRate(@StringRes val labelRes: Int, val kcalPerDayDeficit: Int) {
+    GENTLE(R.string.weight_loss_gentle, 275),
+    MODERATE(R.string.weight_loss_moderate, 550),
+    AGGRESSIVE(R.string.weight_loss_aggressive, 825)
 }
 
 /** User-selectable BMR formula. AUTO picks the best fit for available data. */
-enum class BmrFormula(val label: String) {
-    AUTO("Automatic (recommended)"),
-    MIFFLIN_ST_JEOR("Mifflin-St Jeor"),
-    HARRIS_BENEDICT("Harris-Benedict (revised)"),
-    KATCH_MCARDLE("Katch-McArdle (needs body fat %)")
+enum class BmrFormula(@StringRes val labelRes: Int) {
+    AUTO(R.string.formula_auto),
+    MIFFLIN_ST_JEOR(R.string.formula_mifflin),
+    HARRIS_BENEDICT(R.string.formula_harris),
+    KATCH_MCARDLE(R.string.formula_katch)
 }
 
-enum class UnitSystem(val label: String) {
-    METRIC("Metric (kg, cm)"),
-    IMPERIAL("Imperial (lb, ft/in)")
+enum class UnitSystem(@StringRes val labelRes: Int) {
+    METRIC(R.string.units_metric),
+    IMPERIAL(R.string.units_imperial)
 }
 
 @Entity(tableName = "profiles")

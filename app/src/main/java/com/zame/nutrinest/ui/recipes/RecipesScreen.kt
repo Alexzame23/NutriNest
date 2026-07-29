@@ -1,10 +1,5 @@
 package com.zame.nutrinest.ui.recipes
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,114 +14,76 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Egg
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.RestaurantMenu
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The Recipes list.
+ *
+ * Rendered inside the Recipes & Ingredients tab host, which owns the Scaffold,
+ * the top bar and the add button — hence content rather than a screen of its
+ * own. The filtering, cards and empty state are unchanged.
+ */
 @Composable
-fun RecipesScreen(
-    onBack: () -> Unit,
-    onAddRecipe: () -> Unit,
-    onAddIngredient: () -> Unit,
+fun RecipesTabContent(
     onOpenRecipe: (Long) -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: RecipesViewModel = viewModel(factory = RecipesViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsState()
-    var fabMenuOpen by remember { mutableStateOf(false) }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Recipes", style = MaterialTheme.typography.headlineSmall) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
-        },
-        floatingActionButton = {
-            AddFabMenu(
-                open = fabMenuOpen,
-                onToggle = { fabMenuOpen = !fabMenuOpen },
-                onAddRecipe = { fabMenuOpen = false; onAddRecipe() },
-                onAddIngredient = { fabMenuOpen = false; onAddIngredient() }
+    Column(modifier.fillMaxSize()) {
+        // ── Folder chips ────────────────────────────────────────
+        if (state.folders.isNotEmpty()) {
+            FilterChipRow(
+                icon = { Icon(Icons.Rounded.Folder, null, Modifier.size(16.dp)) },
+                options = state.folders,
+                selected = state.selectedFolder,
+                onSelected = viewModel::onFolderSelected
             )
         }
-    ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // ── Folder chips ────────────────────────────────────────
-            if (state.folders.isNotEmpty()) {
-                FilterChipRow(
-                    icon = { Icon(Icons.Rounded.Folder, null, Modifier.size(16.dp)) },
-                    options = state.folders,
-                    selected = state.selectedFolder,
-                    onSelected = viewModel::onFolderSelected
-                )
-            }
-            // ── Category chips ──────────────────────────────────────
-            FilterChipRow(
-                icon = null,
-                options = RecipeCategories.ALL,
-                selected = state.selectedCategory,
-                onSelected = viewModel::onCategorySelected
-            )
+        // ── Category chips ──────────────────────────────────────
+        FilterChipRow(
+            icon = null,
+            options = RecipeCategories.ALL,
+            selected = state.selectedCategory,
+            onSelected = viewModel::onCategorySelected
+        )
 
-            if (state.isEmpty) {
-                EmptyState()
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    items(state.recipes, key = { it.id }) { recipe ->
-                        RecipeCard(recipe = recipe, onClick = { onOpenRecipe(recipe.id) })
-                    }
+        if (state.isEmpty) {
+            EmptyState()
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                items(state.recipes, key = { it.id }) { recipe ->
+                    RecipeCard(recipe = recipe, onClick = { onOpenRecipe(recipe.id) })
                 }
             }
         }
@@ -211,53 +167,6 @@ private fun RecipeCard(recipe: RecipeEntity, onClick: () -> Unit) {
     }
 }
 
-/** "+" FAB that expands into Add Recipe / Add Ingredient options. */
-@Composable
-private fun AddFabMenu(
-    open: Boolean,
-    onToggle: () -> Unit,
-    onAddRecipe: () -> Unit,
-    onAddIngredient: () -> Unit
-) {
-    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        AnimatedVisibility(
-            visible = open,
-            enter = fadeIn() + slideInVertically { it / 2 },
-            exit = fadeOut() + slideOutVertically { it / 2 }
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ExtendedFloatingActionButton(
-                    onClick = onAddRecipe,
-                    icon = { Icon(Icons.Rounded.RestaurantMenu, null) },
-                    text = { Text("Add Recipe") },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                ExtendedFloatingActionButton(
-                    onClick = onAddIngredient,
-                    icon = { Icon(Icons.Rounded.Egg, null) },
-                    text = { Text("Add Ingredient") },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-        FloatingActionButton(
-            onClick = onToggle,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ) {
-            Icon(
-                if (open) Icons.Rounded.Close else Icons.Rounded.Add,
-                contentDescription = if (open) "Close menu" else "Add"
-            )
-        }
-    }
-}
-
 @Composable
 private fun EmptyState() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -270,13 +179,13 @@ private fun EmptyState() {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                "No recipes yet",
+                stringResource(R.string.recipes_empty_title),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Tap + to create your first recipe.",
+                stringResource(R.string.recipes_empty_body),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

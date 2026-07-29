@@ -1,5 +1,6 @@
 package com.zame.nutrinest.data.local.entity
 
+import androidx.annotation.StringRes
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -7,14 +8,15 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 import androidx.room.TypeConverter
+import com.zame.nutrinest.R
 
 /** Meal slots within a day. Order in the enum = display order. */
-enum class MealSlot(val label: String) {
-    BREAKFAST("Breakfast"),
-    MORNING_SNACK("Morning snack"),
-    LUNCH("Lunch"),
-    AFTERNOON_SNACK("Afternoon snack"),
-    DINNER("Dinner");
+enum class MealSlot(@StringRes val labelRes: Int) {
+    BREAKFAST(R.string.meal_slot_breakfast),
+    MORNING_SNACK(R.string.meal_slot_morning_snack),
+    LUNCH(R.string.meal_slot_lunch),
+    AFTERNOON_SNACK(R.string.meal_slot_afternoon_snack),
+    DINNER(R.string.meal_slot_dinner);
 
     companion object {
         /** Which slots make up a day for a given meals-per-day setting. */

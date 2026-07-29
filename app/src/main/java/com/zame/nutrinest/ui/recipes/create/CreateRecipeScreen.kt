@@ -52,11 +52,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.ui.components.ImagePickerBox
@@ -64,6 +67,8 @@ import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.components.formatGrams
+import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.util.TextNormalizer
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -83,8 +88,9 @@ fun CreateRecipeScreen(
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
 
     // Surface validation errors as snackbars.
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let {
+    val errorMessage = state.error?.let { stringResource(it.messageRes) }
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.dismissError()
         }
@@ -95,10 +101,18 @@ fun CreateRecipeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("New Recipe", style = MaterialTheme.typography.headlineSmall) },
+                title = {
+                    Text(
+                        stringResource(R.string.create_recipe_title),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -110,7 +124,14 @@ fun CreateRecipeScreen(
             ExtendedFloatingActionButton(
                 onClick = viewModel::save,
                 icon = { Icon(Icons.Rounded.Check, null) },
-                text = { Text(if (state.isSaving) "Saving…" else "Save") },
+                text = {
+                    Text(
+                        stringResource(
+                            if (state.isSaving) R.string.create_recipe_saving
+                            else R.string.action_save
+                        )
+                    )
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )
@@ -128,14 +149,14 @@ fun CreateRecipeScreen(
                 ImagePickerBox(
                     imagePath = state.coverImagePath,
                     onImagePicked = viewModel::onCoverImagePicked,
-                    placeholderText = "Add cover photo"
+                    placeholderText = stringResource(R.string.create_recipe_cover_photo)
                 )
             }
             item {
                 OutlinedTextField(
                     value = state.name,
                     onValueChange = viewModel::onNameChange,
-                    label = { Text("Recipe name *") },
+                    label = { Text(stringResource(R.string.create_recipe_name)) },
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
@@ -144,7 +165,7 @@ fun CreateRecipeScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OptionDropdown(
-                        label = "Category *",
+                        label = stringResource(R.string.create_recipe_category),
                         options = RecipeCategories.ALL,
                         selected = state.category,
                         onSelected = viewModel::onCategoryChange,
@@ -153,7 +174,7 @@ fun CreateRecipeScreen(
                     OutlinedTextField(
                         value = state.folder,
                         onValueChange = viewModel::onFolderChange,
-                        label = { Text("Folder") },
+                        label = { Text(stringResource(R.string.create_recipe_folder)) },
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.weight(1f)
@@ -162,7 +183,7 @@ fun CreateRecipeScreen(
             }
 
             // ── Ingredients ────────────────────────────────────────
-            item { SectionTitle("Ingredients") }
+            item { SectionTitle(stringResource(R.string.ingredients_title)) }
             items(state.ingredients, key = { it.ingredient.id }) { draft ->
                 DraftIngredientRow(
                     draft = draft,
@@ -178,13 +199,13 @@ fun CreateRecipeScreen(
                 ) {
                     Icon(Icons.Rounded.Add, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add ingredient")
+                    Text(stringResource(R.string.create_recipe_add_ingredient))
                 }
             }
 
             // ── Live nutrition ─────────────────────────────────────
             if (state.ingredients.isNotEmpty()) {
-                item { SectionTitle("Nutrition") }
+                item { SectionTitle(stringResource(R.string.create_recipe_nutrition)) }
                 item {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         MacroDonutChart(nutrition = state.totalNutrition)
@@ -194,7 +215,7 @@ fun CreateRecipeScreen(
             }
 
             // ── Preparation steps ──────────────────────────────────
-            item { SectionTitle("Preparation") }
+            item { SectionTitle(stringResource(R.string.meal_preparation)) }
             items(state.steps.size) { index ->
                 StepEditor(
                     index = index,
@@ -212,7 +233,7 @@ fun CreateRecipeScreen(
                 ) {
                     Icon(Icons.Rounded.Add, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add step")
+                    Text(stringResource(R.string.create_recipe_add_step))
                 }
             }
         }
@@ -294,7 +315,7 @@ private fun DraftIngredientRow(
             IconButton(onClick = onRemove) {
                 Icon(
                     Icons.Rounded.Delete,
-                    contentDescription = "Remove ${draft.ingredient.name}",
+                    contentDescription = stringResource(R.string.action_remove),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -321,7 +342,7 @@ private fun StepEditor(
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Step ${index + 1}",
+                    stringResource(R.string.meal_step, index + 1),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
@@ -333,14 +354,14 @@ private fun StepEditor(
                 }) {
                     Icon(
                         Icons.Rounded.AddAPhoto,
-                        contentDescription = "Add photo to step ${index + 1}",
+                        contentDescription = stringResource(R.string.create_recipe_step_photo, index + 1),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = onRemove) {
                     Icon(
                         Icons.Rounded.Delete,
-                        contentDescription = "Remove step ${index + 1}",
+                        contentDescription = stringResource(R.string.create_recipe_remove_step, index + 1),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -358,7 +379,7 @@ private fun StepEditor(
             OutlinedTextField(
                 value = step.text,
                 onValueChange = onTextChange,
-                placeholder = { Text("Describe this step…") },
+                placeholder = { Text(stringResource(R.string.create_recipe_step_hint)) },
                 shape = MaterialTheme.shapes.small,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -376,6 +397,7 @@ private fun IngredientPickerSheet(
 ) {
     var query by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<IngredientEntity?>(null) }
+    val spanish = rememberIsSpanish()
     var gramsText by remember { mutableStateOf("100") }
 
     ModalBottomSheet(
@@ -390,7 +412,7 @@ private fun IngredientPickerSheet(
                     value = query,
                     onValueChange = { query = it },
                     leadingIcon = { Icon(Icons.Rounded.Search, null) },
-                    placeholder = { Text("Search ingredients") },
+                    placeholder = { Text(stringResource(R.string.ingredients_search_hint)) },
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
@@ -398,14 +420,19 @@ private fun IngredientPickerSheet(
                 TextButton(onClick = onCreateIngredient) {
                     Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Create new ingredient")
+                    Text(stringResource(R.string.create_recipe_new_ingredient))
                 }
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Matches either language and any synonym-free name form,
+                    // so the picker finds what the Ingredients tab would.
+                    val needle = TextNormalizer.normalize(query)
                     val filtered = ingredients.filter {
-                        it.name.contains(query.trim(), ignoreCase = true)
+                        needle.isEmpty() ||
+                            it.nameNorm.contains(needle) ||
+                            it.nameEsNorm?.contains(needle) == true
                     }
                     items(filtered, key = { it.id }) { ingredient ->
                         Card(
@@ -426,15 +453,19 @@ private fun IngredientPickerSheet(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        "${ingredient.foodType} · " +
-                                            "${ingredient.nutrition.kcal.roundToInt()} kcal / 100 g",
+                                        IngredientCategories
+                                            .shortName(ingredient.categoryKey, spanish) + " · " +
+                                            stringResource(
+                                                R.string.kcal_per_100g,
+                                                ingredient.nutrition.kcal.roundToInt()
+                                            ),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 if (ingredient.isCustom) {
                                     Text(
-                                        "Custom",
+                                        stringResource(R.string.ingredients_custom_badge),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.primary
                                     )
@@ -454,7 +485,7 @@ private fun IngredientPickerSheet(
                 OutlinedTextField(
                     value = gramsText,
                     onValueChange = { gramsText = it },
-                    label = { Text("Quantity (grams)") },
+                    label = { Text(stringResource(R.string.create_recipe_quantity)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     shape = MaterialTheme.shapes.small,
@@ -470,7 +501,7 @@ private fun IngredientPickerSheet(
                     OutlinedButton(
                         onClick = { pending = null },
                         modifier = Modifier.weight(1f)
-                    ) { Text("Back") }
+                    ) { Text(stringResource(R.string.action_back)) }
                     androidx.compose.material3.Button(
                         onClick = {
                             gramsText.toDoubleOrNull()?.takeIf { it > 0 }?.let { grams ->
@@ -479,7 +510,7 @@ private fun IngredientPickerSheet(
                         },
                         enabled = (gramsText.toDoubleOrNull() ?: 0.0) > 0,
                         modifier = Modifier.weight(1f)
-                    ) { Text("Add") }
+                    ) { Text(stringResource(R.string.action_add)) }
                 }
             }
         }

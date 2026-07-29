@@ -1,0 +1,144 @@
+package com.zame.nutrinest.data.local
+
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.zame.nutrinest.data.local.entity.FoodDatasetMetaEntity
+import com.zame.nutrinest.data.local.entity.IngredientCategories
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * Exercises the real import against the real asset on a device.
+ *
+ * The offline harness in `tools/verify_migration.py` covers the SQL; this
+ * covers what only Android can: reading the asset out of the APK, running the
+ * import from Room's `onOpen` callback, and the DAO queries built on top.
+ */
+@RunWith(AndroidJUnit4::class)
+class FoodImportTest {
+
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private lateinit var database: NutriNestDatabase
+
+    @Before
+    fun setUp() {
+        // A fresh file each run, so the import is exercised from nothing.
+        context.deleteDatabase(DB_NAME)
+        database = NutriNestDatabase.build(context)
+    }
+
+    @After
+    fun tearDown() {
+        database.close()
+        context.deleteDatabase(DB_NAME)
+    }
+
+    @Test
+    fun importsTheWholeDataset() = runBlocking {
+        val ingredients = database.ingredientDao().count()
+        assertTrue("expected the full catalogue, got $ingredients", ingredients > 900)
+
+        assertEquals(12, database.foodReferenceDao().observeCategories().first().size)
+        assertEquals(14, database.foodReferenceDao().observeAisles().first().size)
+        assertEquals(81, database.foodReferenceDao().nutrientDefs().size)
+    }
+
+    @Test
+    fun everyIngredientHasAKnownCategory() = runBlocking {
+        val ingredients = database.ingredientDao().observeAll().first()
+        val unknown = ingredients.map { it.categoryKey }.toSet() - IngredientCategories.ALL.toSet()
+        assertTrue("unexpected categories: $unknown", unknown.isEmpty())
+    }
+
+    @Test
+    fun searchMatchesBothLanguagesAndSynonyms() = runBlocking {
+        val dao = database.ingredientDao()
+        val all = IngredientCategories.ALL
+
+        // A Spanish name, an English one, and a synonym found in neither.
+        listOf("aceite", "olive", "puerco").forEach { term ->
+            val hits = dao.observeFiltered(term, all, 0, 0).first()
+            assertTrue("'$term' found nothing", hits.isNotEmpty())
+        }
+
+        // Accents are optional: the stored names are accent-stripped.
+        val withAccent = dao.observeFiltered("platano", all, 0, 0).first()
+        assertTrue("accent-free search should still match", withAccent.isNotEmpty())
+    }
+
+    @Test
+    fun categoryFilterNarrowsTheResults() = runBlocking {
+        val dao = database.ingredientDao()
+        val fatsAndOils = dao.observeFiltered("", listOf(IngredientCategories.FATS_OILS), 0, 0).first()
+        assertTrue(fatsAndOils.isNotEmpty())
+        assertTrue(
+            "the filter must not leak other categories",
+            fatsAndOils.all { it.categoryKey == IngredientCategories.FATS_OILS }
+        )
+    }
+
+    @Test
+    fun importedFoodsCarryTheirNutrientPanel() = runBlocking {
+        val dao = database.ingredientDao()
+        val wellCovered = dao.observeAll().first()
+            .first { it.sourceKey != null && it.completenessPct > 70 }
+
+        val nutrients = dao.observeNutrients(wellCovered.id).first()
+        assertTrue("expected a nutrient panel", nutrients.size > 5)
+        assertTrue("nutrients should carry their unit", nutrients.all { it.unit.isNotBlank() })
+        assertTrue(
+            "nutrients should be labelled in both languages",
+            nutrients.all { it.nameEn.isNotBlank() && it.nameEs.isNotBlank() }
+        )
+    }
+
+    @Test
+    fun householdPortionsAreImported() = runBlocking {
+        val dao = database.ingredientDao()
+        val withPortions = dao.observeAll().first()
+            .firstNotNullOf { ingredient ->
+                dao.observeDetails(ingredient.id).first()?.takeIf { it.portions.isNotEmpty() }
+            }
+        assertTrue(withPortions.portions.all { it.grams > 0 })
+        assertTrue(withPortions.portions.all { it.labelEn.isNotBlank() && it.labelEs.isNotBlank() })
+    }
+
+    @Test
+    fun recordsTheDatasetVersionAndAttribution() = runBlocking {
+        val reference = database.foodReferenceDao()
+        assertNotNull(reference.meta(FoodDatasetMetaEntity.DATASET_VERSION))
+        assertTrue(
+            "BEDCA must be credited wherever its figures are shown",
+            reference.attribution()?.contains("BEDCA") == true
+        )
+    }
+
+    @Test
+    fun importedIdsStayOutOfTheRangeUsersWillGet() = runBlocking {
+        val imported = database.ingredientDao().observeAll().first().filter { !it.isCustom }
+        assertTrue(
+            "imported ids belong in their reserved block",
+            imported.all { it.id > FoodDatabaseImporter.IMPORTED_ID_OFFSET }
+        )
+    }
+
+    @Test
+    fun reopeningDoesNotImportTwice() = runBlocking {
+        val before = database.ingredientDao().count()
+        database.close()
+
+        database = NutriNestDatabase.build(context)
+        assertEquals(before, database.ingredientDao().count())
+    }
+
+    private companion object {
+        const val DB_NAME = "nutrinest.db"
+    }
+}

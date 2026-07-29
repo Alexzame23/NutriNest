@@ -1,5 +1,7 @@
 package com.zame.nutrinest.domain.planner
 
+import androidx.annotation.StringRes
+import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.NutritionValues
@@ -21,8 +23,10 @@ data class GenerationConfig(
     val slotWeights: Map<MealSlot, Float>,
     val cheatMeals: Int = 0,
     val maxRecipeRepeats: Int = 2,
+    /** Recipe categories to skip, e.g. "Dessert". */
     val excludedCategories: Set<String> = emptySet(),
-    val excludedFoodTypes: Set<String> = emptySet(),
+    /** Ingredient category keys to avoid, e.g. `IngredientCategories.FISH`. */
+    val excludedIngredientCategories: Set<String> = emptySet(),
     val excludedRecipeIds: Set<Long> = emptySet(),
     /** Empty = all folders allowed; otherwise only recipes in these folders (or no folder). */
     val includedFolders: Set<String> = emptySet(),
@@ -39,7 +43,8 @@ data class PlannableRecipe(
     val totalNutrition: NutritionValues =
         ingredients.fold(NutritionValues()) { acc, i -> acc + i.nutrition }
     val ingredientIds: Set<Long> = ingredients.map { it.ingredient.id }.toSet()
-    val foodTypes: Set<String> = ingredients.map { it.ingredient.foodType }.toSet()
+    val ingredientCategories: Set<String> =
+        ingredients.map { it.ingredient.categoryKey }.toSet()
 }
 
 data class GeneratedMeal(
@@ -60,7 +65,15 @@ data class GeneratedMenu(
 
 sealed class GenerationResult {
     data class Success(val menu: GeneratedMenu) : GenerationResult()
-    data class Failure(val reason: String) : GenerationResult()
+
+    /** Carries a code, not a sentence — the UI layer owns the wording. */
+    data class Failure(val reason: FailureReason) : GenerationResult()
+}
+
+enum class FailureReason(@StringRes val messageRes: Int) {
+    NO_PROFILES(R.string.menu_error_no_profiles),
+    NO_MATCHING_RECIPES(R.string.menu_error_no_matching_recipes),
+    NOT_ENOUGH_RECIPES(R.string.menu_error_not_enough_recipes)
 }
 
 // ── Generator ────────────────────────────────────────────────────────────
@@ -88,16 +101,14 @@ class MenuGenerator(private val random: Random = Random.Default) {
         leftoverIngredientIds: Set<Long> = emptySet()
     ): GenerationResult {
         if (profiles.isEmpty()) {
-            return GenerationResult.Failure(
-                "Create at least one profile first — the menu is personalized to each person's calorie targets."
-            )
+            return GenerationResult.Failure(FailureReason.NO_PROFILES)
         }
 
         // ── Filter the candidate pool ──────────────────────────────────
         val pool = recipes.filter { candidate ->
             candidate.recipe.id !in config.excludedRecipeIds &&
                 candidate.recipe.category !in config.excludedCategories &&
-                candidate.foodTypes.none { it in config.excludedFoodTypes } &&
+                candidate.ingredientCategories.none { it in config.excludedIngredientCategories } &&
                 (config.includedFolders.isEmpty() ||
                     candidate.recipe.folder in config.includedFolders) &&
                 candidate.totalNutrition.kcal > 0
@@ -109,9 +120,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
             else pool
 
         if (freshPool.isEmpty()) {
-            return GenerationResult.Failure(
-                "No recipes match the selected filters. Relax the exclusions or add more recipes."
-            )
+            return GenerationResult.Failure(FailureReason.NO_MATCHING_RECIPES)
         }
 
         val byId = recipes.associateBy { it.recipe.id }
@@ -158,10 +167,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
                             .filter { it.dayOfWeek == day - 1 }
                             .map { it.recipeId }
                             .toSet()
-                    ) ?: return GenerationResult.Failure(
-                        "Not enough recipes to fill the week with the current repeat limit. " +
-                            "Increase the repeat limit or add more recipes."
-                    )
+                    ) ?: return GenerationResult.Failure(FailureReason.NOT_ENOUGH_RECIPES)
                 }
                 useCount[chosen.recipe.id] = (useCount[chosen.recipe.id] ?: 0) + 1
 

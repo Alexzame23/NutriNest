@@ -12,6 +12,7 @@ import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.repository.MenuRepository
 import com.zame.nutrinest.data.repository.RecipeRepository
+import com.zame.nutrinest.domain.planner.FailureReason
 import com.zame.nutrinest.domain.planner.GenerationConfig
 import com.zame.nutrinest.domain.planner.GenerationResult
 import com.zame.nutrinest.domain.planner.MealLock
@@ -28,13 +29,13 @@ data class MenuConfigUiState(
     val cheatMeals: Int = 0,
     val maxRepeats: Int = 2,
     val excludedCategories: Set<String> = emptySet(),
-    val excludedFoodTypes: Set<String> = emptySet(),
+    val excludedIngredientCategories: Set<String> = emptySet(),
     val excludedRecipeIds: Set<Long> = emptySet(),
     val includedFolders: Set<String> = emptySet(),
     val excludeRecentlyUsed: Boolean = true,
     val locks: List<MealLock> = emptyList(),
     val isGenerating: Boolean = false,
-    val errorMessage: String? = null,
+    val error: FailureReason? = null,
     val done: Boolean = false
 )
 
@@ -77,8 +78,8 @@ class MenuConfigViewModel(
         copy(excludedCategories = excludedCategories.toggle(category))
     }
 
-    fun toggleFoodType(foodType: String) = update {
-        copy(excludedFoodTypes = excludedFoodTypes.toggle(foodType))
+    fun toggleIngredientCategory(categoryKey: String) = update {
+        copy(excludedIngredientCategories = excludedIngredientCategories.toggle(categoryKey))
     }
 
     fun toggleRecipeExclusion(recipeId: Long) = update {
@@ -101,7 +102,7 @@ class MenuConfigViewModel(
         copy(locks = locks.filterIndexed { i, _ -> i != index })
     }
 
-    fun dismissError() = update { copy(errorMessage = null) }
+    fun dismissError() = update { copy(error = null) }
 
     fun generate() {
         val s = _state.value
@@ -114,7 +115,7 @@ class MenuConfigViewModel(
                     cheatMeals = s.cheatMeals,
                     maxRecipeRepeats = s.maxRepeats,
                     excludedCategories = s.excludedCategories,
-                    excludedFoodTypes = s.excludedFoodTypes,
+                    excludedIngredientCategories = s.excludedIngredientCategories,
                     excludedRecipeIds = s.excludedRecipeIds,
                     includedFolders = s.includedFolders,
                     excludeRecentlyUsed = s.excludeRecentlyUsed,
@@ -124,7 +125,7 @@ class MenuConfigViewModel(
             when (result) {
                 is GenerationResult.Success -> update { copy(isGenerating = false, done = true) }
                 is GenerationResult.Failure -> update {
-                    copy(isGenerating = false, errorMessage = result.reason)
+                    copy(isGenerating = false, error = result.reason)
                 }
             }
         }

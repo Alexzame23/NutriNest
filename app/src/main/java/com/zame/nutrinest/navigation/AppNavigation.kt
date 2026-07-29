@@ -8,22 +8,43 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zame.nutrinest.ui.home.HomeScreen
-import com.zame.nutrinest.ui.ingredients.CreateIngredientScreen
+import com.zame.nutrinest.ui.ingredients.compare.CompareIngredientsScreen
+import com.zame.nutrinest.ui.ingredients.detail.IngredientDetailScreen
+import com.zame.nutrinest.ui.ingredients.editor.IngredientEditorScreen
 import com.zame.nutrinest.ui.menu.WeeklyMenuScreen
 import com.zame.nutrinest.ui.menu.config.MenuConfigScreen
 import com.zame.nutrinest.ui.menu.detail.MealDetailScreen
 import com.zame.nutrinest.ui.menu.shopping.ShoppingListScreen
 import com.zame.nutrinest.ui.profiles.ProfilesScreen
 import com.zame.nutrinest.ui.profiles.edit.ProfileEditorScreen
-import com.zame.nutrinest.ui.recipes.RecipesScreen
+import com.zame.nutrinest.ui.recipes.RecipesAndIngredientsScreen
 import com.zame.nutrinest.ui.recipes.create.CreateRecipeScreen
 import com.zame.nutrinest.util.WeekUtils
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
-    data object Recipes : Screen("recipes")
+
+    /** Recipes and Ingredients, as two tabs of a single destination. */
+    data object RecipesAndIngredients : Screen("food?tab={tab}") {
+        fun recipes() = "food?tab=0"
+        fun ingredients() = "food?tab=1"
+    }
+
     data object CreateRecipe : Screen("recipes/create")
-    data object CreateIngredient : Screen("ingredients/create")
+
+    data object IngredientDetail : Screen("ingredients/{ingredientId}") {
+        fun of(id: Long) = "ingredients/$id"
+    }
+
+    data object IngredientEditor : Screen("ingredients/editor?ingredientId={ingredientId}") {
+        fun create() = "ingredients/editor?ingredientId=-1"
+        fun edit(id: Long) = "ingredients/editor?ingredientId=$id"
+    }
+
+    data object CompareIngredients : Screen("ingredients/compare?ids={ids}") {
+        fun of(ids: List<Long>) = "ingredients/compare?ids=${ids.joinToString(",")}"
+    }
+
     data object Profiles : Screen("profiles")
 
     data object ProfileEditor : Screen("profiles/editor?profileId={profileId}") {
@@ -52,32 +73,78 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
     ) {
         composable(Screen.Home.route) {
             HomeScreen(
-                onRecipesClick = { navController.navigate(Screen.Recipes.route) },
+                onRecipesClick = {
+                    navController.navigate(Screen.RecipesAndIngredients.recipes())
+                },
                 onWeeklyMenuClick = { navController.navigate(Screen.WeeklyMenu.route) },
                 onProfilesClick = { navController.navigate(Screen.Profiles.route) }
             )
         }
 
-        composable(Screen.Recipes.route) {
-            RecipesScreen(
+        composable(
+            route = Screen.RecipesAndIngredients.route,
+            arguments = listOf(
+                navArgument("tab") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                }
+            )
+        ) { entry ->
+            RecipesAndIngredientsScreen(
                 onBack = { navController.popBackStack() },
                 onAddRecipe = { navController.navigate(Screen.CreateRecipe.route) },
-                onAddIngredient = { navController.navigate(Screen.CreateIngredient.route) },
-                onOpenRecipe = { /* TODO: RecipeDetail screen in a future step */ }
+                onAddIngredient = { navController.navigate(Screen.IngredientEditor.create()) },
+                onOpenRecipe = { /* TODO: RecipeDetail screen in a future step */ },
+                onOpenIngredient = { id -> navController.navigate(Screen.IngredientDetail.of(id)) },
+                onCompareIngredients = { ids ->
+                    navController.navigate(Screen.CompareIngredients.of(ids))
+                },
+                startTab = entry.arguments?.getInt("tab") ?: 0
             )
         }
 
         composable(Screen.CreateRecipe.route) {
             CreateRecipeScreen(
                 onBack = { navController.popBackStack() },
-                onCreateIngredient = { navController.navigate(Screen.CreateIngredient.route) }
+                onCreateIngredient = { navController.navigate(Screen.IngredientEditor.create()) }
             )
         }
 
-        composable(Screen.CreateIngredient.route) {
-            CreateIngredientScreen(
-                onBack = { navController.popBackStack() }
+        composable(
+            route = Screen.IngredientDetail.route,
+            arguments = listOf(navArgument("ingredientId") { type = NavType.LongType })
+        ) {
+            IngredientDetailScreen(
+                onBack = { navController.popBackStack() },
+                onEdit = { id -> navController.navigate(Screen.IngredientEditor.edit(id)) },
+                onCompare = { id ->
+                    navController.navigate(Screen.CompareIngredients.of(listOf(id)))
+                }
             )
+        }
+
+        composable(
+            route = Screen.IngredientEditor.route,
+            arguments = listOf(
+                navArgument("ingredientId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                }
+            )
+        ) {
+            IngredientEditorScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = Screen.CompareIngredients.route,
+            arguments = listOf(
+                navArgument("ids") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
+            )
+        ) {
+            CompareIngredientsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Profiles.route) {

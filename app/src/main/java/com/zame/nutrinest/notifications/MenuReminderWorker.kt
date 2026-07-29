@@ -17,6 +17,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.zame.nutrinest.MainActivity
 import com.zame.nutrinest.NutriNestApp
+import com.zame.nutrinest.R
 import com.zame.nutrinest.util.WeekUtils
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -52,9 +53,9 @@ class MenuReminderWorker(
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Menu planning reminders",
+                context.getString(R.string.notification_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
-            ).apply { description = "Weekend reminder to plan next week's meals" }
+            ).apply { description = context.getString(R.string.notification_channel_detail) }
         )
 
         val intent = PendingIntent.getActivity(
@@ -65,8 +66,8 @@ class MenuReminderWorker(
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_agenda)
-            .setContentTitle("Plan next week's menu")
-            .setContentText("Take a minute to generate next week's meal plan and shopping list.")
+            .setContentTitle(context.getString(R.string.notification_title))
+            .setContentText(context.getString(R.string.notification_body))
             .setContentIntent(intent)
             .setAutoCancel(true)
             .build()
