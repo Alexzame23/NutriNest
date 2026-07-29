@@ -63,7 +63,6 @@ import com.zame.nutrinest.data.local.entity.WeightLossRate
 import com.zame.nutrinest.domain.nutrition.NutritionTargets
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
-import com.zame.nutrinest.ui.components.OptionDropdown
 import java.text.DateFormat
 import java.util.Date
 

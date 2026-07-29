@@ -2,7 +2,6 @@ package com.zame.nutrinest.domain.nutrition
 
 import androidx.annotation.StringRes
 import com.zame.nutrinest.R
-import com.zame.nutrinest.data.local.entity.ActivityLevel
 import com.zame.nutrinest.data.local.entity.BiologicalSex
 import com.zame.nutrinest.data.local.entity.BmrFormula
 import com.zame.nutrinest.data.local.entity.Goal
