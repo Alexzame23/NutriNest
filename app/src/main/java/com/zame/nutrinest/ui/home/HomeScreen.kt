@@ -23,8 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +36,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -42,6 +48,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +57,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.ui.theme.NutritionAppTheme
+import com.zame.nutrinest.util.AppLanguage
+import com.zame.nutrinest.util.AppLocale
+import com.zame.nutrinest.util.findActivity
 
 @Composable
 fun HomeScreen(
@@ -64,6 +75,14 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize()) {
 
             OrganicBackdrop()
+
+            // Language switch, top-left, mirroring the profile button opposite.
+            LanguageSwitch(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(top = 8.dp, start = 12.dp)
+            )
 
             // Profile entry point, top-right.
             IconButton(
@@ -128,6 +147,69 @@ fun HomeScreen(
                     subtitle = stringResource(R.string.home_weekly_menu_subtitle),
                     icon = Icons.Rounded.CalendarMonth,
                     onClick = onWeeklyMenuClick
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Switches the app between English and Spanish.
+ *
+ * Shows the language in effect rather than the one a tap would move to, so the
+ * badge always reads as a statement of the current state; the menu is where the
+ * choice happens. Applying it recreates the activity, which is how every string
+ * on screen gets re-read.
+ */
+@Composable
+private fun LanguageSwitch(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val activity = context.findActivity()
+    // Studio's preview renderer has neither an Activity nor real preferences.
+    val inPreview = LocalInspectionMode.current
+    val current = if (inPreview) AppLanguage.ENGLISH else AppLocale.current(context)
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier) {
+        Surface(
+            onClick = { expanded = true },
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            tonalElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Rounded.Language,
+                    contentDescription = stringResource(R.string.language_switch),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.size(6.dp))
+                Text(
+                    current.shortLabel,
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            AppLanguage.entries.forEach { language ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(language.labelRes)) },
+                    trailingIcon = {
+                        if (language == current) {
+                            Icon(Icons.Rounded.Check, contentDescription = null)
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        if (language != current && activity != null) {
+                            AppLocale.apply(activity, language)
+                        }
+                    }
                 )
             }
         }

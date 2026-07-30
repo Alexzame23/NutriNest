@@ -1,0 +1,96 @@
+package com.zame.nutrinest.ui.recipes.detail
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.zame.nutrinest.NutriNestApp
+import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
+import com.zame.nutrinest.data.local.entity.NutritionValues
+import com.zame.nutrinest.data.local.entity.RecipeEntity
+import com.zame.nutrinest.data.local.entity.RecipeStepEntity
+import com.zame.nutrinest.data.repository.RecipeRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+data class RecipeDetailUiState(
+    val recipe: RecipeEntity? = null,
+    val steps: List<RecipeStepEntity> = emptyList(),
+    val ingredients: List<IngredientWithQuantity> = emptyList(),
+    val deleted: Boolean = false,
+    /** A weekly menu still plans this recipe, so the delete was refused. */
+    val deleteBlocked: Boolean = false,
+    val isLoading: Boolean = true
+) {
+    /** Everything the recipe makes, summed from its ingredients. */
+    val totals: NutritionValues
+        get() = ingredients.fold(NutritionValues()) { acc, item -> acc + item.nutrition }
+
+    val totalGrams: Double get() = ingredients.sumOf { it.grams }
+}
+
+class RecipeDetailViewModel(
+    private val repository: RecipeRepository,
+    savedStateHandle: SavedStateHandle
+) : ViewModel() {
+
+    private val recipeId: Long = savedStateHandle["recipeId"] ?: -1L
+
+    private val deletion = MutableStateFlow(Deletion())
+
+    private data class Deletion(val done: Boolean = false, val blocked: Boolean = false)
+
+    val uiState: StateFlow<RecipeDetailUiState> = combine(
+        repository.observeRecipeWithSteps(recipeId),
+        repository.observeIngredientsOf(recipeId),
+        deletion
+    ) { withSteps, ingredients, deleteState ->
+        RecipeDetailUiState(
+            recipe = withSteps?.recipe,
+            // @Relation does not order its rows, so the numbering is applied here.
+            steps = withSteps?.steps?.sortedBy { it.position }.orEmpty(),
+            ingredients = ingredients,
+            deleted = deleteState.done,
+            deleteBlocked = deleteState.blocked,
+            isLoading = false
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipeDetailUiState())
+
+    fun onFavoriteToggled() {
+        val recipe = uiState.value.recipe ?: return
+        viewModelScope.launch {
+            repository.setFavorite(recipe.id, !recipe.isFavorite)
+        }
+    }
+
+    fun onDeleteConfirmed() {
+        viewModelScope.launch {
+            if (repository.delete(recipeId)) {
+                deletion.value = Deletion(done = true)
+            } else {
+                deletion.value = Deletion(blocked = true)
+            }
+        }
+    }
+
+    fun dismissDeleteBlocked() {
+        deletion.value = Deletion()
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
+                    as NutriNestApp
+                RecipeDetailViewModel(app.container.recipeRepository, createSavedStateHandle())
+            }
+        }
+    }
+}

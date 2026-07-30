@@ -132,7 +132,7 @@ fun ImagePickerBox(
     imagePath: String?,
     onImagePicked: (android.net.Uri) -> Unit,
     modifier: Modifier = Modifier,
-    placeholderText: String = "Add photo"
+    placeholderText: String = stringResource(R.string.action_add_photo)
 ) {
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()

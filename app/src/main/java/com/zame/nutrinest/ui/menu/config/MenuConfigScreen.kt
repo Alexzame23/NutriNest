@@ -62,6 +62,7 @@ import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
 import com.zame.nutrinest.util.WeekUtils
 import kotlin.math.roundToInt
 
@@ -246,7 +247,7 @@ fun MenuConfigScreen(
                         FilterChip(
                             selected = category in state.excludedCategories,
                             onClick = { viewModel.toggleCategory(category) },
-                            label = { Text(category) }
+                            label = { Text(stringResource(recipeCategoryLabel(category))) }
                         )
                     }
                 }

@@ -63,11 +63,12 @@ import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.ui.components.ImagePickerBox
+import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
-import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.components.formatGrams
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
 import com.zame.nutrinest.util.TextNormalizer
 import java.io.File
 import kotlin.math.roundToInt
@@ -164,10 +165,14 @@ fun CreateRecipeScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OptionDropdown(
+                    // Keyed, because the stored category is the English wording
+                    // while the option text is translated.
+                    KeyedDropdown(
                         label = stringResource(R.string.create_recipe_category),
-                        options = RecipeCategories.ALL,
-                        selected = state.category,
+                        options = RecipeCategories.ALL.map { key ->
+                            key to stringResource(recipeCategoryLabel(key))
+                        },
+                        selectedKey = state.category,
                         onSelected = viewModel::onCategoryChange,
                         modifier = Modifier.weight(1f)
                     )

@@ -6,6 +6,7 @@ import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.ProfileEntity
+import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.domain.nutrition.NutritionCalculator
 import kotlin.random.Random
@@ -240,16 +241,16 @@ class MenuGenerator(private val random: Random = Random.Default) {
     /** Category ↔ slot affinity, mild enough that any recipe CAN appear anywhere. */
     private fun slotAffinity(recipe: RecipeEntity, slot: MealSlot): Double = when (slot) {
         MealSlot.BREAKFAST ->
-            if (recipe.category == "Breakfast") 3.0 else 0.0
+            if (recipe.category == RecipeCategories.BREAKFAST) 3.0 else 0.0
         MealSlot.MORNING_SNACK, MealSlot.AFTERNOON_SNACK -> when (recipe.category) {
-            "Snack" -> 3.0
-            "Dessert", "Drink" -> 1.5
+            RecipeCategories.SNACK -> 3.0
+            RecipeCategories.DESSERT, RecipeCategories.DRINK -> 1.5
             else -> 0.0
         }
         MealSlot.LUNCH, MealSlot.DINNER -> when (recipe.category) {
-            "Main Dish" -> 3.0
-            "Side Dish" -> 1.0
-            "Breakfast", "Snack" -> -1.0
+            RecipeCategories.MAIN_DISH -> 3.0
+            RecipeCategories.SIDE_DISH -> 1.0
+            RecipeCategories.BREAKFAST, RecipeCategories.SNACK -> -1.0
             else -> 0.0
         }
     }

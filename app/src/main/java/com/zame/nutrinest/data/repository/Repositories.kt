@@ -16,12 +16,14 @@ import com.zame.nutrinest.data.local.entity.IngredientWithDetails
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.NutrientDefEntity
 import com.zame.nutrinest.data.local.entity.NutrientValueWithDef
+import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.local.entity.RecipeUsage
 import com.zame.nutrinest.data.local.entity.RecipeWithSteps
 import com.zame.nutrinest.data.local.entity.ShoppingAisleEntity
 import com.zame.nutrinest.util.TextNormalizer
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * Repositories abstract WHERE data comes from. Today: Room only.
@@ -91,12 +93,20 @@ interface RecipeRepository {
     fun observeFolders(): Flow<List<String>>
     fun observeRecipeWithSteps(id: Long): Flow<RecipeWithSteps?>
     fun observeIngredientsOf(recipeId: Long): Flow<List<IngredientWithQuantity>>
+
+    /** Nutrition per recipe, keyed by recipe id, for list rows. */
+    fun observeNutritionTotals(): Flow<Map<Long, NutritionValues>>
     suspend fun existsByName(name: String): Boolean
     suspend fun create(
         recipe: RecipeEntity,
         ingredients: List<Pair<Long, Double>>,
         steps: List<Pair<String, String?>>
     ): Long
+
+    suspend fun setFavorite(id: Long, favorite: Boolean)
+
+    /** @return false when a weekly menu still plans this recipe. */
+    suspend fun delete(id: Long): Boolean
 }
 
 class LocalIngredientRepository(private val dao: IngredientDao) : IngredientRepository {
@@ -178,10 +188,24 @@ class LocalRecipeRepository(private val dao: RecipeDao) : RecipeRepository {
     override fun observeFolders() = dao.observeFolders()
     override fun observeRecipeWithSteps(id: Long) = dao.observeRecipeWithSteps(id)
     override fun observeIngredientsOf(recipeId: Long) = dao.observeIngredientsOf(recipeId)
+
+    override fun observeNutritionTotals(): Flow<Map<Long, NutritionValues>> =
+        dao.observeNutritionTotals().map { rows ->
+            rows.associate { it.recipeId to it.nutrition }
+        }
+
     override suspend fun existsByName(name: String) = dao.countByName(name.trim()) > 0
     override suspend fun create(
         recipe: RecipeEntity,
         ingredients: List<Pair<Long, Double>>,
         steps: List<Pair<String, String?>>
     ) = dao.insertFullRecipe(recipe, ingredients, steps)
+
+    override suspend fun setFavorite(id: Long, favorite: Boolean) = dao.setFavorite(id, favorite)
+
+    override suspend fun delete(id: Long): Boolean {
+        if (dao.countReferences(id) > 0) return false
+        dao.deleteById(id)
+        return true
+    }
 }

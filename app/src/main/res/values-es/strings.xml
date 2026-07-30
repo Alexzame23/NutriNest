@@ -15,6 +15,8 @@
     <string name="action_clear">Borrar</string>
     <string name="action_more">Más opciones</string>
     <string name="action_save_anyway">Guardar igualmente</string>
+    <string name="action_ok">Aceptar</string>
+    <string name="action_add_photo">Añadir foto</string>
     <string name="unit_grams">g</string>
     <string name="unit_kcal">kcal</string>
     <string name="value_with_grams">%1$s g</string>
@@ -32,6 +34,12 @@
     <string name="home_profiles">Perfiles</string>
     <string name="home_card_description">%1$s. %2$s</string>
 
+    <!-- ── Idioma ─────────────────────────────────────────────────── -->
+    <string name="language_switch">Cambiar el idioma</string>
+    <!-- Los nombres de los idiomas se quedan en su propio idioma. -->
+    <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+
     <!-- ── Pestañas ───────────────────────────────────────────────── -->
     <string name="tab_recipes">Recetas</string>
     <string name="tab_ingredients">Ingredientes</string>
@@ -40,8 +48,51 @@
     <string name="recipes_title">Recetas</string>
     <string name="recipes_empty_title">Todavía no hay recetas</string>
     <string name="recipes_empty_body">Toca + para crear tu primera receta.</string>
+    <string name="recipes_empty_filtered_title">Sin resultados</string>
+    <string name="recipes_empty_filtered">Prueba con otra búsqueda o quita los filtros.</string>
+    <string name="recipes_empty_favorites">Marca una receta con una estrella para tenerla aquí.</string>
+    <string name="recipes_empty_recent">Las recetas que añadas aparecerán aquí.</string>
     <string name="recipes_add_recipe">Añadir receta</string>
     <string name="recipes_add_ingredient">Añadir ingrediente</string>
+    <string name="recipes_search_hint">Buscar recetas</string>
+    <string name="recipes_view_categories">Tipos de plato</string>
+    <string name="recipes_view_all">Todas</string>
+    <string name="recipes_view_favorites">Favoritas</string>
+    <string name="recipes_view_recent">Añadidas hace poco</string>
+    <string name="recipes_sort_newest">Más recientes primero</string>
+    <string name="recipes_sort_oldest">Más antiguas primero</string>
+    <string name="recipes_favorite_add">Añadir a favoritas</string>
+    <string name="recipes_favorite_remove">Quitar de favoritas</string>
+    <plurals name="recipes_count">
+        <item quantity="one">%1$d receta</item>
+        <item quantity="other">%1$d recetas</item>
+    </plurals>
+
+    <!-- ── Tipos de plato (se guardan en inglés, se muestran aquí) ── -->
+    <string name="recipe_category_breakfast">Desayuno</string>
+    <string name="recipe_category_main_dish">Plato principal</string>
+    <string name="recipe_category_side_dish">Acompañamiento</string>
+    <string name="recipe_category_dessert">Postre</string>
+    <string name="recipe_category_snack">Tentempié</string>
+    <string name="recipe_category_drink">Bebida</string>
+    <string name="recipe_category_other">Otros</string>
+
+    <!-- ── Detalle de la receta ───────────────────────────────────── -->
+    <string name="recipe_totals">Lo que da esta receta</string>
+    <string name="recipe_total_weight">Peso total: %1$s</string>
+    <string name="recipe_steps">Preparación</string>
+    <string name="recipe_step">Paso %1$d</string>
+    <string name="recipe_no_steps">Esta receta no tiene pasos de preparación.</string>
+    <string name="recipe_no_ingredients">Esta receta no tiene ingredientes.</string>
+    <string name="recipe_not_found">Esa receta ya no está aquí.</string>
+    <string name="recipe_delete_title">¿Eliminar la receta?</string>
+    <string name="recipe_delete_body">Se eliminará %1$s junto con sus pasos.</string>
+    <string name="recipe_delete_blocked_title">Todavía se usa</string>
+    <string name="recipe_delete_blocked_body">%1$s está planificada en un menú semanal. Quítala del menú primero.</string>
+    <plurals name="recipe_ingredients_count">
+        <item quantity="one">%1$d ingrediente</item>
+        <item quantity="other">%1$d ingredientes</item>
+    </plurals>
 
     <!-- ── Lista de ingredientes ──────────────────────────────────── -->
     <string name="ingredients_title">Ingredientes</string>

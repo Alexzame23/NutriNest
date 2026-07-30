@@ -19,6 +19,7 @@ import com.zame.nutrinest.ui.profiles.ProfilesScreen
 import com.zame.nutrinest.ui.profiles.edit.ProfileEditorScreen
 import com.zame.nutrinest.ui.recipes.RecipesAndIngredientsScreen
 import com.zame.nutrinest.ui.recipes.create.CreateRecipeScreen
+import com.zame.nutrinest.ui.recipes.detail.RecipeDetailScreen
 import com.zame.nutrinest.util.WeekUtils
 
 sealed class Screen(val route: String) {
@@ -31,6 +32,11 @@ sealed class Screen(val route: String) {
     }
 
     data object CreateRecipe : Screen("recipes/create")
+
+    /** Kept off `recipes/{id}` so it can never race `recipes/create` for a match. */
+    data object RecipeDetail : Screen("recipes/detail/{recipeId}") {
+        fun of(id: Long) = "recipes/detail/$id"
+    }
 
     data object IngredientDetail : Screen("ingredients/{ingredientId}") {
         fun of(id: Long) = "ingredients/$id"
@@ -94,7 +100,7 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onBack = { navController.popBackStack() },
                 onAddRecipe = { navController.navigate(Screen.CreateRecipe.route) },
                 onAddIngredient = { navController.navigate(Screen.IngredientEditor.create()) },
-                onOpenRecipe = { /* TODO: RecipeDetail screen in a future step */ },
+                onOpenRecipe = { id -> navController.navigate(Screen.RecipeDetail.of(id)) },
                 onOpenIngredient = { id -> navController.navigate(Screen.IngredientDetail.of(id)) },
                 onCompareIngredients = { ids ->
                     navController.navigate(Screen.CompareIngredients.of(ids))
@@ -108,6 +114,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 onBack = { navController.popBackStack() },
                 onCreateIngredient = { navController.navigate(Screen.IngredientEditor.create()) }
             )
+        }
+
+        composable(
+            route = Screen.RecipeDetail.route,
+            arguments = listOf(navArgument("recipeId") { type = NavType.LongType })
+        ) {
+            RecipeDetailScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

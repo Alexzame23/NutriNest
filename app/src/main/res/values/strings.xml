@@ -16,6 +16,8 @@
     <string name="action_clear">Clear</string>
     <string name="action_more">More options</string>
     <string name="action_save_anyway">Save anyway</string>
+    <string name="action_ok">OK</string>
+    <string name="action_add_photo">Add photo</string>
     <string name="unit_grams">g</string>
     <string name="unit_kcal">kcal</string>
     <string name="value_with_grams">%1$s g</string>
@@ -33,6 +35,12 @@
     <string name="home_profiles">Profiles</string>
     <string name="home_card_description">%1$s. %2$s</string>
 
+    <!-- ── Language ───────────────────────────────────────────────── -->
+    <string name="language_switch">Change language</string>
+    <!-- Language names stay in their own language in every locale. -->
+    <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+
     <!-- ── Recipes &amp; Ingredients tabs ─────────────────────────── -->
     <string name="tab_recipes">Recipes</string>
     <string name="tab_ingredients">Ingredients</string>
@@ -41,8 +49,51 @@
     <string name="recipes_title">Recipes</string>
     <string name="recipes_empty_title">No recipes yet</string>
     <string name="recipes_empty_body">Tap + to create your first recipe.</string>
+    <string name="recipes_empty_filtered_title">No matches</string>
+    <string name="recipes_empty_filtered">Try a different search, or clear the filters.</string>
+    <string name="recipes_empty_favorites">Star a recipe to keep it here.</string>
+    <string name="recipes_empty_recent">Recipes you add will show up here.</string>
     <string name="recipes_add_recipe">Add Recipe</string>
     <string name="recipes_add_ingredient">Add Ingredient</string>
+    <string name="recipes_search_hint">Search recipes</string>
+    <string name="recipes_view_categories">Courses</string>
+    <string name="recipes_view_all">All</string>
+    <string name="recipes_view_favorites">Favourites</string>
+    <string name="recipes_view_recent">Recently added</string>
+    <string name="recipes_sort_newest">Newest first</string>
+    <string name="recipes_sort_oldest">Oldest first</string>
+    <string name="recipes_favorite_add">Add to favourites</string>
+    <string name="recipes_favorite_remove">Remove from favourites</string>
+    <plurals name="recipes_count">
+        <item quantity="one">%1$d recipe</item>
+        <item quantity="other">%1$d recipes</item>
+    </plurals>
+
+    <!-- ── Recipe courses (stored in English, shown translated) ───── -->
+    <string name="recipe_category_breakfast">Breakfast</string>
+    <string name="recipe_category_main_dish">Main dish</string>
+    <string name="recipe_category_side_dish">Side dish</string>
+    <string name="recipe_category_dessert">Dessert</string>
+    <string name="recipe_category_snack">Snack</string>
+    <string name="recipe_category_drink">Drink</string>
+    <string name="recipe_category_other">Other</string>
+
+    <!-- ── Recipe detail ──────────────────────────────────────────── -->
+    <string name="recipe_totals">What this recipe makes</string>
+    <string name="recipe_total_weight">Total weight: %1$s</string>
+    <string name="recipe_steps">Preparation</string>
+    <string name="recipe_step">Step %1$d</string>
+    <string name="recipe_no_steps">This recipe has no preparation steps.</string>
+    <string name="recipe_no_ingredients">This recipe has no ingredients.</string>
+    <string name="recipe_not_found">That recipe is no longer here.</string>
+    <string name="recipe_delete_title">Delete recipe?</string>
+    <string name="recipe_delete_body">%1$s will be removed, along with its steps.</string>
+    <string name="recipe_delete_blocked_title">Still in use</string>
+    <string name="recipe_delete_blocked_body">%1$s is planned in a weekly menu. Remove it from the menu first.</string>
+    <plurals name="recipe_ingredients_count">
+        <item quantity="one">%1$d ingredient</item>
+        <item quantity="other">%1$d ingredients</item>
+    </plurals>
 
     <!-- ── Ingredients list ───────────────────────────────────────── -->
     <string name="ingredients_title">Ingredients</string>

@@ -44,6 +44,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -85,6 +86,9 @@ fun IngredientsTabContent(
 ) {
     val state by viewModel.uiState.collectAsState()
     val spanish = rememberIsSpanish()
+
+    // The ViewModel outlives the language switch, so it has to be told.
+    LaunchedEffect(spanish) { viewModel.onLocaleChanged() }
 
     Column(modifier.fillMaxSize()) {
         SearchField(

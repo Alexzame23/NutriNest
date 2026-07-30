@@ -91,18 +91,32 @@ private data class Filters(
 class IngredientsViewModel(
     private val repository: IngredientRepository,
     referenceRepository: FoodReferenceRepository,
-    private val locale: Locale = Locale.getDefault()
+    private val locale: () -> Locale = { Locale.getDefault() }
 ) : ViewModel() {
 
-    private val spanish = isSpanishLocale(locale)
+    /**
+     * Read on use rather than captured once.
+     *
+     * A ViewModel survives the activity restart that the in-app language switch
+     * performs, so a snapshot taken in the constructor would keep sorting and
+     * labelling in the language the user just left.
+     */
+    private val spanish: Boolean get() = isSpanishLocale(locale())
 
     /** PRIMARY strength ignores case and accents, matching how search behaves. */
-    private val collator = Collator.getInstance(locale)
-        .apply { strength = Collator.PRIMARY }
+    private fun collator(): Collator =
+        Collator.getInstance(locale()).apply { strength = Collator.PRIMARY }
 
     private val filters = MutableStateFlow(Filters())
     private val collapsed = MutableStateFlow<Set<String>>(emptySet())
     private val compare = MutableStateFlow(CompareState())
+
+    /**
+     * Only there to re-run the shaping when the language changes: the names and
+     * ordering below depend on the locale, and nothing else in the graph emits
+     * when the user switches it. See [onLocaleChanged].
+     */
+    private val localeTick = MutableStateFlow(locale())
 
     private data class CompareState(
         val active: Boolean = false,
@@ -133,7 +147,9 @@ class IngredientsViewModel(
         ingredients,
         referenceRepository.observeCategoriesWithCounts(),
         collapsed,
-        combine(compare, recentlyAdded, attribution) { c, added, credit -> Triple(c, added, credit) }
+        combine(compare, recentlyAdded, attribution, localeTick) { c, added, credit, _ ->
+            Triple(c, added, credit)
+        }
     ) { f, all, categories, collapsedKeys, (compareState, added, credit) ->
         val visible = if (f.view == IngredientView.RECENT) narrowInMemory(all, f) else all
         val sorted = sort(visible, f.sort)
@@ -174,6 +190,18 @@ class IngredientsViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IngredientsUiState())
 
     // ── Intents ─────────────────────────────────────────────────────────
+
+    /**
+     * Called by the screen when the configured language changes.
+     *
+     * The switch restarts the activity but not the ViewModel, and a
+     * `WhileSubscribed` state flow replays its last value to the new
+     * composition — so without this nudge the category headers would keep the
+     * old language until some other change happened to move the data.
+     */
+    fun onLocaleChanged() {
+        localeTick.value = locale()
+    }
 
     fun onQueryChange(value: String) = filters.update { copy(query = value) }
 
@@ -246,7 +274,7 @@ class IngredientsViewModel(
     }
 
     private fun sort(items: List<IngredientEntity>, sort: IngredientSort): List<IngredientEntity> {
-        val byName = compareBy(collator) { it: IngredientEntity -> it.displayName(spanish) }
+        val byName = compareBy(collator()) { it: IngredientEntity -> it.displayName(spanish) }
         return when (sort) {
             IngredientSort.NAME_ASC -> items.sortedWith(byName)
             IngredientSort.NAME_DESC -> items.sortedWith(byName.reversed())

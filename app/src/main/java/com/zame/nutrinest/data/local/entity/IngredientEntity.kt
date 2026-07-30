@@ -256,8 +256,21 @@ data class IngredientEntity(
         if (spanish) nameEs?.takeIf { it.isNotBlank() } ?: name else name
 }
 
+/**
+ * The course a recipe belongs to.
+ *
+ * The English wording is the stored key, not a label: it is written into
+ * `recipes.category`, matched by the menu planner and already sits in every
+ * user's database. Display names come from `strings.xml` instead — see
+ * `recipeCategoryLabel` in the UI layer.
+ */
 object RecipeCategories {
-    val ALL = listOf(
-        "Breakfast", "Main Dish", "Side Dish", "Dessert", "Snack", "Drink"
-    )
+    const val BREAKFAST = "Breakfast"
+    const val MAIN_DISH = "Main Dish"
+    const val SIDE_DISH = "Side Dish"
+    const val DESSERT = "Dessert"
+    const val SNACK = "Snack"
+    const val DRINK = "Drink"
+
+    val ALL = listOf(BREAKFAST, MAIN_DISH, SIDE_DISH, DESSERT, SNACK, DRINK)
 }

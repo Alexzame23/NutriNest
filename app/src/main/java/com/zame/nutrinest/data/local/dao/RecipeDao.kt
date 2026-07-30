@@ -7,6 +7,7 @@ import androidx.room.Transaction
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.local.entity.RecipeIngredientCrossRef
+import com.zame.nutrinest.data.local.entity.RecipeNutrition
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
 import com.zame.nutrinest.data.local.entity.RecipeWithSteps
 import kotlinx.coroutines.flow.Flow
@@ -33,8 +34,42 @@ interface RecipeDao {
     @Query("SELECT DISTINCT folder FROM recipes WHERE folder IS NOT NULL ORDER BY folder COLLATE NOCASE")
     fun observeFolders(): Flow<List<String>>
 
+    /**
+     * Per-recipe nutrition totals for the list rows. Ingredient figures are
+     * stored per 100 g, hence the `grams / 100` scaling. Recipes with no
+     * ingredients simply have no row.
+     */
+    @Query(
+        """
+        SELECT ri.recipeId AS recipeId,
+               SUM(i.kcal * ri.grams / 100.0) AS kcal,
+               SUM(i.carbs * ri.grams / 100.0) AS carbs,
+               SUM(i.fats * ri.grams / 100.0) AS fats,
+               SUM(i.protein * ri.grams / 100.0) AS protein
+        FROM recipe_ingredients ri
+        INNER JOIN ingredients i ON i.id = ri.ingredientId
+        GROUP BY ri.recipeId
+        """
+    )
+    fun observeNutritionTotals(): Flow<List<RecipeNutrition>>
+
     @Query("SELECT COUNT(*) FROM recipes WHERE name = :name COLLATE NOCASE")
     suspend fun countByName(name: String): Int
+
+    @Query("UPDATE recipes SET isFavorite = :favorite WHERE id = :id")
+    suspend fun setFavorite(id: Long, favorite: Boolean)
+
+    /**
+     * Planned meals hold a `RESTRICT` foreign key on the recipe, so a recipe in
+     * a weekly menu cannot be deleted. Counted up front to explain why instead
+     * of letting SQLite throw.
+     */
+    @Query("SELECT COUNT(*) FROM planned_meals WHERE recipeId = :recipeId")
+    suspend fun countReferences(recipeId: Long): Int
+
+    /** Steps and ingredient links go with it — both cascade. */
+    @Query("DELETE FROM recipes WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     @Insert
     suspend fun insertRecipe(recipe: RecipeEntity): Long
