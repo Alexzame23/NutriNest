@@ -48,7 +48,7 @@ import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.ShoppingItemWithIngredient
 import com.zame.nutrinest.data.repository.MenuRepository
-import com.zame.nutrinest.ui.components.formatGrams
+import com.zame.nutrinest.ui.components.formatWeight
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.util.WeekUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -215,7 +215,7 @@ fun ShoppingListScreen(
                                         onCheckedChange = { viewModel.togglePurchased(item) }
                                     )
                                     Text(
-                                        item.ingredient.name,
+                                        item.ingredient.displayName(spanish),
                                         style = MaterialTheme.typography.bodyLarge,
                                         textDecoration =
                                             if (item.item.purchased) TextDecoration.LineThrough
@@ -227,7 +227,7 @@ fun ShoppingListScreen(
                                         modifier = Modifier.weight(1f)
                                     )
                                     Text(
-                                        formatGrams(item.item.grams),
+                                        formatWeight(item.item.grams),
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface

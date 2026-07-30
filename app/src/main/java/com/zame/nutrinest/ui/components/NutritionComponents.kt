@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.NutritionValues
+import com.zame.nutrinest.domain.nutrition.MeasureConversions
 import com.zame.nutrinest.ui.theme.Amber
 import com.zame.nutrinest.ui.theme.Apricot
 import com.zame.nutrinest.ui.theme.Caramel
@@ -338,6 +339,11 @@ private fun trimZeros(text: String): String =
         text
     }
 
-fun formatGrams(value: Double): String =
-    if (value == value.roundToInt().toDouble()) "${value.roundToInt()} g"
-    else "%.1f g".format(Locale.getDefault(), value)
+/** An amount in grams. See [MeasureConversions.formatGrams]. */
+fun formatGrams(value: Double): String = MeasureConversions.formatGrams(value)
+
+/**
+ * An amount that may run past a kilo, e.g. a week's shopping list.
+ * See [MeasureConversions.formatWeight].
+ */
+fun formatWeight(grams: Double): String = MeasureConversions.formatWeight(grams)

@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class MeasureConversionsTest {
 
@@ -87,5 +88,45 @@ class MeasureConversionsTest {
         assertEquals(850.0 to MeasureUnit.GRAM, MeasureConversions.humanizeGrams(850.0))
         assertEquals(1.5 to MeasureUnit.KILOGRAM, MeasureConversions.humanizeGrams(1500.0))
         assertEquals(1.0 to MeasureUnit.KILOGRAM, MeasureConversions.humanizeGrams(1000.0))
+    }
+
+    // ── Formatting ──────────────────────────────────────────────────────
+
+    private fun weight(grams: Double) = MeasureConversions.formatWeight(grams, Locale.UK)
+
+    @Test
+    fun `weights under a kilogram stay in grams`() {
+        assertEquals("0 g", weight(0.0))
+        assertEquals("250 g", weight(250.0))
+        assertEquals("999 g", weight(999.0))
+        assertEquals("37.5 g", weight(37.5))
+    }
+
+    @Test
+    fun `a kilogram or more switches to kilograms`() {
+        assertEquals("1 kg", weight(1000.0))
+        assertEquals("1.5 kg", weight(1500.0))
+        assertEquals("2.45 kg", weight(2450.0))
+        assertEquals("12.35 kg", weight(12345.0))
+    }
+
+    @Test
+    fun `kilograms drop trailing zeros`() {
+        assertEquals("2 kg", weight(2000.0))
+        assertEquals("2.5 kg", weight(2500.0))
+        assertEquals("2.05 kg", weight(2050.0))
+    }
+
+    @Test
+    fun `kilograms follow the locale decimal separator`() {
+        assertEquals("2,45 kg", MeasureConversions.formatWeight(2450.0, Locale.forLanguageTag("es-ES")))
+        assertEquals("2 kg", MeasureConversions.formatWeight(2000.0, Locale.forLanguageTag("es-ES")))
+    }
+
+    @Test
+    fun `grams keep one decimal only when they need it`() {
+        assertEquals("120 g", MeasureConversions.formatGrams(120.0, Locale.UK))
+        assertEquals("120.4 g", MeasureConversions.formatGrams(120.42, Locale.UK))
+        assertEquals("1500 g", MeasureConversions.formatGrams(1500.0, Locale.UK))
     }
 }
