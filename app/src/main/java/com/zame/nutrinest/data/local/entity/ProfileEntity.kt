@@ -94,6 +94,37 @@ data class ProfileEntity(
 }
 
 /**
+ * How one person splits their daily calories across the day, set up once with
+ * the rest of the profile.
+ *
+ * [share] is a fraction of [ProfileEntity]'s daily target and is deliberately
+ * **never renormalised**: marking a slot free leaves the other slots on the
+ * absolute budgets they already had. 3000 kcal at 20/40/40 with dinner free is
+ * 600 for breakfast and 1200 for lunch — the other 1200 kcal is simply
+ * unplanned, not redistributed.
+ */
+@Entity(
+    tableName = "profile_meal_plans",
+    primaryKeys = ["profileId", "slot"],
+    foreignKeys = [
+        ForeignKey(
+            entity = ProfileEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["profileId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
+data class ProfileMealPlanEntity(
+    val profileId: Long,
+    val slot: MealSlot,
+    /** Fraction of the daily calorie target, e.g. 0.4 for 40%. */
+    val share: Float,
+    /** Free/untracked: no recipe, no ingredients, no shopping list. */
+    val isFree: Boolean = false
+)
+
+/**
  * Weight history. Every time a profile's weight is updated we also append
  * a row here, so the future progress-monitoring feature has data from day one.
  */

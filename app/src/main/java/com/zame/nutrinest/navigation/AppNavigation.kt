@@ -14,6 +14,7 @@ import com.zame.nutrinest.ui.ingredients.editor.IngredientEditorScreen
 import com.zame.nutrinest.ui.menu.WeeklyMenuScreen
 import com.zame.nutrinest.ui.menu.config.MenuConfigScreen
 import com.zame.nutrinest.ui.menu.detail.MealDetailScreen
+import com.zame.nutrinest.ui.menu.intake.IntakeScreen
 import com.zame.nutrinest.ui.menu.shopping.ShoppingListScreen
 import com.zame.nutrinest.ui.profiles.ProfilesScreen
 import com.zame.nutrinest.ui.profiles.edit.ProfileEditorScreen
@@ -69,6 +70,9 @@ sealed class Screen(val route: String) {
     }
 
     data object ShoppingList : Screen("weekly_menu/shopping")
+
+    /** Ad-hoc food logging, which re-portions the rest of that person's day. */
+    data object Intake : Screen("weekly_menu/intake")
 }
 
 @Composable
@@ -191,7 +195,8 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 },
                 onOpenShoppingList = {
                     navController.navigate(Screen.ShoppingList.route)
-                }
+                },
+                onOpenIntake = { navController.navigate(Screen.Intake.route) }
             )
         }
 
@@ -221,6 +226,10 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 
         composable(Screen.ShoppingList.route) {
             ShoppingListScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.Intake.route) {
+            IntakeScreen(onBack = { navController.popBackStack() })
         }
     }
 }

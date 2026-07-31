@@ -174,6 +174,64 @@ def run_migration_4_5(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def run_migration_5_6(conn: sqlite3.Connection) -> None:
+    """v5 -> v6, replaying the Kotlin's own statements in source order.
+
+    Foreign keys are switched off around it on purpose: `planned_meals` is
+    rebuilt to make `recipeId` nullable, and Room runs migrations before it
+    turns constraints on for the connection, so on a real device the DROP does
+    not cascade into `meal_portions` either.
+    """
+    source = open(DB_KT).read()
+    start = source.index("private fun addMenuScopeColumns")
+    block = source[start:source.index("private fun addIngredientColumns")]
+
+    conn.execute("PRAGMA foreign_keys = OFF")
+    for statement in extract_exec_sql(block):
+        # The planned_meals indexes are built from a list in Kotlin.
+        if "$" in statement:
+            continue
+        conn.execute(statement)
+    for column in extract_string_list(block, 'listOf("menuId"'):
+        conn.execute(
+            f"CREATE INDEX IF NOT EXISTS `index_planned_meals_{column}`"
+            f" ON `planned_meals` (`{column}`)"
+        )
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+
+def seed_v5_menu(conn: sqlite3.Connection) -> None:
+    """A week as v5 stored it: one dish per slot, shared, one of them locked."""
+    ingredient_id = conn.execute(
+        "SELECT ingredientId FROM recipe_ingredients WHERE recipeId = 1 LIMIT 1"
+    ).fetchone()[0]
+    conn.execute(
+        """
+        INSERT INTO profiles (id, name, dateOfBirth, sex, heightCm, weightKg,
+                              activityLevel, goal, formula, unitSystem, colorIndex,
+                              createdAt, weightLossRate)
+        VALUES (1, 'Ana', 0, 'FEMALE', 165.0, 60.0, 'MODERATE', 'MAINTAIN',
+                'AUTO', 'METRIC', 0, 0, 'MODERATE')
+        """
+    )
+    conn.execute(
+        "INSERT INTO weekly_menus (id, weekStart, slotsSpec, createdAt)"
+        " VALUES (1, 1000, 'BREAKFAST:0.3,LUNCH:0.4,DINNER:0.3', 0)"
+    )
+    conn.execute(
+        "INSERT INTO planned_meals (id, menuId, dayOfWeek, slot, recipeId, isLocked, isCheatMeal)"
+        " VALUES (1, 1, 0, 'LUNCH', 1, 1, 0), (2, 1, 1, 'DINNER', 1, 0, 1)"
+    )
+    conn.execute("INSERT INTO meal_portions VALUES (1, 1, 1.5), (2, 1, 0.8)")
+    conn.execute(
+        "INSERT INTO shopping_items (id, menuId, ingredientId, grams, purchased)"
+        " VALUES (1, 1, ?, 500.0, 1)",
+        (ingredient_id,),
+    )
+    conn.commit()
+
+
 def _legacy_block(_: str) -> str:
     """The LEGACY_FOOD_TYPES map, which lives with the entity, not the database."""
     entity = open(f"{SRC}/data/local/entity/IngredientEntity.kt").read()
@@ -446,6 +504,74 @@ def main() -> None:
     check("favourite and usage preserved across refresh", kept == (1, 7), str(kept))
     check("row count stable after refresh",
           conn.execute("SELECT COUNT(*) FROM ingredients").fetchone()[0] == before)
+
+    print("\n6. v5 -> v6: per-person menus")
+    seed_v5_menu(conn)
+    run_migration_5_6(conn)
+
+    meals = conn.execute(
+        "SELECT id, slot, recipeId, isLocked, isCheatMeal, course, profileId, isFree"
+        " FROM planned_meals ORDER BY id"
+    ).fetchall()
+    check("the week's meals survived the rebuild", len(meals) == 2, str(meals))
+    check("meal ids are unchanged, so portions still point at them",
+          [m[0] for m in meals] == [1, 2], str(meals))
+    check("the lock survived", meals[0][3] == 1, str(meals[0]))
+    check("everything already planned is still shared",
+          all(m[6] is None for m in meals), str(meals))
+    check("existing meals became single-course",
+          all(m[5] == "SINGLE" for m in meals), str(meals))
+    check("nothing was turned into a free slot",
+          all(m[7] == 0 for m in meals), str(meals))
+    check("recipeId is now nullable",
+          not next(
+              r[3] for r in conn.execute("PRAGMA table_info(planned_meals)")
+              if r[1] == "recipeId"
+          ))
+
+    portions = conn.execute(
+        "SELECT plannedMealId, profileId, factor, baseFactor FROM meal_portions ORDER BY plannedMealId"
+    ).fetchall()
+    check("portions kept their factors", [p[2] for p in portions] == [1.5, 0.8], str(portions))
+    check("the planned factor was backfilled from the served one",
+          all(p[2] == p[3] for p in portions), str(portions))
+
+    check("the shopping list is untouched, ticks included",
+          conn.execute(
+              "SELECT COUNT(*) FROM shopping_items WHERE menuId = 1 AND purchased = 1"
+          ).fetchone()[0] == 1)
+    check("the menu itself defaults to a shared scope",
+          conn.execute("SELECT scope, coursesSpec FROM weekly_menus WHERE id = 1").fetchone()
+          == ("SHARED", ""))
+
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    check("per-person tables created",
+          {"profile_meal_plans", "intake_entries"} <= tables, str(sorted(tables)))
+    check("the rebuilt table left no scratch copy behind", "planned_meals_new" not in tables)
+
+    indexes = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='planned_meals'"
+    )}
+    check("planned_meals indexes recreated",
+          {"index_planned_meals_menuId", "index_planned_meals_recipeId",
+           "index_planned_meals_profileId"} <= indexes, str(sorted(indexes)))
+
+    # The whole point of turning foreign keys back on: the rebuilt table has to
+    # satisfy every constraint pointing at it and every constraint it declares.
+    violations = conn.execute("PRAGMA foreign_key_check").fetchall()
+    check("no foreign key violations after the rebuild", not violations, str(violations[:5]))
+
+    # A free slot is the one row shape v5 could not store.
+    conn.execute(
+        "INSERT INTO planned_meals (menuId, dayOfWeek, slot, recipeId, isLocked,"
+        " isCheatMeal, course, profileId, isFree) VALUES (1, 2, 'DINNER', NULL, 0, 0,"
+        " 'SINGLE', 1, 1)"
+    )
+    conn.commit()
+    check("a free slot with no recipe is storable",
+          conn.execute(
+              "SELECT COUNT(*) FROM planned_meals WHERE recipeId IS NULL AND isFree = 1"
+          ).fetchone()[0] == 1)
 
     conn.close()
     print()

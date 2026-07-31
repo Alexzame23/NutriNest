@@ -306,8 +306,14 @@
     <string name="weekly_menu_empty_body">Generate a personalized plan for the whole household from your recipes.</string>
     <string name="week_current">This week</string>
     <string name="week_next">Next week</string>
-    <string name="meal_cheat">Cheat</string>
+    <string name="meal_cheat">Free</string>
     <string name="meal_locked">Locked meal</string>
+    <string name="weekly_menu_everyone">Everyone</string>
+    <string name="weekly_menu_erase">Erase menu</string>
+    <string name="weekly_menu_erase_title">Erase menu</string>
+    <string name="weekly_menu_erase_body">The meals and the shopping list of the selected weeks are deleted. This cannot be undone.</string>
+    <string name="weekly_menu_erase_confirm">Erase</string>
+    <string name="meal_free_placeholder">Free meal</string>
 
     <!-- ── Meal detail ────────────────────────────────────────────── -->
     <string name="meal_detail_title">Meal</string>
@@ -317,6 +323,21 @@
     <string name="meal_preparation">Preparation</string>
     <string name="meal_step">Step %1$d</string>
     <string name="meal_portion_summary">Portion ×%1$.2f · P %2$d g · C %3$d g · F %4$d g</string>
+    <string name="meal_portion_adjusted">Adjusted from ×%1$.2f after today\'s logged food</string>
+    <string name="meal_whole_household">Whole household</string>
+    <string name="meal_only_for">Only for %1$s</string>
+    <string name="meal_swap">Swap this meal</string>
+    <string name="meal_swap_title">Swap this meal</string>
+    <string name="meal_swap_confirm">Swap</string>
+    <string name="meal_lock_toggle">Lock or unlock this meal</string>
+    <string name="meal_free_title">Nothing planned here</string>
+    <string name="meal_free_body">This slot is free: its calories are yours to spend and nothing is tracked, cooked or added to the shopping list. Every other meal of the day keeps its own budget.</string>
+
+    <!-- ── Courses within a meal ──────────────────────────────────── -->
+    <string name="course_single">Single course</string>
+    <string name="course_first">First course</string>
+    <string name="course_main">Main course</string>
+    <string name="course_dessert">Dessert</string>
 
     <!-- ── Meal slots ─────────────────────────────────────────────── -->
     <string name="meal_slot_breakfast">Breakfast</string>
@@ -331,9 +352,31 @@
     <string name="menu_config_generating">Generating…</string>
     <string name="menu_config_meals_per_day">Meals per day</string>
     <string name="menu_config_meal_sizes">Meal size distribution</string>
-    <string name="menu_config_shares_note">Shares are relative — together they always make a whole day.</string>
-    <string name="menu_config_cheat_meals">Cheat meals</string>
+    <string name="menu_config_shares_note">Shares are relative — together they always make a whole day. Each profile can override them with its own split.</string>
+    <string name="menu_config_cheat_meals">Free meals</string>
     <string name="menu_config_max_repeats">Max recipe repeats</string>
+
+    <!-- ── Who eats what ──────────────────────────────────────────── -->
+    <string name="menu_config_scope">Who eats what</string>
+    <string name="menu_scope_everyone">Everyone</string>
+    <string name="menu_scope_shared">Shared</string>
+    <string name="menu_scope_shared_note">One menu for the whole household, all week.</string>
+    <string name="menu_scope_individual">Individual</string>
+    <string name="menu_scope_individual_note">Everyone gets their own menu, built around their own targets.</string>
+    <string name="menu_scope_per_meal">Per meal</string>
+    <string name="menu_scope_per_meal_note">Shared by default, with exceptions for the meals somebody eats apart.</string>
+    <string name="menu_config_who">For whom</string>
+    <string name="menu_config_exceptions">Meals eaten apart</string>
+    <string name="menu_config_exceptions_note">Pick the meals somebody has on their own — a child eating lunch at school, for instance — and they get their own dish there.</string>
+    <string name="menu_config_add_exception">Add exception</string>
+    <string name="menu_config_remove_exception">Remove exception</string>
+    <string name="menu_config_exception_dialog_title">Eats apart</string>
+
+    <!-- ── Courses ────────────────────────────────────────────────── -->
+    <string name="menu_config_courses">Courses</string>
+    <string name="menu_config_courses_note">Serve a meal as a first course plus a main, and finish with a dessert. The slot\'s calories are split across the courses.</string>
+    <string name="menu_config_two_courses">First course + main</string>
+    <string name="menu_config_dessert">Dessert</string>
     <string name="menu_config_avoid_recent">Avoid last week\'s recipes</string>
     <string name="menu_config_avoid_recent_note">Skipped automatically if it would leave too few recipes</string>
     <string name="menu_config_exclude_categories">Exclude categories</string>
@@ -351,6 +394,24 @@
     <string name="menu_error_no_profiles">Create at least one profile first — the menu is personalized to each person\'s calorie targets.</string>
     <string name="menu_error_no_matching_recipes">No recipes match the selected filters. Relax the exclusions or add more recipes.</string>
     <string name="menu_error_not_enough_recipes">Not enough recipes to fill the week with the current repeat limit. Increase the limit or add more recipes.</string>
+
+    <!-- ── Ad-hoc intake ──────────────────────────────────────────── -->
+    <string name="intake_title">Eaten today</string>
+    <string name="intake_log">Log food</string>
+    <string name="intake_no_profiles">Create a profile first — logging is personal, and so is the plan it rebalances.</string>
+    <string name="intake_today_meals">Today\'s meals</string>
+    <string name="intake_no_menu">No menu for today, so there is nothing to rebalance yet.</string>
+    <string name="intake_meal_adjusted">Rebalanced · planned %1$d kcal</string>
+    <string name="intake_untracked">Free</string>
+    <string name="intake_logged">Logged off-plan</string>
+    <string name="intake_nothing_logged">Nothing logged yet today.</string>
+    <string name="intake_planned_today">Planned for today</string>
+    <string name="intake_still_planned">Left on the plan</string>
+    <string name="intake_over_budget">Today\'s log is already over the planned calories — the remaining meals are down to their smallest portion.</string>
+    <string name="intake_dialog_title">Log what you ate</string>
+    <string name="intake_what">What was it</string>
+    <string name="intake_kcal">Calories</string>
+    <string name="intake_dialog_note">The rest of your day is re-portioned straight away. Free meals are left out of it, and nobody else\'s menu changes.</string>
 
     <!-- ── Shopping list ──────────────────────────────────────────── -->
     <string name="shopping_list_title">Shopping List</string>
@@ -373,6 +434,10 @@
     <string name="profile_section_body">Body</string>
     <string name="profile_section_lifestyle">Lifestyle &amp; Goal</string>
     <string name="profile_section_preferences">Preferences (optional)</string>
+    <string name="profile_section_day_split">How the day is split</string>
+    <string name="profile_day_split_note">The share of the daily calories each meal gets. Marking a meal free leaves it untracked and does not move the others: their budgets stay exactly as they are.</string>
+    <string name="profile_slot_free">Free</string>
+    <string name="profile_day_split_summary">%1$d%% planned of %2$d%% assigned</string>
     <string name="profile_name">Name *</string>
     <string name="profile_dob">Date of birth *</string>
     <string name="profile_height_cm">Height (cm) *</string>

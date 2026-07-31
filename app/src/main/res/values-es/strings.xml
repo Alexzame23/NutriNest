@@ -307,6 +307,12 @@
     <string name="week_next">Semana que viene</string>
     <string name="meal_cheat">Libre</string>
     <string name="meal_locked">Comida fijada</string>
+    <string name="weekly_menu_everyone">Todos</string>
+    <string name="weekly_menu_erase">Borrar el menú</string>
+    <string name="weekly_menu_erase_title">Borrar el menú</string>
+    <string name="weekly_menu_erase_body">Se eliminan las comidas y la lista de la compra de las semanas seleccionadas. No se puede deshacer.</string>
+    <string name="weekly_menu_erase_confirm">Borrar</string>
+    <string name="meal_free_placeholder">Comida libre</string>
 
     <!-- ── Detalle de la comida ───────────────────────────────────── -->
     <string name="meal_detail_title">Comida</string>
@@ -316,6 +322,21 @@
     <string name="meal_preparation">Preparación</string>
     <string name="meal_step">Paso %1$d</string>
     <string name="meal_portion_summary">Ración ×%1$.2f · P %2$d g · C %3$d g · G %4$d g</string>
+    <string name="meal_portion_adjusted">Ajustada desde ×%1$.2f por lo registrado hoy</string>
+    <string name="meal_whole_household">Toda la casa</string>
+    <string name="meal_only_for">Solo para %1$s</string>
+    <string name="meal_swap">Cambiar esta comida</string>
+    <string name="meal_swap_title">Cambiar esta comida</string>
+    <string name="meal_swap_confirm">Cambiar</string>
+    <string name="meal_lock_toggle">Fijar o soltar esta comida</string>
+    <string name="meal_free_title">Aquí no hay nada planificado</string>
+    <string name="meal_free_body">Esta comida es libre: sus calorías son tuyas y no se registran, ni se cocinan, ni entran en la lista de la compra. El resto de comidas del día conservan su presupuesto.</string>
+
+    <!-- ── Platos dentro de una comida ────────────────────────────── -->
+    <string name="course_single">Plato único</string>
+    <string name="course_first">Primer plato</string>
+    <string name="course_main">Segundo plato</string>
+    <string name="course_dessert">Postre</string>
 
     <!-- ── Comidas del día ────────────────────────────────────────── -->
     <string name="meal_slot_breakfast">Desayuno</string>
@@ -330,9 +351,31 @@
     <string name="menu_config_generating">Generando…</string>
     <string name="menu_config_meals_per_day">Comidas al día</string>
     <string name="menu_config_meal_sizes">Reparto del tamaño de las comidas</string>
-    <string name="menu_config_shares_note">Las proporciones son relativas: juntas forman siempre el día completo.</string>
+    <string name="menu_config_shares_note">Las proporciones son relativas: juntas forman siempre el día completo. Cada perfil puede sustituirlas por su propio reparto.</string>
     <string name="menu_config_cheat_meals">Comidas libres</string>
     <string name="menu_config_max_repeats">Repeticiones máximas por receta</string>
+
+    <!-- ── Quién come qué ─────────────────────────────────────────── -->
+    <string name="menu_config_scope">Quién come qué</string>
+    <string name="menu_scope_everyone">Todos</string>
+    <string name="menu_scope_shared">Compartido</string>
+    <string name="menu_scope_shared_note">Un único menú para toda la casa, toda la semana.</string>
+    <string name="menu_scope_individual">Individual</string>
+    <string name="menu_scope_individual_note">Cada persona tiene su menú, hecho a la medida de sus objetivos.</string>
+    <string name="menu_scope_per_meal">Por comida</string>
+    <string name="menu_scope_per_meal_note">Compartido por defecto, con excepciones para las comidas que alguien hace por su cuenta.</string>
+    <string name="menu_config_who">Para quién</string>
+    <string name="menu_config_exceptions">Comidas aparte</string>
+    <string name="menu_config_exceptions_note">Marca las comidas que alguien hace por su cuenta —un niño que come en el colegio, por ejemplo— y tendrá su propio plato ahí.</string>
+    <string name="menu_config_add_exception">Añadir excepción</string>
+    <string name="menu_config_remove_exception">Quitar la excepción</string>
+    <string name="menu_config_exception_dialog_title">Come aparte</string>
+
+    <!-- ── Platos ─────────────────────────────────────────────────── -->
+    <string name="menu_config_courses">Platos</string>
+    <string name="menu_config_courses_note">Sirve una comida como primer plato y segundo, y termina con un postre. Las calorías de la comida se reparten entre los platos.</string>
+    <string name="menu_config_two_courses">Primero y segundo</string>
+    <string name="menu_config_dessert">Postre</string>
     <string name="menu_config_avoid_recent">Evitar las recetas de la semana pasada</string>
     <string name="menu_config_avoid_recent_note">Se omite automáticamente si dejara muy pocas recetas</string>
     <string name="menu_config_exclude_categories">Excluir categorías</string>
@@ -352,6 +395,24 @@
     <string name="menu_error_not_enough_recipes">No hay recetas suficientes para llenar la semana con el límite de repeticiones actual. Súbelo o añade más recetas.</string>
 
     <!-- ── Lista de la compra ─────────────────────────────────────── -->
+    <!-- ── Ingesta puntual ────────────────────────────────────────── -->
+    <string name="intake_title">Comido hoy</string>
+    <string name="intake_log">Registrar comida</string>
+    <string name="intake_no_profiles">Crea antes un perfil: el registro es personal, igual que el plan que reequilibra.</string>
+    <string name="intake_today_meals">Comidas de hoy</string>
+    <string name="intake_no_menu">Hoy no hay menú, así que todavía no hay nada que reequilibrar.</string>
+    <string name="intake_meal_adjusted">Reequilibrada · planificadas %1$d kcal</string>
+    <string name="intake_untracked">Libre</string>
+    <string name="intake_logged">Registrado fuera del plan</string>
+    <string name="intake_nothing_logged">Hoy todavía no has registrado nada.</string>
+    <string name="intake_planned_today">Planificado para hoy</string>
+    <string name="intake_still_planned">Queda en el plan</string>
+    <string name="intake_over_budget">Lo registrado hoy ya supera las calorías planificadas: las comidas que quedan están en su ración mínima.</string>
+    <string name="intake_dialog_title">Registra lo que has comido</string>
+    <string name="intake_what">Qué era</string>
+    <string name="intake_kcal">Calorías</string>
+    <string name="intake_dialog_note">El resto del día se reajusta al momento. Las comidas libres quedan fuera y el menú de los demás no cambia.</string>
+
     <string name="shopping_list_title">Lista de la compra</string>
     <string name="shopping_list_empty_title">Todavía no hay nada que comprar</string>
     <string name="shopping_list_empty_body">Genera un menú semanal y la lista se rellenará sola.</string>
@@ -372,6 +433,10 @@
     <string name="profile_section_body">Cuerpo</string>
     <string name="profile_section_lifestyle">Estilo de vida y objetivo</string>
     <string name="profile_section_preferences">Preferencias (opcional)</string>
+    <string name="profile_section_day_split">Cómo se reparte el día</string>
+    <string name="profile_day_split_note">La parte de las calorías diarias que se lleva cada comida. Marcar una comida como libre la deja sin registrar y no mueve a las demás: sus presupuestos se quedan como están.</string>
+    <string name="profile_slot_free">Libre</string>
+    <string name="profile_day_split_summary">%1$d %% planificado de %2$d %% asignado</string>
     <string name="profile_name">Nombre *</string>
     <string name="profile_dob">Fecha de nacimiento *</string>
     <string name="profile_height_cm">Altura (cm) *</string>

@@ -12,12 +12,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,9 +33,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -65,6 +70,7 @@ import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import java.text.DateFormat
 import java.util.Date
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -293,6 +299,28 @@ fun ProfileEditorScreen(
                 }
             }
 
+            // ── How the day is split ────────────────────────────────
+            item { SectionTitle(stringResource(R.string.profile_section_day_split)) }
+            item {
+                Text(
+                    stringResource(R.string.profile_day_split_note),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            item {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    listOf(3, 4, 5).forEachIndexed { index, count ->
+                        SegmentedButton(
+                            selected = state.mealsPerDay == count,
+                            onClick = { viewModel.onMealsPerDayChange(count) },
+                            shape = SegmentedButtonDefaults.itemShape(index, 3)
+                        ) { Text("$count") }
+                    }
+                }
+            }
+            item { MealSplitCard(state, viewModel) }
+
             // ── Optional extras ─────────────────────────────────────
             item { SectionTitle(stringResource(R.string.profile_section_preferences)) }
             item {
@@ -408,6 +436,82 @@ private fun TargetsCard(targets: NutritionTargets) {
             StatRow(
                 stringResource(R.string.nutrition_fats),
                 stringResource(R.string.value_with_grams, targets.fatG.toString())
+            )
+        }
+    }
+}
+
+/**
+ * The per-slot share of the day, in percent of the daily target.
+ *
+ * The percentages are absolute, never renormalised: marking a slot free greys
+ * out its calories and leaves every other meal on exactly the budget it
+ * already had, which is the whole point of a free meal.
+ */
+@Composable
+private fun MealSplitCard(state: ProfileEditorState, viewModel: ProfileEditorViewModel) {
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            state.slots.forEach { slot ->
+                val free = slot in state.freeSlots
+                val share = state.slotShares[slot] ?: 0f
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(slot.labelRes),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (free) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.width(120.dp)
+                    )
+                    Slider(
+                        value = share,
+                        onValueChange = { viewModel.onSlotShareChange(slot, it) },
+                        valueRange = 0f..0.8f,
+                        enabled = !free,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "${(share * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.width(44.dp)
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        state.slotKcal(slot)
+                            ?.let { stringResource(R.string.kcal_value, it) }
+                            .orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        stringResource(R.string.profile_slot_free),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Switch(
+                        checked = free,
+                        onCheckedChange = { viewModel.onSlotFreeToggle(slot) }
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
+            val planned = (state.plannedShare * 100).roundToInt()
+            val total = (state.totalShare * 100).roundToInt()
+            Text(
+                stringResource(R.string.profile_day_split_summary, planned, total),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (total in 95..105) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.error
             )
         }
     }

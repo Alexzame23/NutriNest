@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,11 +25,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -35,8 +43,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.MealCourse
+import com.zame.nutrinest.data.local.entity.RecipeEntity
+import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
+import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.components.formatGrams
 import java.io.File
 import kotlin.math.roundToInt
@@ -48,7 +60,9 @@ fun MealDetailScreen(
     viewModel: MealDetailViewModel = viewModel(factory = MealDetailViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsState()
+    val recipes by viewModel.allRecipes.collectAsState()
     val meal = state.meal
+    var showSwapDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -56,7 +70,11 @@ fun MealDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        meal?.recipe?.name ?: stringResource(R.string.meal_detail_title),
+                        meal?.recipe?.name
+                            ?: stringResource(
+                                if (state.isFree) R.string.meal_free_placeholder
+                                else R.string.meal_detail_title
+                            ),
                         style = MaterialTheme.typography.headlineSmall
                     )
                 },
@@ -68,6 +86,28 @@ fun MealDetailScreen(
                         )
                     }
                 },
+                actions = {
+                    if (meal != null) {
+                        IconButton(onClick = { showSwapDialog = true }) {
+                            Icon(
+                                Icons.Rounded.SwapHoriz,
+                                contentDescription = stringResource(R.string.meal_swap)
+                            )
+                        }
+                        if (!state.isFree) {
+                            IconButton(onClick = viewModel::toggleLock) {
+                                Icon(
+                                    if (meal.meal.isLocked) Icons.Rounded.Lock
+                                    else Icons.Rounded.LockOpen,
+                                    contentDescription = stringResource(R.string.meal_lock_toggle),
+                                    tint = if (meal.meal.isLocked)
+                                        MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
@@ -75,6 +115,11 @@ fun MealDetailScreen(
         }
     ) { padding ->
         if (meal == null) return@Scaffold
+
+        if (state.isFree) {
+            FreeMealBody(state, Modifier.padding(padding))
+            return@Scaffold
+        }
 
         LazyColumn(
             modifier = Modifier
@@ -85,18 +130,29 @@ fun MealDetailScreen(
         ) {
             item {
                 Text(
-                    stringResource(meal.meal.slot.labelRes) +
-                        if (meal.meal.isCheatMeal) {
-                            " · " + stringResource(R.string.meal_cheat)
-                        } else {
-                            ""
-                        },
+                    buildList {
+                        add(stringResource(meal.meal.slot.labelRes))
+                        if (meal.meal.course != MealCourse.SINGLE) {
+                            add(stringResource(meal.meal.course.labelRes))
+                        }
+                        add(
+                            state.ownerProfileId
+                                ?.let { id ->
+                                    stringResource(
+                                        R.string.meal_only_for,
+                                        state.profiles.find { it.id == id }?.name.orEmpty()
+                                    )
+                                }
+                                ?: stringResource(R.string.meal_whole_household)
+                        )
+                        if (meal.meal.isCheatMeal) add(stringResource(R.string.meal_cheat))
+                    }.joinToString(" · "),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            meal.recipe.coverImagePath?.let { path ->
+            meal.recipe?.coverImagePath?.let { path ->
                 item {
                     AsyncImage(
                         model = File(path),
@@ -153,6 +209,17 @@ fun MealDetailScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        // Says why the grams below don't match the plan.
+                        if (state.isAdjusted(portion)) {
+                            Text(
+                                stringResource(
+                                    R.string.meal_portion_adjusted,
+                                    portion.portion.baseFactor
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         Spacer(Modifier.height(8.dp))
                         state.baseIngredients.forEach { ingredient ->
                             Row(Modifier.fillMaxWidth()) {
@@ -234,6 +301,124 @@ fun MealDetailScreen(
             }
         }
     }
+
+    if (showSwapDialog && meal != null) {
+        SwapMealDialog(
+            state = state,
+            recipes = recipes,
+            onDismiss = { showSwapDialog = false },
+            onConfirm = { recipeId, profileId ->
+                viewModel.replaceMeal(recipeId, profileId)
+                showSwapDialog = false
+            }
+        )
+    }
+}
+
+/**
+ * A free slot. There is deliberately nothing to show: no recipe, no
+ * ingredients, no calories counted — the budget for this slot stays with the
+ * person to spend as they like, and the rest of their day is unaffected.
+ */
+@Composable
+private fun FreeMealBody(state: MealDetailUiState, modifier: Modifier = Modifier) {
+    val meal = state.meal ?: return
+    Column(
+        modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            buildList {
+                add(stringResource(meal.meal.slot.labelRes))
+                add(
+                    state.ownerProfileId
+                        ?.let { id ->
+                            stringResource(
+                                R.string.meal_only_for,
+                                state.profiles.find { it.id == id }?.name.orEmpty()
+                            )
+                        }
+                        ?: stringResource(R.string.meal_whole_household)
+                )
+            }.joinToString(" · "),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold
+        )
+        Card(
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    stringResource(R.string.meal_free_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(R.string.meal_free_body),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Swap this dish for another. With more than one person eating it, the choice
+ * of who the swap is for is the point — one person's change must not move
+ * anybody else's plate.
+ */
+@Composable
+private fun SwapMealDialog(
+    state: MealDetailUiState,
+    recipes: List<RecipeEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long, Long?) -> Unit
+) {
+    var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
+    // Pre-selected to the row's own scope, which is the expected default.
+    var swapFor by remember { mutableStateOf(state.ownerProfileId) }
+    val canChooseScope = state.ownerProfileId == null && state.profiles.size > 1
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.meal_swap_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OptionDropdown(
+                    label = stringResource(R.string.menu_config_recipe),
+                    options = recipes.map { it.name },
+                    selected = selectedRecipe?.name,
+                    onSelected = { name -> selectedRecipe = recipes.find { it.name == name } }
+                )
+                if (canChooseScope) {
+                    KeyedDropdown(
+                        label = stringResource(R.string.menu_config_who),
+                        options = listOf(
+                            null to stringResource(R.string.menu_scope_everyone)
+                        ) + state.profiles.map { it.id to it.name },
+                        selectedKey = swapFor,
+                        onSelected = { swapFor = it }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = selectedRecipe != null,
+                onClick = { selectedRecipe?.let { onConfirm(it.id, swapFor) } }
+            ) { Text(stringResource(R.string.meal_swap_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
+    )
 }
 
 @Composable
