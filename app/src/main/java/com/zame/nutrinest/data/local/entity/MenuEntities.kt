@@ -1,6 +1,7 @@
 package com.zame.nutrinest.data.local.entity
 
 import androidx.annotation.StringRes
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -119,8 +120,10 @@ data class WeeklyMenuEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val weekStart: Long,
     val slotsSpec: String,
-    val scope: MenuScope = MenuScope.SHARED,
-    val coursesSpec: String = "",
+    // Declared defaults, so a migrated row and a freshly created one agree —
+    // which is exactly what Room compares the two schemas on.
+    @ColumnInfo(defaultValue = "'SHARED'") val scope: MenuScope = MenuScope.SHARED,
+    @ColumnInfo(defaultValue = "''") val coursesSpec: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val remoteId: String? = null
 ) {
@@ -240,7 +243,7 @@ data class MealPortionEntity(
     val plannedMealId: Long,
     val profileId: Long,
     val factor: Double,
-    val baseFactor: Double = factor
+    @ColumnInfo(defaultValue = "0") val baseFactor: Double = factor
 )
 
 @Entity(
