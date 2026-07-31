@@ -23,3 +23,11 @@ val Peach = Color(0xFFFBE0C3)          // container tint
 val DarkCoffee = Color(0xFF221812)     // dark background
 val DarkMocha = Color(0xFF2F221A)      // dark surface
 val Linen = Color(0xFFF3E9DA)          // light text on dark
+
+// ── Semantic accents ──────────────────────────────────────────────────
+// Muted to sit beside the warm palette rather than shout over it. Used for
+// raw-safety badges, data-quality warnings and nutrient-density indicators —
+// always alongside an icon or label, never as the only signal.
+val Sage = Color(0xFF5E8C61)           // good / safe / nutrient-rich
+val Amber = Color(0xFFC98A2B)          // caution / check this
+val Clay = Color(0xFFB4523F)           // not advised / error

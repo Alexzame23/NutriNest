@@ -29,10 +29,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.zame.nutrinest.R
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.formatGrams
@@ -54,13 +56,16 @@ fun MealDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        meal?.recipe?.name ?: "Meal",
+                        meal?.recipe?.name ?: stringResource(R.string.meal_detail_title),
                         style = MaterialTheme.typography.headlineSmall
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -80,7 +85,12 @@ fun MealDetailScreen(
         ) {
             item {
                 Text(
-                    "${meal.meal.slot.label}${if (meal.meal.isCheatMeal) " · Cheat meal" else ""}",
+                    stringResource(meal.meal.slot.labelRes) +
+                        if (meal.meal.isCheatMeal) {
+                            " · " + stringResource(R.string.meal_cheat)
+                        } else {
+                            ""
+                        },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
@@ -100,7 +110,7 @@ fun MealDetailScreen(
             }
 
             // ── Household nutrition ─────────────────────────────────
-            item { SectionTitle("Nutrition · whole household") }
+            item { SectionTitle(stringResource(R.string.meal_nutrition_household)) }
             item {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     MacroDonutChart(nutrition = state.householdNutrition)
@@ -109,7 +119,7 @@ fun MealDetailScreen(
             item { NutritionSummary(nutrition = state.householdNutrition) }
 
             // ── Per person ──────────────────────────────────────────
-            item { SectionTitle("Per person") }
+            item { SectionTitle(stringResource(R.string.meal_per_person)) }
             items(state.portions.size) { i ->
                 val portion = state.portions[i]
                 val nutrition = state.nutritionFor(portion)
@@ -134,7 +144,7 @@ fun MealDetailScreen(
                             )
                         }
                         Text(
-                            "Portion ×%.2f · P %d g · C %d g · F %d g".format(
+                            stringResource(R.string.meal_portion_summary).format(
                                 portion.portion.factor,
                                 nutrition.protein.roundToInt(),
                                 nutrition.carbs.roundToInt(),
@@ -163,7 +173,7 @@ fun MealDetailScreen(
             }
 
             // ── Household ingredient totals ─────────────────────────
-            item { SectionTitle("Ingredients · household total") }
+            item { SectionTitle(stringResource(R.string.meal_ingredients_total)) }
             item {
                 Card(
                     shape = MaterialTheme.shapes.medium,
@@ -191,7 +201,7 @@ fun MealDetailScreen(
             }
 
             // ── Preparation ─────────────────────────────────────────
-            item { SectionTitle("Preparation") }
+            item { SectionTitle(stringResource(R.string.meal_preparation)) }
             items(state.steps.size) { i ->
                 val step = state.steps[i]
                 Card(
@@ -202,7 +212,7 @@ fun MealDetailScreen(
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Text(
-                            "Step ${i + 1}",
+                            stringResource(R.string.meal_step, i + 1),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.primary
                         )

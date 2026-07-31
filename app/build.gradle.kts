@@ -38,6 +38,12 @@ android {
     }
 }
 
+// Room writes the schema of every version here. Checked in, so the v4 -> v5
+// migration can be verified against the real schemas instead of by eye.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
@@ -55,6 +61,7 @@ dependencies {
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

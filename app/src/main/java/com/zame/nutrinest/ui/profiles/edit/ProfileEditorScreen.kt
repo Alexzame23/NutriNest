@@ -47,10 +47,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.ActivityLevel
 import com.zame.nutrinest.data.local.entity.BiologicalSex
 import com.zame.nutrinest.data.local.entity.BmrFormula
@@ -59,8 +61,8 @@ import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.UnitSystem
 import com.zame.nutrinest.data.local.entity.WeightLossRate
 import com.zame.nutrinest.domain.nutrition.NutritionTargets
+import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
-import com.zame.nutrinest.ui.components.OptionDropdown
 import java.text.DateFormat
 import java.util.Date
 
@@ -75,8 +77,9 @@ fun ProfileEditorScreen(
     var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let {
+    val errorMessage = state.error?.let { stringResource(it.messageRes) }
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.dismissError()
         }
@@ -89,13 +92,19 @@ fun ProfileEditorScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (state.editingId == null) "New Profile" else "Edit Profile",
+                        stringResource(
+                            if (state.editingId == null) R.string.profile_editor_new
+                            else R.string.profile_editor_edit
+                        ),
                         style = MaterialTheme.typography.headlineSmall
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -107,7 +116,7 @@ fun ProfileEditorScreen(
             ExtendedFloatingActionButton(
                 onClick = viewModel::save,
                 icon = { Icon(Icons.Rounded.Check, null) },
-                text = { Text("Save") },
+                text = { Text(stringResource(R.string.action_save)) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             )
@@ -121,12 +130,12 @@ fun ProfileEditorScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // ── Basics ──────────────────────────────────────────────
-            item { SectionTitle("About") }
+            item { SectionTitle(stringResource(R.string.profile_section_about)) }
             item {
                 OutlinedTextField(
                     value = state.name,
                     onValueChange = viewModel::onNameChange,
-                    label = { Text("Name *") },
+                    label = { Text(stringResource(R.string.profile_name)) },
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
@@ -141,7 +150,7 @@ fun ProfileEditorScreen(
                     onValueChange = {},
                     readOnly = true,
                     enabled = false,
-                    label = { Text("Date of birth *") },
+                    label = { Text(stringResource(R.string.profile_dob)) },
                     trailingIcon = { Icon(Icons.Rounded.CalendarToday, null) },
                     shape = MaterialTheme.shapes.small,
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
@@ -164,13 +173,13 @@ fun ProfileEditorScreen(
                             shape = SegmentedButtonDefaults.itemShape(
                                 index, BiologicalSex.entries.size
                             )
-                        ) { Text(sex.label) }
+                        ) { Text(stringResource(sex.labelRes)) }
                     }
                 }
             }
 
             // ── Body ────────────────────────────────────────────────
-            item { SectionTitle("Body") }
+            item { SectionTitle(stringResource(R.string.profile_section_body)) }
             item {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     UnitSystem.entries.forEachIndexed { index, unit ->
@@ -180,7 +189,7 @@ fun ProfileEditorScreen(
                             shape = SegmentedButtonDefaults.itemShape(
                                 index, UnitSystem.entries.size
                             )
-                        ) { Text(if (unit == UnitSystem.METRIC) "Metric" else "Imperial") }
+                        ) { Text(stringResource(unit.labelRes)) }
                     }
                 }
             }
@@ -188,13 +197,13 @@ fun ProfileEditorScreen(
                 if (state.unitSystem == UnitSystem.METRIC) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         NumberField(
-                            label = "Height (cm) *",
+                            label = stringResource(R.string.profile_height_cm),
                             value = state.heightText,
                             onChange = viewModel::onHeightChange,
                             modifier = Modifier.weight(1f)
                         )
                         NumberField(
-                            label = "Weight (kg) *",
+                            label = stringResource(R.string.profile_weight_kg),
                             value = state.weightText,
                             onChange = viewModel::onWeightChange,
                             modifier = Modifier.weight(1f)
@@ -203,19 +212,19 @@ fun ProfileEditorScreen(
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         NumberField(
-                            label = "Height (ft) *",
+                            label = stringResource(R.string.profile_height_ft),
                             value = state.heightText,
                             onChange = viewModel::onHeightChange,
                             modifier = Modifier.weight(1f)
                         )
                         NumberField(
-                            label = "(in)",
+                            label = stringResource(R.string.profile_height_in),
                             value = state.heightInchesText,
                             onChange = viewModel::onHeightInchesChange,
                             modifier = Modifier.weight(1f)
                         )
                         NumberField(
-                            label = "Weight (lb) *",
+                            label = stringResource(R.string.profile_weight_lb),
                             value = state.weightText,
                             onChange = viewModel::onWeightChange,
                             modifier = Modifier.weight(1f)
@@ -225,60 +234,55 @@ fun ProfileEditorScreen(
             }
             item {
                 NumberField(
-                    label = "Body fat % (optional — enables Katch-McArdle)",
+                    label = stringResource(R.string.profile_body_fat),
                     value = state.bodyFatText,
                     onChange = viewModel::onBodyFatChange
                 )
             }
 
             // ── Lifestyle & goal ────────────────────────────────────
-            item { SectionTitle("Lifestyle & Goal") }
+            item { SectionTitle(stringResource(R.string.profile_section_lifestyle)) }
             item {
-                OptionDropdown(
-                    label = "Activity level *",
-                    options = ActivityLevel.entries.map { "${it.label} — ${it.description}" },
-                    selected = "${state.activityLevel.label} — ${state.activityLevel.description}",
-                    onSelected = { selected ->
-                        ActivityLevel.entries
-                            .find { selected.startsWith(it.label) }
-                            ?.let(viewModel::onActivityChange)
-                    }
+                KeyedDropdown(
+                    label = stringResource(R.string.profile_activity_level),
+                    options = ActivityLevel.entries.map {
+                        it to stringResource(
+                            R.string.profile_activity_option,
+                            stringResource(it.labelRes),
+                            stringResource(it.descriptionRes)
+                        )
+                    },
+                    selectedKey = state.activityLevel,
+                    onSelected = viewModel::onActivityChange
                 )
             }
             item {
-                OptionDropdown(
-                    label = "Primary goal *",
-                    options = Goal.entries.map { it.label },
-                    selected = state.goal.label,
-                    onSelected = { selected ->
-                        Goal.entries.find { it.label == selected }
-                            ?.let(viewModel::onGoalChange)
-                    }
+                KeyedDropdown(
+                    label = stringResource(R.string.profile_goal),
+                    options = Goal.entries.map { it to stringResource(it.labelRes) },
+                    selectedKey = state.goal,
+                    onSelected = viewModel::onGoalChange
                 )
             }
             // Deficit size — only relevant when losing weight.
             item {
                 AnimatedVisibility(visible = state.goal == Goal.LOSE_WEIGHT) {
-                    OptionDropdown(
-                        label = "Weight loss pace",
-                        options = WeightLossRate.entries.map { it.label },
-                        selected = state.weightLossRate.label,
-                        onSelected = { selected ->
-                            WeightLossRate.entries.find { it.label == selected }
-                                ?.let(viewModel::onWeightLossRateChange)
-                        }
+                    KeyedDropdown(
+                        label = stringResource(R.string.profile_weight_loss_pace),
+                        options = WeightLossRate.entries.map {
+                            it to stringResource(it.labelRes)
+                        },
+                        selectedKey = state.weightLossRate,
+                        onSelected = viewModel::onWeightLossRateChange
                     )
                 }
             }
             item {
-                OptionDropdown(
-                    label = "Calculation formula",
-                    options = BmrFormula.entries.map { it.label },
-                    selected = state.formula.label,
-                    onSelected = { selected ->
-                        BmrFormula.entries.find { it.label == selected }
-                            ?.let(viewModel::onFormulaChange)
-                    }
+                KeyedDropdown(
+                    label = stringResource(R.string.profile_formula),
+                    options = BmrFormula.entries.map { it to stringResource(it.labelRes) },
+                    selectedKey = state.formula,
+                    onSelected = viewModel::onFormulaChange
                 )
             }
 
@@ -290,13 +294,13 @@ fun ProfileEditorScreen(
             }
 
             // ── Optional extras ─────────────────────────────────────
-            item { SectionTitle("Preferences (optional)") }
+            item { SectionTitle(stringResource(R.string.profile_section_preferences)) }
             item {
                 OutlinedTextField(
                     value = state.dietaryPreferences,
                     onValueChange = viewModel::onDietaryChange,
-                    label = { Text("Dietary preferences") },
-                    placeholder = { Text("e.g. vegetarian, low-carb…") },
+                    label = { Text(stringResource(R.string.profile_dietary)) },
+                    placeholder = { Text(stringResource(R.string.profile_dietary_hint)) },
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -305,8 +309,8 @@ fun ProfileEditorScreen(
                 OutlinedTextField(
                     value = state.allergies,
                     onValueChange = viewModel::onAllergiesChange,
-                    label = { Text("Allergies") },
-                    placeholder = { Text("e.g. peanuts, shellfish…") },
+                    label = { Text(stringResource(R.string.profile_allergies)) },
+                    placeholder = { Text(stringResource(R.string.profile_allergies_hint)) },
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -324,10 +328,12 @@ fun ProfileEditorScreen(
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let(viewModel::onDateOfBirthChange)
                     showDatePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.action_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -345,19 +351,22 @@ private fun TargetsCard(targets: NutritionTargets) {
     ) {
         Column(Modifier.padding(20.dp)) {
             Text(
-                "Your daily targets",
+                stringResource(R.string.profile_targets_title),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                "Calculated with ${targets.formulaUsed.label}",
+                stringResource(
+                    R.string.profile_targets_formula,
+                    stringResource(targets.formulaUsed.labelRes)
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             targets.note?.let {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    it,
+                    stringResource(it.messageRes),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -374,13 +383,32 @@ private fun TargetsCard(targets: NutritionTargets) {
                 )
             }
             Spacer(Modifier.height(16.dp))
-            StatRow("BMR (at rest)", "${targets.bmr} kcal")
-            StatRow("TDEE (with activity)", "${targets.tdee} kcal")
-            StatRow("Daily target", "${targets.dailyCalories} kcal", highlight = true)
+            StatRow(
+                stringResource(R.string.profile_bmr),
+                stringResource(R.string.kcal_value, targets.bmr)
+            )
+            StatRow(
+                stringResource(R.string.profile_tdee),
+                stringResource(R.string.kcal_value, targets.tdee)
+            )
+            StatRow(
+                stringResource(R.string.profile_daily_target),
+                stringResource(R.string.kcal_value, targets.dailyCalories),
+                highlight = true
+            )
             Spacer(Modifier.height(8.dp))
-            StatRow("Protein", "${targets.proteinG} g")
-            StatRow("Carbohydrates", "${targets.carbsG} g")
-            StatRow("Fats", "${targets.fatG} g")
+            StatRow(
+                stringResource(R.string.nutrition_protein),
+                stringResource(R.string.value_with_grams, targets.proteinG.toString())
+            )
+            StatRow(
+                stringResource(R.string.nutrition_carbohydrates),
+                stringResource(R.string.value_with_grams, targets.carbsG.toString())
+            )
+            StatRow(
+                stringResource(R.string.nutrition_fats),
+                stringResource(R.string.value_with_grams, targets.fatG.toString())
+            )
         }
     }
 }

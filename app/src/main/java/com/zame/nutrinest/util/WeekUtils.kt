@@ -1,12 +1,25 @@
 package com.zame.nutrinest.util
 
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 import java.util.Calendar
+import java.util.Locale
 
 object WeekUtils {
 
-    val DAY_NAMES = listOf(
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
-    )
+    /**
+     * Day names for the device's language.
+     *
+     * Taken from the JDK rather than `strings.xml`: the platform already knows
+     * every locale's day names and capitalisation conventions, so translating
+     * them by hand would only be a chance to get them wrong.
+     */
+    fun dayNames(locale: Locale = Locale.getDefault()): List<String> =
+        DayOfWeek.entries.map { it.getDisplayName(TextStyle.FULL_STANDALONE, locale) }
+
+    /** Three-letter forms, for chips and other tight spots. */
+    fun shortDayNames(locale: Locale = Locale.getDefault()): List<String> =
+        DayOfWeek.entries.map { it.getDisplayName(TextStyle.SHORT_STANDALONE, locale) }
 
     /** Epoch millis of Monday 00:00 (local) of the week containing [time]. */
     fun weekStartOf(time: Long = System.currentTimeMillis()): Long {

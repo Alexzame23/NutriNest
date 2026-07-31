@@ -2,7 +2,9 @@ package com.zame.nutrinest
 
 import android.app.Application
 import com.zame.nutrinest.data.local.NutriNestDatabase
+import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
+import com.zame.nutrinest.data.repository.LocalFoodReferenceRepository
 import com.zame.nutrinest.data.repository.LocalIngredientRepository
 import com.zame.nutrinest.data.repository.LocalMenuRepository
 import com.zame.nutrinest.data.repository.LocalProfileRepository
@@ -17,6 +19,9 @@ class AppContainer(app: Application) {
 
     val ingredientRepository: IngredientRepository =
         LocalIngredientRepository(database.ingredientDao())
+
+    val foodReferenceRepository: FoodReferenceRepository =
+        LocalFoodReferenceRepository(database.foodReferenceDao())
 
     val recipeRepository: RecipeRepository =
         LocalRecipeRepository(database.recipeDao())

@@ -1,13 +1,15 @@
 package com.zame.nutrinest.ui.profiles.edit
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.zame.nutrinest.NutriNestApp
+import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.ActivityLevel
 import com.zame.nutrinest.data.local.entity.BiologicalSex
 import com.zame.nutrinest.data.local.entity.BmrFormula
@@ -22,6 +24,16 @@ import com.zame.nutrinest.domain.nutrition.UnitConversions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+/** What is wrong with the form, as a code the UI layer translates. */
+enum class ProfileFormError(@StringRes val messageRes: Int) {
+    NAME_REQUIRED(R.string.profile_error_name),
+    DOB_REQUIRED(R.string.profile_error_dob),
+    DOB_IN_FUTURE(R.string.profile_error_dob_future),
+    HEIGHT_INVALID(R.string.profile_error_height),
+    WEIGHT_INVALID(R.string.profile_error_weight),
+    BODY_FAT_INVALID(R.string.profile_error_body_fat)
+}
 
 data class ProfileEditorState(
     val editingId: Long? = null,
@@ -40,7 +52,7 @@ data class ProfileEditorState(
     val formula: BmrFormula = BmrFormula.AUTO,
     val dietaryPreferences: String = "",
     val allergies: String = "",
-    val errorMessage: String? = null,
+    val error: ProfileFormError? = null,
     val saved: Boolean = false,
     val isLoading: Boolean = false
 ) {
@@ -160,7 +172,7 @@ class ProfileEditorViewModel(
     fun onFormulaChange(v: BmrFormula) = update { copy(formula = v) }
     fun onDietaryChange(v: String) = update { copy(dietaryPreferences = v) }
     fun onAllergiesChange(v: String) = update { copy(allergies = v) }
-    fun dismissError() = update { copy(errorMessage = null) }
+    fun dismissError() = update { copy(error = null) }
 
     /** Switching units converts the current values instead of clearing them. */
     fun onUnitSystemChange(target: UnitSystem) {
@@ -196,18 +208,17 @@ class ProfileEditorViewModel(
         val s = _state.value
         viewModelScope.launch {
             val error = when {
-                s.name.isBlank() -> "Please enter a name."
-                s.dateOfBirth == null -> "Please select a date of birth."
-                s.dateOfBirth > System.currentTimeMillis() ->
-                    "Date of birth can't be in the future."
-                s.heightCm == null -> "Please enter a valid height."
-                s.weightKg == null -> "Please enter a valid weight."
+                s.name.isBlank() -> ProfileFormError.NAME_REQUIRED
+                s.dateOfBirth == null -> ProfileFormError.DOB_REQUIRED
+                s.dateOfBirth > System.currentTimeMillis() -> ProfileFormError.DOB_IN_FUTURE
+                s.heightCm == null -> ProfileFormError.HEIGHT_INVALID
+                s.weightKg == null -> ProfileFormError.WEIGHT_INVALID
                 s.bodyFatText.isNotBlank() && s.bodyFatPercent == null ->
-                    "Body fat must be between 3% and 70%, or left empty."
+                    ProfileFormError.BODY_FAT_INVALID
                 else -> null
             }
             if (error != null) {
-                update { copy(errorMessage = error) }
+                update { copy(error = error) }
                 return@launch
             }
 

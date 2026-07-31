@@ -78,6 +78,17 @@ data class IngredientWithQuantity(
     val nutrition: NutritionValues get() = ingredient.nutrition.forGrams(grams)
 }
 
+/**
+ * What a whole recipe adds up to, summed in SQL.
+ *
+ * Lets the recipe list show calories and a macro split per row without loading
+ * every recipe's ingredients into memory first.
+ */
+data class RecipeNutrition(
+    val recipeId: Long,
+    @Embedded val nutrition: NutritionValues
+)
+
 /** A recipe together with its steps (ingredients fetched via a JOIN query). */
 data class RecipeWithSteps(
     @Embedded val recipe: RecipeEntity,

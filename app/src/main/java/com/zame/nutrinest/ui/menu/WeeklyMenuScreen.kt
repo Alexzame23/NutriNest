@@ -45,11 +45,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.PlannedMealWithRecipe
 import com.zame.nutrinest.util.WeekUtils
 
@@ -63,6 +67,9 @@ fun WeeklyMenuScreen(
     viewModel: WeeklyMenuViewModel = viewModel(factory = WeeklyMenuViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsState()
+    // Day names come from the JDK for the device's locale, not from strings.xml.
+    val configuration = LocalConfiguration.current
+    val dayNames = remember(configuration) { WeekUtils.dayNames(configuration.locales[0]) }
 
     // Politely ask for notification permission once (Android 13+) so the
     // weekend planning reminder can be delivered.
@@ -79,10 +86,18 @@ fun WeeklyMenuScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Weekly Menu", style = MaterialTheme.typography.headlineSmall) },
+                title = {
+                    Text(
+                        stringResource(R.string.weekly_menu_title),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back)
+                        )
                     }
                 },
                 actions = {
@@ -90,14 +105,14 @@ fun WeeklyMenuScreen(
                         IconButton(onClick = { onConfigure(state.weekStart) }) {
                             Icon(
                                 Icons.Rounded.Refresh,
-                                contentDescription = "Regenerate this week's menu"
+                                contentDescription = stringResource(R.string.weekly_menu_regenerate)
                             )
                         }
                     }
                     IconButton(onClick = onOpenShoppingList) {
                         Icon(
                             Icons.Rounded.ShoppingCart,
-                            contentDescription = "Shopping list"
+                            contentDescription = stringResource(R.string.shopping_list_title)
                         )
                     }
                 },
@@ -111,7 +126,7 @@ fun WeeklyMenuScreen(
                 ExtendedFloatingActionButton(
                     onClick = { onConfigure(state.weekStart) },
                     icon = { Icon(Icons.Rounded.AutoAwesome, null) },
-                    text = { Text("Create Weekly Menu") },
+                    text = { Text(stringResource(R.string.weekly_menu_create)) },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
@@ -130,12 +145,12 @@ fun WeeklyMenuScreen(
                     selected = state.isCurrentWeek,
                     onClick = viewModel::showCurrentWeek,
                     shape = SegmentedButtonDefaults.itemShape(0, 2)
-                ) { Text("This week") }
+                ) { Text(stringResource(R.string.week_current)) }
                 SegmentedButton(
                     selected = !state.isCurrentWeek,
                     onClick = viewModel::showNextWeek,
                     shape = SegmentedButtonDefaults.itemShape(1, 2)
-                ) { Text("Next week") }
+                ) { Text(stringResource(R.string.week_next)) }
             }
             Spacer(Modifier.height(12.dp))
 
@@ -150,7 +165,13 @@ fun WeeklyMenuScreen(
                     if (state.isCurrentWeek) {
                         state.mealsByDay[state.todayIndex]?.let { todayMeals ->
                             item {
-                                DayHeader("Today · ${WeekUtils.DAY_NAMES[state.todayIndex]}", highlight = true)
+                                DayHeader(
+                                    stringResource(
+                                        R.string.weekly_menu_today,
+                                        dayNames[state.todayIndex]
+                                    ),
+                                    highlight = true
+                                )
                             }
                             items(todayMeals.size) { i ->
                                 MealRow(todayMeals[i], onOpenMeal, highlight = true)
@@ -161,7 +182,7 @@ fun WeeklyMenuScreen(
                     for (day in 0..6) {
                         if (state.isCurrentWeek && day == state.todayIndex) continue
                         val meals = state.mealsByDay[day] ?: continue
-                        item { DayHeader(WeekUtils.DAY_NAMES[day]) }
+                        item { DayHeader(dayNames[day]) }
                         items(meals.size) { i -> MealRow(meals[i], onOpenMeal) }
                     }
                 }
@@ -208,7 +229,7 @@ private fun MealRow(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    item.meal.slot.label,
+                    stringResource(item.meal.slot.labelRes),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -221,7 +242,7 @@ private fun MealRow(
             }
             if (item.meal.isCheatMeal) {
                 Text(
-                    "Cheat",
+                    stringResource(R.string.meal_cheat),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
@@ -231,7 +252,7 @@ private fun MealRow(
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     Icons.Rounded.Lock,
-                    contentDescription = "Locked meal",
+                    contentDescription = stringResource(R.string.meal_locked),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
@@ -252,14 +273,16 @@ private fun EmptyMenuState(isCurrentWeek: Boolean) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                if (isCurrentWeek) "No menu for this week yet"
-                else "Next week isn't planned yet",
+                stringResource(
+                    if (isCurrentWeek) R.string.weekly_menu_empty_current
+                    else R.string.weekly_menu_empty_next
+                ),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Generate a personalized plan for the\nwhole household from your recipes.",
+                stringResource(R.string.weekly_menu_empty_body),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center

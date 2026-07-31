@@ -1,6 +1,7 @@
 package com.zame.nutrinest.domain.nutrition
 
-import com.zame.nutrinest.data.local.entity.ActivityLevel
+import androidx.annotation.StringRes
+import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.BiologicalSex
 import com.zame.nutrinest.data.local.entity.BmrFormula
 import com.zame.nutrinest.data.local.entity.Goal
@@ -21,9 +22,17 @@ data class NutritionTargets(
     val fatG: Int,
     /** The formula actually used (relevant when the profile is set to AUTO). */
     val formulaUsed: BmrFormula,
-    /** Non-null when AUTO downgraded a choice, e.g. Katch-McArdle without body fat. */
-    val note: String? = null
+    /** Set when a formula was swapped out, e.g. Katch-McArdle without body fat. */
+    val note: NutritionNote? = null
 )
+
+/**
+ * Something worth telling the user about how their targets were worked out.
+ * A code rather than a sentence, so the UI layer supplies the translation.
+ */
+enum class NutritionNote(@StringRes val messageRes: Int) {
+    KATCH_MCARDLE_NEEDS_BODY_FAT(R.string.nutrition_note_katch_needs_body_fat)
+}
 
 /**
  * Pure, stateless calculation engine. Deliberately has NO Android
@@ -55,7 +64,7 @@ object NutritionCalculator {
 
     // ── BMR ─────────────────────────────────────────────────────────────
 
-    private fun bmrFor(p: ProfileEntity): Triple<Double, BmrFormula, String?> {
+    private fun bmrFor(p: ProfileEntity): Triple<Double, BmrFormula, NutritionNote?> {
         val requested = p.formula
         return when (requested) {
             BmrFormula.AUTO -> {
@@ -76,7 +85,7 @@ object NutritionCalculator {
                     Triple(
                         mifflinStJeor(p),
                         BmrFormula.MIFFLIN_ST_JEOR,
-                        "Katch-McArdle needs body fat %. Used Mifflin-St Jeor instead."
+                        NutritionNote.KATCH_MCARDLE_NEEDS_BODY_FAT
                     )
                 }
             }

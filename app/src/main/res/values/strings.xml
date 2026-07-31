@@ -1,3 +1,439 @@
 <resources>
     <string name="app_name">NutriNest</string>
+
+    <!-- ── Common ─────────────────────────────────────────────────── -->
+    <string name="action_back">Back</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_add">Add</string>
+    <string name="action_close">Close</string>
+    <string name="action_compare">Compare</string>
+    <string name="action_done">Done</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_search">Search</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_more">More options</string>
+    <string name="action_save_anyway">Save anyway</string>
+    <string name="action_ok">OK</string>
+    <string name="action_add_photo">Add photo</string>
+    <string name="unit_grams">g</string>
+    <string name="unit_kcal">kcal</string>
+    <string name="value_with_grams">%1$s g</string>
+    <string name="value_with_unit">%1$s %2$s</string>
+    <string name="kcal_value">%1$d kcal</string>
+    <string name="kcal_per_100g">%1$d kcal / 100 g</string>
+
+    <!-- ── Home ───────────────────────────────────────────────────── -->
+    <string name="home_title">Nutrition Planner</string>
+    <string name="home_subtitle">Organize your meals and discover healthy, delicious recipes.</string>
+    <string name="home_recipes_ingredients_title">Recipes &amp; Ingredients</string>
+    <string name="home_recipes_ingredients_subtitle">Browse your dishes and the food database</string>
+    <string name="home_weekly_menu_title">Weekly Menu</string>
+    <string name="home_weekly_menu_subtitle">Plan your meals for the week</string>
+    <string name="home_profiles">Profiles</string>
+    <string name="home_card_description">%1$s. %2$s</string>
+
+    <!-- ── Language ───────────────────────────────────────────────── -->
+    <string name="language_switch">Change language</string>
+    <!-- Language names stay in their own language in every locale. -->
+    <string name="language_english">English</string>
+    <string name="language_spanish">Español</string>
+
+    <!-- ── Recipes &amp; Ingredients tabs ─────────────────────────── -->
+    <string name="tab_recipes">Recipes</string>
+    <string name="tab_ingredients">Ingredients</string>
+
+    <!-- ── Recipes ────────────────────────────────────────────────── -->
+    <string name="recipes_title">Recipes</string>
+    <string name="recipes_empty_title">No recipes yet</string>
+    <string name="recipes_empty_body">Tap + to create your first recipe.</string>
+    <string name="recipes_empty_filtered_title">No matches</string>
+    <string name="recipes_empty_filtered">Try a different search, or clear the filters.</string>
+    <string name="recipes_empty_favorites">Star a recipe to keep it here.</string>
+    <string name="recipes_empty_recent">Recipes you add will show up here.</string>
+    <string name="recipes_add_recipe">Add Recipe</string>
+    <string name="recipes_add_ingredient">Add Ingredient</string>
+    <string name="recipes_search_hint">Search recipes</string>
+    <string name="recipes_view_categories">Courses</string>
+    <string name="recipes_view_all">All</string>
+    <string name="recipes_view_favorites">Favourites</string>
+    <string name="recipes_view_recent">Recently added</string>
+    <string name="recipes_sort_newest">Newest first</string>
+    <string name="recipes_sort_oldest">Oldest first</string>
+    <string name="recipes_favorite_add">Add to favourites</string>
+    <string name="recipes_favorite_remove">Remove from favourites</string>
+    <plurals name="recipes_count">
+        <item quantity="one">%1$d recipe</item>
+        <item quantity="other">%1$d recipes</item>
+    </plurals>
+
+    <!-- ── Recipe courses (stored in English, shown translated) ───── -->
+    <string name="recipe_category_breakfast">Breakfast</string>
+    <string name="recipe_category_main_dish">Main dish</string>
+    <string name="recipe_category_side_dish">Side dish</string>
+    <string name="recipe_category_dessert">Dessert</string>
+    <string name="recipe_category_snack">Snack</string>
+    <string name="recipe_category_drink">Drink</string>
+    <string name="recipe_category_other">Other</string>
+
+    <!-- ── Recipe detail ──────────────────────────────────────────── -->
+    <string name="recipe_totals">What this recipe makes</string>
+    <string name="recipe_total_weight">Total weight: %1$s</string>
+    <string name="recipe_steps">Preparation</string>
+    <string name="recipe_step">Step %1$d</string>
+    <string name="recipe_no_steps">This recipe has no preparation steps.</string>
+    <string name="recipe_no_ingredients">This recipe has no ingredients.</string>
+    <string name="recipe_not_found">That recipe is no longer here.</string>
+    <string name="recipe_delete_title">Delete recipe?</string>
+    <string name="recipe_delete_body">%1$s will be removed, along with its steps.</string>
+    <string name="recipe_delete_blocked_title">Still in use</string>
+    <string name="recipe_delete_blocked_body">%1$s is planned in a weekly menu. Remove it from the menu first.</string>
+    <plurals name="recipe_ingredients_count">
+        <item quantity="one">%1$d ingredient</item>
+        <item quantity="other">%1$d ingredients</item>
+    </plurals>
+
+    <!-- ── Ingredients list ───────────────────────────────────────── -->
+    <string name="ingredients_title">Ingredients</string>
+    <string name="ingredients_search_hint">Search ingredients</string>
+    <string name="ingredients_view_categories">Categories</string>
+    <string name="ingredients_view_all">All</string>
+    <string name="ingredients_view_favorites">Favorites</string>
+    <string name="ingredients_view_recent">Recent</string>
+    <string name="ingredients_sort_name_asc">Name A–Z</string>
+    <string name="ingredients_sort_name_desc">Name Z–A</string>
+    <string name="ingredients_sort_calories_desc">Most calories</string>
+    <string name="ingredients_sort_calories_asc">Fewest calories</string>
+    <string name="ingredients_sort_protein_desc">Most protein</string>
+    <string name="ingredients_sort_label">Sort</string>
+    <string name="ingredients_filter_clear">Clear filters</string>
+    <string name="ingredients_custom_only">Custom only</string>
+    <string name="ingredients_empty_title">No ingredients found</string>
+    <string name="ingredients_empty_body">Try a different search, or clear the filters.</string>
+    <string name="ingredients_empty_favorites">Tap the star on an ingredient to keep it here.</string>
+    <string name="ingredients_empty_recent">Ingredients you use in recipes show up here.</string>
+    <string name="ingredients_new">New ingredient</string>
+    <string name="ingredients_custom_badge">Custom</string>
+    <string name="ingredients_favorite_add">Add to favorites</string>
+    <string name="ingredients_favorite_remove">Remove from favorites</string>
+    <string name="ingredients_recently_added">Recently added</string>
+    <string name="ingredients_incomplete_data">Incomplete nutritional data</string>
+    <string name="ingredients_compare_start">Compare ingredients</string>
+    <string name="ingredients_compare_selected">%1$d selected</string>
+    <string name="ingredients_compare_hint">Pick 2 or 3 ingredients to compare</string>
+    <string name="ingredients_compare_limit">You can compare up to 3 ingredients</string>
+    <string name="ingredients_attribution_title">About this data</string>
+    <plurals name="ingredients_count">
+        <item quantity="one">%1$d ingredient</item>
+        <item quantity="other">%1$d ingredients</item>
+    </plurals>
+
+    <!-- ── Ingredient detail ──────────────────────────────────────── -->
+    <string name="ingredient_detail_title">Ingredient</string>
+    <string name="ingredient_basis_label">Show values per</string>
+    <string name="ingredient_basis_100g">100 g</string>
+    <string name="ingredient_basis_serving">Serving (%1$s g)</string>
+    <string name="ingredient_macros">Macronutrients</string>
+    <string name="ingredient_micros">Micronutrients</string>
+    <string name="ingredient_portions">Portions &amp; measures</string>
+    <string name="ingredient_synonyms">Also known as</string>
+    <string name="ingredient_notes">Notes</string>
+    <string name="ingredient_raw_safety">Eating it raw</string>
+    <string name="ingredient_used_in">Used in recipes</string>
+    <string name="ingredient_used_in_none">Not used in any recipe yet</string>
+    <string name="ingredient_data_quality">Data quality</string>
+    <string name="ingredient_completeness">%1$d%% of the nutrient panel is filled in</string>
+    <string name="ingredient_no_micros">No micronutrient data for this ingredient.</string>
+    <string name="ingredient_delete_title">Delete this ingredient?</string>
+    <string name="ingredient_delete_body">%1$s will be removed permanently.</string>
+    <string name="ingredient_delete_blocked_title">Still in use</string>
+    <string name="ingredient_delete_blocked_body">%1$s is used by a recipe or shopping list, so it can\'t be deleted. Remove it from those first.</string>
+    <string name="ingredient_deleted">Ingredient deleted</string>
+    <string name="ingredient_not_found">This ingredient no longer exists.</string>
+    <string name="ingredient_nrv_share">%1$d%% NRV</string>
+    <string name="ingredient_nrv_explainer">NRV is the share of the EU daily reference intake.</string>
+
+    <!-- ── Nutrient groups ────────────────────────────────────────── -->
+    <string name="nutrient_group_macro">Macronutrients</string>
+    <string name="nutrient_group_fat">Fats</string>
+    <string name="nutrient_group_fatty_acid">Fatty acids</string>
+    <string name="nutrient_group_sugar">Sugars</string>
+    <string name="nutrient_group_vitamin">Vitamins</string>
+    <string name="nutrient_group_mineral">Minerals</string>
+    <string name="nutrient_group_other">Other</string>
+
+    <!-- ── Raw safety ─────────────────────────────────────────────── -->
+    <string name="raw_safety_safe">Safe to eat raw</string>
+    <string name="raw_safety_caution">Care needed</string>
+    <string name="raw_safety_unsafe">Cook before eating</string>
+    <string name="raw_safety_unknown">Not known</string>
+    <string name="raw_safety_safe_detail">Usually eaten without cooking.</string>
+    <string name="raw_safety_caution_detail">Edible without cooking, but check how it was prepared.</string>
+    <string name="raw_safety_unsafe_detail">Should be cooked before eating.</string>
+    <string name="raw_safety_unknown_detail">We don\'t have guidance for this ingredient.</string>
+    <string name="raw_safety_guidance">Guidance only — it isn\'t food-safety advice.</string>
+
+    <!-- ── Preparation state ──────────────────────────────────────── -->
+    <string name="prep_state_unspecified">Unspecified</string>
+    <string name="prep_state_raw">Raw</string>
+    <string name="prep_state_boiled">Boiled</string>
+    <string name="prep_state_cooked">Cooked</string>
+    <string name="prep_state_fried">Fried</string>
+    <string name="prep_state_grilled">Grilled</string>
+    <string name="prep_state_roasted">Roasted</string>
+    <string name="prep_state_steamed">Steamed</string>
+    <string name="prep_state_canned">Canned</string>
+    <string name="prep_state_cured">Cured</string>
+    <string name="prep_state_smoked">Smoked</string>
+    <string name="prep_state_dried">Dried</string>
+    <string name="prep_state_frozen">Frozen</string>
+    <string name="prep_state_powdered">Powdered</string>
+
+    <!-- ── Data quality ───────────────────────────────────────────── -->
+    <string name="data_quality_ok">Complete</string>
+    <string name="data_quality_suspect">Check these figures</string>
+    <string name="data_quality_incomplete">Incomplete</string>
+    <string name="quality_issue_energy_mismatch">Stated calories don\'t match the macronutrients.</string>
+    <string name="quality_issue_mass_balance">The nutrients add up to more or less than 100 g.</string>
+    <string name="quality_issue_satfat_exceeds_fat">Saturated fat is higher than total fat.</string>
+    <string name="quality_issue_monofat_exceeds_fat">Monounsaturated fat is higher than total fat.</string>
+    <string name="quality_issue_polyfat_exceeds_fat">Polyunsaturated fat is higher than total fat.</string>
+    <string name="quality_issue_sugars_exceed_carbs">Sugars are higher than total carbohydrate.</string>
+    <string name="quality_issue_starch_exceeds_carbs">Starch is higher than total carbohydrate.</string>
+    <string name="quality_issue_sparse_coverage">Only a few nutrients were measured.</string>
+    <string name="quality_issue_carbs_fibre_normalised">Carbohydrate was adjusted to exclude fibre.</string>
+    <string name="quality_issue_duplicate_merged">Merged with a duplicate entry.</string>
+
+    <!-- ── Ingredient editor ──────────────────────────────────────── -->
+    <string name="editor_title_new">New Ingredient</string>
+    <string name="editor_title_edit">Edit Ingredient</string>
+    <string name="editor_photo_hint">Add photo (optional)</string>
+    <string name="editor_selected_photo">Selected photo</string>
+    <string name="editor_name">Ingredient name *</string>
+    <string name="editor_name_es">Spanish name (optional)</string>
+    <string name="editor_name_es_help">Shown when the app is used in Spanish.</string>
+    <string name="editor_category">Category *</string>
+    <string name="editor_nutrition_heading">Nutrition per 100 g</string>
+    <string name="editor_kcal">Calories (kcal) *</string>
+    <string name="editor_carbs">Carbs (g) *</string>
+    <string name="editor_fats">Fats (g) *</string>
+    <string name="editor_protein">Protein (g) *</string>
+    <string name="editor_optional_heading">Optional details</string>
+    <string name="editor_micros_heading">Micronutrients</string>
+    <string name="editor_micros_help">Leave blank for anything you don\'t know.</string>
+    <string name="editor_notes">Description or notes</string>
+    <string name="editor_serving_size">Serving size (g)</string>
+    <string name="editor_raw_safety">Can it be eaten raw?</string>
+    <string name="editor_is_liquid">Measured by volume (liquid)</string>
+    <string name="editor_density">Density (g per ml)</string>
+    <string name="editor_portions_heading">Alternative measures</string>
+    <string name="editor_portions_help">A cup, a tablespoon, a piece — and what it weighs.</string>
+    <string name="editor_portion_label">Measure</string>
+    <string name="editor_portion_grams">Grams</string>
+    <string name="editor_add_portion">Add a measure</string>
+    <string name="editor_synonyms_heading">Synonyms</string>
+    <string name="editor_synonyms_help">Other names this ingredient goes by, to improve search.</string>
+    <string name="editor_add_synonym">Add a synonym</string>
+    <string name="editor_synonym">Synonym</string>
+    <string name="editor_saved">Ingredient saved</string>
+    <string name="editor_use_atwater">Use %1$d kcal</string>
+
+    <!-- ── Validation ─────────────────────────────────────────────── -->
+    <string name="validation_fix_required">Please fill in all required fields with valid values.</string>
+    <string name="validation_name_required">A name is required.</string>
+    <string name="validation_category_required">Pick a category.</string>
+    <string name="validation_kcal_required">Calories are required.</string>
+    <string name="validation_kcal_invalid">Calories must be zero or more.</string>
+    <string name="validation_carbs_invalid">Carbs must be between 0 and 100 g.</string>
+    <string name="validation_fats_invalid">Fats must be between 0 and 100 g.</string>
+    <string name="validation_protein_invalid">Protein must be between 0 and 100 g.</string>
+    <string name="validation_nutrient_negative">Nutrient values can\'t be negative.</string>
+    <string name="validation_grams_exceed_100">Can\'t be more than 100 g per 100 g.</string>
+    <string name="validation_mass_balance">The nutrients add up to %1$s g, more than the 100 g they\'re measured in.</string>
+    <string name="validation_energy_mismatch">You entered %1$s kcal, but the macronutrients work out to about %2$s kcal.</string>
+    <string name="validation_satfat_exceeds_fat">Saturated fat (%1$s g) can\'t exceed total fat (%2$s g).</string>
+    <string name="validation_sugars_exceed_carbs">Sugars (%1$s g) can\'t exceed carbs (%2$s g).</string>
+    <string name="validation_starch_exceeds_carbs">Starch (%1$s g) can\'t exceed carbs (%2$s g).</string>
+    <string name="validation_kcal_implausible">Calories can\'t exceed %1$s per 100 g — pure fat is 884.</string>
+    <string name="validation_serving_size_invalid">Serving size must be between 0 and 5000 g.</string>
+    <string name="validation_density_invalid">Density should be between 0.1 and 2.5 g per ml.</string>
+    <string name="validation_duplicate_name">An ingredient called \"%1$s\" already exists.</string>
+    <string name="validation_similar_name">Similar to %1$s — is this a duplicate?</string>
+    <string name="validation_warnings_title">Check before saving</string>
+
+    <!-- ── Comparison ─────────────────────────────────────────────── -->
+    <string name="compare_title">Compare</string>
+    <string name="compare_empty">Pick at least two ingredients to compare.</string>
+    <string name="compare_per_100g">All values per 100 g</string>
+    <string name="compare_shared_nutrients">Shared nutrients</string>
+    <string name="compare_no_shared">These ingredients have no nutrients in common.</string>
+
+    <!-- ── Nutrition components ───────────────────────────────────── -->
+    <string name="nutrition_carbohydrates">Carbohydrates</string>
+    <string name="nutrition_fats">Fats</string>
+    <string name="nutrition_protein">Protein</string>
+    <string name="nutrition_total_calories">Total calories</string>
+
+    <!-- ── Create recipe ──────────────────────────────────────────── -->
+    <string name="create_recipe_title">New Recipe</string>
+    <string name="create_recipe_saving">Saving…</string>
+    <string name="create_recipe_cover_photo">Add cover photo</string>
+    <string name="create_recipe_name">Recipe name *</string>
+    <string name="create_recipe_category">Category *</string>
+    <string name="create_recipe_folder">Folder</string>
+    <string name="create_recipe_nutrition">Nutrition</string>
+    <string name="create_recipe_add_ingredient">Add ingredient</string>
+    <string name="create_recipe_add_step">Add step</string>
+    <string name="create_recipe_new_ingredient">Create new ingredient</string>
+    <string name="create_recipe_quantity">Quantity (grams)</string>
+    <string name="create_recipe_step_hint">Describe this step…</string>
+    <string name="create_recipe_step_photo">Add photo to step %1$d</string>
+    <string name="create_recipe_remove_step">Remove step %1$d</string>
+    <string name="recipe_error_name">Please give your recipe a name.</string>
+    <string name="recipe_error_no_ingredients">Add at least one ingredient before saving.</string>
+    <string name="recipe_error_no_steps">Add at least one preparation step before saving.</string>
+    <string name="recipe_error_duplicate_name">A recipe with that name already exists. Choose a different one.</string>
+
+    <!-- ── Weekly menu ────────────────────────────────────────────── -->
+    <string name="weekly_menu_title">Weekly Menu</string>
+    <string name="weekly_menu_create">Create Weekly Menu</string>
+    <string name="weekly_menu_regenerate">Regenerate this week\'s menu</string>
+    <string name="weekly_menu_today">Today · %1$s</string>
+    <string name="weekly_menu_empty_current">No menu for this week yet</string>
+    <string name="weekly_menu_empty_next">Next week isn\'t planned yet</string>
+    <string name="weekly_menu_empty_body">Generate a personalized plan for the whole household from your recipes.</string>
+    <string name="week_current">This week</string>
+    <string name="week_next">Next week</string>
+    <string name="meal_cheat">Cheat</string>
+    <string name="meal_locked">Locked meal</string>
+
+    <!-- ── Meal detail ────────────────────────────────────────────── -->
+    <string name="meal_detail_title">Meal</string>
+    <string name="meal_nutrition_household">Nutrition · whole household</string>
+    <string name="meal_per_person">Per person</string>
+    <string name="meal_ingredients_total">Ingredients · household total</string>
+    <string name="meal_preparation">Preparation</string>
+    <string name="meal_step">Step %1$d</string>
+    <string name="meal_portion_summary">Portion ×%1$.2f · P %2$d g · C %3$d g · F %4$d g</string>
+
+    <!-- ── Meal slots ─────────────────────────────────────────────── -->
+    <string name="meal_slot_breakfast">Breakfast</string>
+    <string name="meal_slot_morning_snack">Morning snack</string>
+    <string name="meal_slot_lunch">Lunch</string>
+    <string name="meal_slot_afternoon_snack">Afternoon snack</string>
+    <string name="meal_slot_dinner">Dinner</string>
+
+    <!-- ── Menu configuration ─────────────────────────────────────── -->
+    <string name="menu_config_title">Plan the Week</string>
+    <string name="menu_config_generate">Generate</string>
+    <string name="menu_config_generating">Generating…</string>
+    <string name="menu_config_meals_per_day">Meals per day</string>
+    <string name="menu_config_meal_sizes">Meal size distribution</string>
+    <string name="menu_config_shares_note">Shares are relative — together they always make a whole day.</string>
+    <string name="menu_config_cheat_meals">Cheat meals</string>
+    <string name="menu_config_max_repeats">Max recipe repeats</string>
+    <string name="menu_config_avoid_recent">Avoid last week\'s recipes</string>
+    <string name="menu_config_avoid_recent_note">Skipped automatically if it would leave too few recipes</string>
+    <string name="menu_config_exclude_categories">Exclude categories</string>
+    <string name="menu_config_exclude_ingredients">Exclude ingredient categories</string>
+    <string name="menu_config_only_folders">Use only these folders</string>
+    <string name="menu_config_exclude_recipes">Exclude specific recipes</string>
+    <string name="menu_config_locked_meals">Locked meals</string>
+    <string name="menu_config_locked_meals_note">Fix a recipe to specific days and meals — the generator plans around them.</string>
+    <string name="menu_config_add_lock">Add locked meal</string>
+    <string name="menu_config_remove_lock">Remove lock</string>
+    <string name="menu_config_lock_dialog_title">Lock a meal</string>
+    <string name="menu_config_days">Days</string>
+    <string name="menu_config_meal">Meal</string>
+    <string name="menu_config_recipe">Recipe</string>
+    <string name="menu_error_no_profiles">Create at least one profile first — the menu is personalized to each person\'s calorie targets.</string>
+    <string name="menu_error_no_matching_recipes">No recipes match the selected filters. Relax the exclusions or add more recipes.</string>
+    <string name="menu_error_not_enough_recipes">Not enough recipes to fill the week with the current repeat limit. Increase the limit or add more recipes.</string>
+
+    <!-- ── Shopping list ──────────────────────────────────────────── -->
+    <string name="shopping_list_title">Shopping List</string>
+    <string name="shopping_list_empty_title">Nothing to buy yet</string>
+    <string name="shopping_list_empty_body">Generate a weekly menu and the list fills itself automatically.</string>
+
+    <!-- ── Profiles ───────────────────────────────────────────────── -->
+    <string name="profiles_title">Profiles</string>
+    <string name="profiles_add">Add profile</string>
+    <string name="profiles_delete_title">Delete %1$s?</string>
+    <string name="profiles_delete_body">This removes the profile and its weight history. Recipes are not affected. This can\'t be undone.</string>
+    <string name="profiles_age_and_goal">%1$d years · %2$s</string>
+    <string name="profiles_empty_title">No profiles yet</string>
+    <string name="profiles_empty_body">Create a profile to get personalized nutrition recommendations.</string>
+
+    <!-- ── Profile editor ─────────────────────────────────────────── -->
+    <string name="profile_editor_new">New Profile</string>
+    <string name="profile_editor_edit">Edit Profile</string>
+    <string name="profile_section_about">About</string>
+    <string name="profile_section_body">Body</string>
+    <string name="profile_section_lifestyle">Lifestyle &amp; Goal</string>
+    <string name="profile_section_preferences">Preferences (optional)</string>
+    <string name="profile_name">Name *</string>
+    <string name="profile_dob">Date of birth *</string>
+    <string name="profile_height_cm">Height (cm) *</string>
+    <string name="profile_weight_kg">Weight (kg) *</string>
+    <string name="profile_height_ft">Height (ft) *</string>
+    <string name="profile_height_in">(in)</string>
+    <string name="profile_weight_lb">Weight (lb) *</string>
+    <string name="profile_body_fat">Body fat percentage (optional — enables Katch-McArdle)</string>
+    <string name="profile_activity_level">Activity level *</string>
+    <string name="profile_activity_option">%1$s — %2$s</string>
+    <string name="profile_goal">Primary goal *</string>
+    <string name="profile_weight_loss_pace">Weight loss pace</string>
+    <string name="profile_formula">Calculation formula</string>
+    <string name="profile_dietary">Dietary preferences</string>
+    <string name="profile_dietary_hint">e.g. vegetarian, low-carb…</string>
+    <string name="profile_allergies">Allergies</string>
+    <string name="profile_allergies_hint">e.g. peanuts, shellfish…</string>
+    <string name="profile_targets_title">Your daily targets</string>
+    <string name="profile_targets_formula">Calculated with %1$s</string>
+    <string name="profile_bmr">BMR (at rest)</string>
+    <string name="profile_tdee">TDEE (with activity)</string>
+    <string name="profile_daily_target">Daily target</string>
+    <string name="profile_error_name">Please enter a name.</string>
+    <string name="profile_error_dob">Please select a date of birth.</string>
+    <string name="profile_error_dob_future">Date of birth can\'t be in the future.</string>
+    <string name="profile_error_height">Please enter a valid height.</string>
+    <string name="profile_error_weight">Please enter a valid weight.</string>
+    <string name="profile_error_body_fat">Body fat must be between 3 and 70 percent, or left empty.</string>
+
+    <!-- ── Profile enums ──────────────────────────────────────────── -->
+    <string name="sex_male">Male</string>
+    <string name="sex_female">Female</string>
+    <string name="activity_sedentary">Sedentary</string>
+    <string name="activity_sedentary_detail">Little or no exercise, desk job</string>
+    <string name="activity_light">Lightly active</string>
+    <string name="activity_light_detail">Light exercise 1–3 days/week</string>
+    <string name="activity_moderate">Moderately active</string>
+    <string name="activity_moderate_detail">Moderate exercise 3–5 days/week</string>
+    <string name="activity_active">Very active</string>
+    <string name="activity_active_detail">Hard exercise 6–7 days/week</string>
+    <string name="activity_very_active">Extremely active</string>
+    <string name="activity_very_active_detail">Hard daily exercise or physical job</string>
+    <string name="goal_lose_weight">Lose weight</string>
+    <string name="goal_maintain">Maintain weight</string>
+    <string name="goal_gain_weight">Gain weight</string>
+    <string name="goal_build_muscle">Build muscle</string>
+    <string name="goal_improve_health">Improve overall health</string>
+    <string name="weight_loss_gentle">Gentle · ~0.25 kg (0.5 lb)/week</string>
+    <string name="weight_loss_moderate">Moderate · ~0.5 kg (1 lb)/week</string>
+    <string name="weight_loss_aggressive">Aggressive · ~0.75 kg (1.5 lb)/week</string>
+    <string name="formula_auto">Automatic (recommended)</string>
+    <string name="formula_mifflin">Mifflin-St Jeor</string>
+    <string name="formula_harris">Harris-Benedict (revised)</string>
+    <string name="formula_katch">Katch-McArdle (needs body fat percentage)</string>
+    <string name="units_metric">Metric (kg, cm)</string>
+    <string name="units_imperial">Imperial (lb, ft/in)</string>
+    <string name="nutrition_note_katch_needs_body_fat">Katch-McArdle needs a body fat percentage. Used Mifflin-St Jeor instead.</string>
+
+    <!-- ── Notifications ──────────────────────────────────────────── -->
+    <string name="notification_channel_name">Menu planning reminders</string>
+    <string name="notification_channel_detail">Weekend reminder to plan next week\'s meals</string>
+    <string name="notification_title">Plan next week\'s menu</string>
+    <string name="notification_body">Take a minute to generate next week\'s meal plan and shopping list.</string>
 </resources>
