@@ -16,6 +16,10 @@
     <string name="action_more">Más opciones</string>
     <string name="action_save_anyway">Guardar igualmente</string>
     <string name="action_ok">Aceptar</string>
+    <string name="error_save_title">No se pudo guardar</string>
+    <string name="error_save_failed">Se produjo un error al guardar. Los cambios siguen aquí; inténtalo de nuevo.</string>
+    <string name="error_operation_title">Algo ha salido mal</string>
+    <string name="error_operation_failed">No se pudo completar el cambio. Inténtalo de nuevo.</string>
     <string name="action_add_photo">Añadir foto</string>
     <string name="unit_grams">g</string>
     <string name="unit_kcal">kcal</string>
@@ -65,6 +69,7 @@
     <string name="recipes_favorite_remove">Quitar de favoritas</string>
     <plurals name="recipes_count">
         <item quantity="one">%1$d receta</item>
+        <item quantity="many">%1$d recetas</item>
         <item quantity="other">%1$d recetas</item>
     </plurals>
 
@@ -91,6 +96,7 @@
     <string name="recipe_delete_blocked_body">%1$s está planificada en un menú semanal. Quítala del menú primero.</string>
     <plurals name="recipe_ingredients_count">
         <item quantity="one">%1$d ingrediente</item>
+        <item quantity="many">%1$d ingredientes</item>
         <item quantity="other">%1$d ingredientes</item>
     </plurals>
 
@@ -126,6 +132,7 @@
     <string name="ingredients_attribution_title">Sobre estos datos</string>
     <plurals name="ingredients_count">
         <item quantity="one">%1$d ingrediente</item>
+        <item quantity="many">%1$d ingredientes</item>
         <item quantity="other">%1$d ingredientes</item>
     </plurals>
 
@@ -257,6 +264,7 @@
     <string name="validation_starch_exceeds_carbs">El almidón (%1$s g) no puede superar los carbohidratos (%2$s g).</string>
     <string name="validation_kcal_implausible">Las calorías no pueden superar %1$s por 100 g: la grasa pura son 884.</string>
     <string name="validation_serving_size_invalid">La ración debe estar entre 0 y 5000 g.</string>
+    <string name="validation_portion_size_invalid">Cada porción necesita una etiqueta y un peso entre 0 y 5000 g.</string>
     <string name="validation_density_invalid">La densidad debería estar entre 0,1 y 2,5 g por ml.</string>
     <string name="validation_duplicate_name">Ya existe un ingrediente llamado «%1$s».</string>
     <string name="validation_similar_name">Se parece a %1$s. ¿Es un duplicado?</string>
@@ -282,11 +290,15 @@
     <string name="create_recipe_name">Nombre de la receta *</string>
     <string name="create_recipe_category">Categoría *</string>
     <string name="create_recipe_folder">Carpeta</string>
+    <string name="create_recipe_no_folder">Sin carpeta</string>
+    <string name="create_recipe_new_folder">Añadir carpeta nueva</string>
+    <string name="create_recipe_new_folder_name">Nombre de la carpeta</string>
     <string name="create_recipe_nutrition">Nutrición</string>
     <string name="create_recipe_add_ingredient">Añadir ingrediente</string>
     <string name="create_recipe_add_step">Añadir paso</string>
     <string name="create_recipe_new_ingredient">Crear un ingrediente</string>
-    <string name="create_recipe_quantity">Cantidad (gramos)</string>
+    <string name="create_recipe_quantity">Cantidad (%1$s)</string>
+    <string name="create_recipe_image_framing">Encuadre de la foto</string>
     <string name="create_recipe_step_hint">Describe este paso…</string>
     <string name="create_recipe_step_photo">Añadir foto al paso %1$d</string>
     <string name="create_recipe_remove_step">Quitar el paso %1$d</string>
@@ -294,6 +306,7 @@
     <string name="recipe_error_no_ingredients">Añade al menos un ingrediente antes de guardar.</string>
     <string name="recipe_error_no_steps">Añade al menos un paso de preparación antes de guardar.</string>
     <string name="recipe_error_duplicate_name">Ya existe una receta con ese nombre. Elige otro.</string>
+    <string name="recipe_error_invalid_quantity">Todas las cantidades deben ser números positivos válidos.</string>
 
     <!-- ── Menú semanal ───────────────────────────────────────────── -->
     <string name="weekly_menu_title">Menú semanal</string>
@@ -393,6 +406,7 @@
     <string name="menu_error_no_profiles">Crea antes al menos un perfil: el menú se personaliza según las calorías objetivo de cada persona.</string>
     <string name="menu_error_no_matching_recipes">Ninguna receta coincide con los filtros. Relaja las exclusiones o añade más recetas.</string>
     <string name="menu_error_not_enough_recipes">No hay recetas suficientes para llenar la semana con el límite de repeticiones actual. Súbelo o añade más recetas.</string>
+    <string name="menu_error_save_failed">No se pudo guardar el menú. Comprueba el almacenamiento disponible e inténtalo de nuevo.</string>
 
     <!-- ── Lista de la compra ─────────────────────────────────────── -->
     <!-- ── Ingesta puntual ────────────────────────────────────────── -->

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddAPhoto
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +59,7 @@ fun OptionDropdown(
             shape = MaterialTheme.shapes.small,
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { option ->
@@ -107,7 +108,7 @@ fun <T> KeyedDropdown(
             shape = MaterialTheme.shapes.small,
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { (key, text) ->
@@ -132,7 +133,8 @@ fun ImagePickerBox(
     imagePath: String?,
     onImagePicked: (android.net.Uri) -> Unit,
     modifier: Modifier = Modifier,
-    placeholderText: String = stringResource(R.string.action_add_photo)
+    placeholderText: String = stringResource(R.string.action_add_photo),
+    imageAlignment: Alignment = Alignment.Center
 ) {
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -153,6 +155,7 @@ fun ImagePickerBox(
                 model = File(imagePath),
                 contentDescription = stringResource(R.string.editor_selected_photo),
                 contentScale = ContentScale.Crop,
+                alignment = imageAlignment,
                 modifier = Modifier.fillMaxSize()
             )
         } else {

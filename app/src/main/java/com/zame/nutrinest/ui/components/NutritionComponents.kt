@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.domain.nutrition.MeasureConversions
+import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.ui.theme.Amber
 import com.zame.nutrinest.ui.theme.Apricot
 import com.zame.nutrinest.ui.theme.Caramel
@@ -341,6 +342,23 @@ private fun trimZeros(text: String): String =
 
 /** An amount in grams. See [MeasureConversions.formatGrams]. */
 fun formatGrams(value: Double): String = MeasureConversions.formatGrams(value)
+
+/** Shows a recipe ingredient in the unit selected when the recipe was created. */
+fun formatRecipeQuantity(
+    ingredient: IngredientEntity,
+    grams: Double,
+    quantityUnit: String
+): String {
+    val unit = MeasureConversions.MeasureUnit.entries
+        .firstOrNull { it.name == quantityUnit }
+        ?: MeasureConversions.MeasureUnit.GRAM
+    return MeasureConversions.formatRecipeQuantity(
+        grams = grams,
+        unit = unit,
+        isLiquid = ingredient.isLiquid,
+        densityGml = ingredient.densityGml
+    )
+}
 
 /**
  * An amount that may run past a kilo, e.g. a week's shopping list.

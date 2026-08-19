@@ -18,9 +18,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.CompareArrows
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.LocalFireDepartment
@@ -160,6 +160,19 @@ fun IngredientDetailScreen(
         )
     }
 
+    if (state.operationFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissOperationError,
+            title = { Text(stringResource(R.string.error_operation_title)) },
+            text = { Text(stringResource(R.string.error_operation_failed)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissOperationError) {
+                    Text(stringResource(R.string.action_done))
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -195,7 +208,7 @@ fun IngredientDetailScreen(
                     }
                     IconButton(onClick = { onCompare(ingredient.id) }) {
                         Icon(
-                            Icons.Rounded.CompareArrows,
+                            Icons.AutoMirrored.Rounded.CompareArrows,
                             contentDescription = stringResource(R.string.action_compare)
                         )
                     }

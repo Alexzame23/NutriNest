@@ -64,6 +64,7 @@ import com.zame.nutrinest.ui.ingredients.rawSafetyLabel
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.theme.Amber
 import com.zame.nutrinest.ui.theme.Clay
+import com.zame.nutrinest.util.toLocalizedDoubleOrNull
 
 /**
  * Create or edit an ingredient.
@@ -88,6 +89,19 @@ fun IngredientEditorScreen(
             warnings = state.validation.warnings,
             onConfirm = viewModel::onConfirmWarnings,
             onDismiss = viewModel::onDismissWarnings
+        )
+    }
+
+    if (state.saveFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSaveError,
+            title = { Text(stringResource(R.string.error_save_title)) },
+            text = { Text(stringResource(R.string.error_save_failed)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissSaveError) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            }
         )
     }
 
@@ -119,7 +133,9 @@ fun IngredientEditorScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = viewModel::onSave,
+                onClick = {
+                    if (!state.isSaving && !state.isLoading) viewModel.onSave()
+                },
                 icon = { Icon(Icons.Rounded.Check, null) },
                 text = { Text(stringResource(R.string.action_save)) },
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -244,10 +260,10 @@ fun IngredientEditorScreen(
             // Live macro balance: a typo like 400 g of carbs is obvious here.
             item("preview") {
                 val preview = NutritionValues(
-                    kcal = state.kcal.toDoubleOrNull() ?: 0.0,
-                    carbs = state.carbs.toDoubleOrNull() ?: 0.0,
-                    fats = state.fats.toDoubleOrNull() ?: 0.0,
-                    protein = state.protein.toDoubleOrNull() ?: 0.0
+                    kcal = state.kcal.toLocalizedDoubleOrNull() ?: 0.0,
+                    carbs = state.carbs.toLocalizedDoubleOrNull() ?: 0.0,
+                    fats = state.fats.toLocalizedDoubleOrNull() ?: 0.0,
+                    protein = state.protein.toLocalizedDoubleOrNull() ?: 0.0
                 )
                 if (preview.carbs + preview.fats + preview.protein > 0) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -516,6 +532,8 @@ private fun validationMessage(issue: IngredientValidator.Issue): String = when (
         stringResource(R.string.validation_kcal_implausible, issue.args.firstOrNull().orEmpty())
     IngredientValidator.ValidationCode.SERVING_SIZE_INVALID ->
         stringResource(R.string.validation_serving_size_invalid)
+    IngredientValidator.ValidationCode.PORTION_SIZE_INVALID ->
+        stringResource(R.string.validation_portion_size_invalid)
     IngredientValidator.ValidationCode.DENSITY_INVALID ->
         stringResource(R.string.validation_density_invalid)
     else -> stringResource(R.string.validation_fix_required)

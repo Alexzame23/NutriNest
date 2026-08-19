@@ -41,6 +41,8 @@ object FoodDatabaseImporter {
      * later dataset adds foods.
      */
     const val IMPORTED_ID_OFFSET = 1_000_000L
+    /** Not a suitable general-purpose food reference for NutriNest. */
+    const val HUMAN_MILK_FOOD_ID = 2494L
     private const val USER_ID_FLOOR = 2_000_000L
 
     /** Marks the last successful import, so user edits since then are respected. */
@@ -71,8 +73,8 @@ object FoodDatabaseImporter {
 
     private fun doImport(context: Context, db: SupportSQLiteDatabase) {
         val staging = File(context.cacheDir, "food-import.db")
-        copyAsset(context, staging)
         try {
+            copyAsset(context, staging)
             val asset = SQLiteDatabase.openDatabase(
                 staging.absolutePath, null, SQLiteDatabase.OPEN_READONLY
             )
@@ -346,7 +348,7 @@ object FoodDatabaseImporter {
                 JOIN food_macros m ON m.food_id = f.id
                 JOIN food_categories c ON c.id = f.category_id
                 JOIN shopping_aisles a ON a.id = f.aisle_id
-                WHERE f.is_deprecated = 0
+                WHERE f.is_deprecated = 0 AND f.id != $HUMAN_MILK_FOOD_ID
             """.trimIndent(),
             // `isCustom` is NOT NULL with no default, so it has to be listed —
             // omitting it made every row fail NOT NULL, which OR IGNORE then
@@ -369,7 +371,7 @@ object FoodDatabaseImporter {
                 SELECT n.food_id + $IMPORTED_ID_OFFSET, n.tag, n.value
                 FROM food_nutrients n
                 JOIN foods f ON f.id = n.food_id
-                WHERE f.is_deprecated = 0
+                WHERE f.is_deprecated = 0 AND f.id != $HUMAN_MILK_FOOD_ID
             """.trimIndent(),
             write = "INSERT OR IGNORE INTO ingredient_nutrients (ingredientId, tag, value) " +
                 "VALUES (?,?,?)"
@@ -381,7 +383,7 @@ object FoodDatabaseImporter {
                        p.grams, p.portion_type, p.is_default
                 FROM food_portions p
                 JOIN foods f ON f.id = p.food_id
-                WHERE f.is_deprecated = 0
+                WHERE f.is_deprecated = 0 AND f.id != $HUMAN_MILK_FOOD_ID
             """.trimIndent(),
             // Deduplicated on the measure itself, not merely on the ingredient:
             // a food with a spoon, a cup and a pinch must keep all three.
@@ -402,7 +404,7 @@ object FoodDatabaseImporter {
                 SELECT al.food_id + $IMPORTED_ID_OFFSET, al.alias, al.alias_norm, al.lang
                 FROM food_aliases al
                 JOIN foods f ON f.id = al.food_id
-                WHERE f.is_deprecated = 0
+                WHERE f.is_deprecated = 0 AND f.id != $HUMAN_MILK_FOOD_ID
             """.trimIndent(),
             write = """
                 INSERT INTO ingredient_aliases (ingredientId, alias, aliasNorm, lang)
@@ -420,7 +422,7 @@ object FoodDatabaseImporter {
                 SELECT q.food_id + $IMPORTED_ID_OFFSET, q.code, q.severity, q.detail
                 FROM food_quality_issues q
                 JOIN foods f ON f.id = q.food_id
-                WHERE f.is_deprecated = 0
+                WHERE f.is_deprecated = 0 AND f.id != $HUMAN_MILK_FOOD_ID
             """.trimIndent(),
             write = """
                 INSERT INTO ingredient_quality_issues (ingredientId, code, severity, detail)

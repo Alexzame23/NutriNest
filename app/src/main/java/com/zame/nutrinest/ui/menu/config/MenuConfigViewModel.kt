@@ -163,26 +163,26 @@ class MenuConfigViewModel(
     fun dismissError() = update { copy(error = null) }
 
     fun generate() {
+        if (_state.value.isGenerating) return
         val s = _state.value
         update { copy(isGenerating = true) }
         viewModelScope.launch {
-            val result = menuRepository.generate(
-                weekStart = weekStart,
-                config = GenerationConfig(
-                    slotWeights = s.slotWeights,
-                    scope = s.scope,
-                    slotCourses = s.slotCourses,
-                    overrides = s.overrides,
-                    cheatMeals = s.cheatMeals,
-                    maxRecipeRepeats = s.maxRepeats,
-                    excludedCategories = s.excludedCategories,
-                    excludedIngredientCategories = s.excludedIngredientCategories,
-                    excludedRecipeIds = s.excludedRecipeIds,
-                    includedFolders = s.includedFolders,
-                    excludeRecentlyUsed = s.excludeRecentlyUsed,
-                    locks = s.locks
+            val result = runCatching {
+                menuRepository.generate(
+                    weekStart = weekStart,
+                    config = GenerationConfig(
+                        slotWeights = s.slotWeights,
+                        cheatMeals = s.cheatMeals,
+                        maxRecipeRepeats = s.maxRepeats,
+                        excludedCategories = s.excludedCategories,
+                        excludedIngredientCategories = s.excludedIngredientCategories,
+                        excludedRecipeIds = s.excludedRecipeIds,
+                        includedFolders = s.includedFolders,
+                        excludeRecentlyUsed = s.excludeRecentlyUsed,
+                        locks = s.locks
+                    )
                 )
-            )
+            }.getOrElse { GenerationResult.Failure(FailureReason.SAVE_FAILED) }
             when (result) {
                 is GenerationResult.Success -> update { copy(isGenerating = false, done = true) }
                 is GenerationResult.Failure -> update {

@@ -55,10 +55,12 @@ import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.StatusChip
 import com.zame.nutrinest.ui.components.formatGrams
+import com.zame.nutrinest.ui.components.formatRecipeQuantity
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.recipeCategoryColor
 import com.zame.nutrinest.ui.recipes.recipeCategoryIcon
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
+import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -115,6 +117,19 @@ fun RecipeDetailScreen(
             text = { Text(stringResource(R.string.recipe_delete_blocked_body, recipe.name)) },
             confirmButton = {
                 TextButton(onClick = viewModel::dismissDeleteBlocked) {
+                    Text(stringResource(R.string.action_done))
+                }
+            }
+        )
+    }
+
+    if (state.operationFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissOperationError,
+            title = { Text(stringResource(R.string.error_operation_title)) },
+            text = { Text(stringResource(R.string.error_operation_failed)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissOperationError) {
                     Text(stringResource(R.string.action_done))
                 }
             }
@@ -230,7 +245,11 @@ fun RecipeDetailScreen(
                                     )
                                 }
                                 Text(
-                                    formatGrams(item.grams),
+                                    formatRecipeQuantity(
+                                        item.ingredient,
+                                        item.grams,
+                                        item.quantityUnit
+                                    ),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -310,6 +329,7 @@ private fun Header(state: RecipeDetailUiState) {
                     model = File(recipe.coverImagePath),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    alignment = recipe.coverImageCrop.toRecipeImageAlignment(),
                     modifier = Modifier.fillMaxSize()
                 )
             } else {

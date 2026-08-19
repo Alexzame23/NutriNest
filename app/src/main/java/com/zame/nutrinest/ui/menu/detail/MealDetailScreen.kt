@@ -48,8 +48,8 @@ import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
-import com.zame.nutrinest.ui.components.OptionDropdown
-import com.zame.nutrinest.ui.components.formatGrams
+import com.zame.nutrinest.ui.components.formatRecipeQuantity
+import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -158,6 +158,7 @@ fun MealDetailScreen(
                         model = File(path),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        alignment = meal.recipe.coverImageCrop.toRecipeImageAlignment(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
@@ -229,7 +230,11 @@ fun MealDetailScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatGrams(ingredient.grams * portion.portion.factor),
+                                    formatRecipeQuantity(
+                                        ingredient.ingredient,
+                                        ingredient.grams * portion.portion.factor,
+                                        ingredient.quantityUnit
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -257,7 +262,11 @@ fun MealDetailScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatGrams(ingredient.grams * state.householdFactor),
+                                    formatRecipeQuantity(
+                                        ingredient.ingredient,
+                                        ingredient.grams * state.householdFactor,
+                                        ingredient.quantityUnit
+                                    ),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold
                                 )

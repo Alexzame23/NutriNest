@@ -23,6 +23,8 @@ import com.zame.nutrinest.data.repository.ProfileRepository
 import com.zame.nutrinest.domain.nutrition.NutritionCalculator
 import com.zame.nutrinest.domain.nutrition.NutritionTargets
 import com.zame.nutrinest.domain.nutrition.UnitConversions
+import com.zame.nutrinest.util.LocalizedNumbers
+import com.zame.nutrinest.util.toLocalizedDoubleOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -35,7 +37,8 @@ enum class ProfileFormError(@StringRes val messageRes: Int) {
     DOB_IN_FUTURE(R.string.profile_error_dob_future),
     HEIGHT_INVALID(R.string.profile_error_height),
     WEIGHT_INVALID(R.string.profile_error_weight),
-    BODY_FAT_INVALID(R.string.profile_error_body_fat)
+    BODY_FAT_INVALID(R.string.profile_error_body_fat),
+    SAVE_FAILED(R.string.error_save_failed)
 }
 
 data class ProfileEditorState(
@@ -63,7 +66,8 @@ data class ProfileEditorState(
     val freeSlots: Set<MealSlot> = emptySet(),
     val error: ProfileFormError? = null,
     val saved: Boolean = false,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val isSaving: Boolean = false
 ) {
     val slots: List<MealSlot> get() = MealSlot.forMealsPerDay(mealsPerDay)
 
@@ -96,10 +100,10 @@ data class ProfileEditorState(
     /** Height in cm parsed from the current inputs, or null if invalid. */
     val heightCm: Double?
         get() = when (unitSystem) {
-            UnitSystem.METRIC -> heightText.toDoubleOrNull()?.takeIf { it in 50.0..280.0 }
+            UnitSystem.METRIC -> heightText.toLocalizedDoubleOrNull()?.takeIf { it in 50.0..280.0 }
             UnitSystem.IMPERIAL -> {
                 val feet = heightText.toIntOrNull() ?: return null
-                val inches = heightInchesText.toDoubleOrNull() ?: 0.0
+                val inches = heightInchesText.toLocalizedDoubleOrNull() ?: 0.0
                 UnitConversions.feetInchesToCm(feet, inches).takeIf { it in 50.0..280.0 }
             }
         }
@@ -107,7 +111,7 @@ data class ProfileEditorState(
     /** Weight in kg parsed from current inputs, or null if invalid. */
     val weightKg: Double?
         get() {
-            val raw = weightText.toDoubleOrNull() ?: return null
+            val raw = weightText.toLocalizedDoubleOrNull() ?: return null
             val kg = when (unitSystem) {
                 UnitSystem.METRIC -> raw
                 UnitSystem.IMPERIAL -> UnitConversions.lbToKg(raw)
@@ -116,7 +120,7 @@ data class ProfileEditorState(
         }
 
     val bodyFatPercent: Double?
-        get() = bodyFatText.toDoubleOrNull()?.takeIf { it in 3.0..70.0 }
+        get() = bodyFatText.toLocalizedDoubleOrNull()?.takeIf { it in 3.0..70.0 }
 
     /** Live targets whenever there's enough valid data; null otherwise. */
     val liveTargets: NutritionTargets?
@@ -148,6 +152,7 @@ class ProfileEditorViewModel(
 
     private val _state = MutableStateFlow(ProfileEditorState())
     val state = _state.asStateFlow()
+    private var original: ProfileEntity? = null
 
     init {
         val profileId: Long = savedStateHandle["profileId"] ?: -1L
@@ -180,6 +185,7 @@ class ProfileEditorViewModel(
         viewModelScope.launch {
             repository.observeById(id).collect { profile ->
                 if (profile != null && _state.value.editingId == null) {
+                    original = profile
                     update {
                         val (feet, inches) =
                             UnitConversions.cmToFeetInches(profile.heightCm)
@@ -285,6 +291,7 @@ class ProfileEditorViewModel(
     }
 
     fun save() {
+        if (_state.value.isSaving || _state.value.isLoading) return
         val s = _state.value
         viewModelScope.launch {
             val error = when {
@@ -317,18 +324,24 @@ class ProfileEditorViewModel(
                 unitSystem = s.unitSystem,
                 dietaryPreferences = s.dietaryPreferences.trim().ifEmpty { null },
                 allergies = s.allergies.trim().ifEmpty { null },
-                colorIndex = (s.editingId ?: System.currentTimeMillis()).toInt().let {
-                    kotlin.math.abs(it) % 4
-                }
+                colorIndex = original?.colorIndex ?: (System.currentTimeMillis().toInt() and Int.MAX_VALUE) % 4,
+                createdAt = original?.createdAt ?: System.currentTimeMillis(),
+                remoteId = original?.remoteId
             )
-            if (s.editingId == null) repository.create(entity, s.mealPlanRows())
-            else repository.update(entity, s.mealPlanRows(entity.id))
-            update { copy(saved = true) }
+            update { copy(isSaving = true) }
+            runCatching {
+                if (s.editingId == null) repository.create(entity)
+                else repository.update(entity)
+            }.onSuccess {
+                update { copy(isSaving = false, saved = true) }
+            }.onFailure {
+                update { copy(isSaving = false, error = ProfileFormError.SAVE_FAILED) }
+            }
         }
     }
 
     private fun trimNumber(v: Double): String =
-        if (v == v.toLong().toDouble()) v.toLong().toString() else "%.1f".format(v)
+        LocalizedNumbers.format(v)
 
     private inline fun update(block: ProfileEditorState.() -> ProfileEditorState) {
         _state.value = _state.value.block()

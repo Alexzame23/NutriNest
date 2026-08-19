@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.RestaurantMenu
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.Card
@@ -63,6 +63,7 @@ import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.CategoryDot
 import com.zame.nutrinest.ui.components.MacroBarChart
+import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -278,7 +279,7 @@ private fun SortMenu(selected: RecipeSort, onSelected: (RecipeSort) -> Unit) {
     Box {
         IconButton(onClick = { expanded = true }) {
             Icon(
-                Icons.Rounded.Sort,
+                Icons.AutoMirrored.Rounded.Sort,
                 contentDescription = stringResource(R.string.ingredients_sort_label),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -362,6 +363,7 @@ private fun RecipeRow(
                     model = File(recipe.coverImagePath),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    alignment = recipe.coverImageCrop.toRecipeImageAlignment(),
                     modifier = Modifier.size(44.dp)
                 )
                 Spacer(Modifier.width(12.dp))

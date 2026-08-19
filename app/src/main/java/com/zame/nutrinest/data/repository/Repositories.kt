@@ -18,6 +18,7 @@ import com.zame.nutrinest.data.local.entity.NutrientDefEntity
 import com.zame.nutrinest.data.local.entity.NutrientValueWithDef
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeEntity
+import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
 import com.zame.nutrinest.data.local.entity.RecipeUsage
 import com.zame.nutrinest.data.local.entity.RecipeWithSteps
 import com.zame.nutrinest.data.local.entity.ShoppingAisleEntity
@@ -99,7 +100,7 @@ interface RecipeRepository {
     suspend fun existsByName(name: String): Boolean
     suspend fun create(
         recipe: RecipeEntity,
-        ingredients: List<Pair<Long, Double>>,
+        ingredients: List<RecipeIngredientInput>,
         steps: List<Pair<String, String?>>
     ): Long
 
@@ -197,7 +198,7 @@ class LocalRecipeRepository(private val dao: RecipeDao) : RecipeRepository {
     override suspend fun existsByName(name: String) = dao.countByName(name.trim()) > 0
     override suspend fun create(
         recipe: RecipeEntity,
-        ingredients: List<Pair<Long, Double>>,
+        ingredients: List<RecipeIngredientInput>,
         steps: List<Pair<String, String?>>
     ) = dao.insertFullRecipe(recipe, ingredients, steps)
 

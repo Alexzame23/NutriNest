@@ -194,7 +194,11 @@ data class WeeklyMenuEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("menuId"), Index("recipeId"), Index("profileId")]
+    indices = [
+        Index("menuId"),
+        Index("recipeId"),
+        Index(value = ["menuId", "dayOfWeek", "slot"], unique = true)
+    ]
 )
 data class PlannedMealEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

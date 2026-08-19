@@ -1,6 +1,7 @@
 package com.zame.nutrinest.data.local.entity
 
 import androidx.room.Embedded
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -15,11 +16,33 @@ data class RecipeEntity(
     /** User-defined folder for organisation; null = not in any folder. */
     val folder: String? = null,
     val coverImagePath: String? = null,
+    /** Anchor used when a landscape/portrait cover is cropped into a card. */
+    @ColumnInfo(defaultValue = "'CENTER'")
+    val coverImageCrop: String = RecipeImageCrop.CENTER,
     val createdAt: Long = System.currentTimeMillis(),
     /** Reserved for future community sync. */
     val remoteId: String? = null,
     val isFavorite: Boolean = false
 )
+
+/** Stable, storage-friendly cover-image crop anchors. */
+object RecipeImageCrop {
+    const val TOP_START = "TOP_START"
+    const val TOP_CENTER = "TOP_CENTER"
+    const val TOP_END = "TOP_END"
+    const val CENTER_START = "CENTER_START"
+    const val CENTER = "CENTER"
+    const val CENTER_END = "CENTER_END"
+    const val BOTTOM_START = "BOTTOM_START"
+    const val BOTTOM_CENTER = "BOTTOM_CENTER"
+    const val BOTTOM_END = "BOTTOM_END"
+
+    val all = listOf(
+        TOP_START, TOP_CENTER, TOP_END,
+        CENTER_START, CENTER, CENTER_END,
+        BOTTOM_START, BOTTOM_CENTER, BOTTOM_END
+    )
+}
 
 /**
  * Junction table linking a recipe to its ingredients,
@@ -47,7 +70,18 @@ data class RecipeEntity(
 data class RecipeIngredientCrossRef(
     val recipeId: Long,
     val ingredientId: Long,
-    val grams: Double
+    /** Canonical mass used for nutrition and planning calculations. */
+    val grams: Double,
+    /** The unit the cook chose, retained for recipe instructions/display. */
+    @ColumnInfo(defaultValue = "'GRAM'")
+    val quantityUnit: String = "GRAM"
+)
+
+/** Input to an atomic recipe save. Quantities are always canonical grams. */
+data class RecipeIngredientInput(
+    val ingredientId: Long,
+    val grams: Double,
+    val quantityUnit: String = "GRAM"
 )
 
 @Entity(
@@ -73,7 +107,8 @@ data class RecipeStepEntity(
 /** Result row for the JOIN of ingredients with their quantity in a recipe. */
 data class IngredientWithQuantity(
     @Embedded val ingredient: IngredientEntity,
-    val grams: Double
+    val grams: Double,
+    val quantityUnit: String = "GRAM"
 ) {
     val nutrition: NutritionValues get() = ingredient.nutrition.forGrams(grams)
 }

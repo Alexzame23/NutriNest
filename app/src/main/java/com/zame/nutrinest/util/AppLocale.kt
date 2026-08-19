@@ -3,6 +3,7 @@ package com.zame.nutrinest.util
 import android.app.Activity
 import android.app.LocaleManager
 import android.content.Context
+import androidx.core.content.edit
 import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.os.Build
@@ -73,7 +74,7 @@ object AppLocale {
             activity.getSystemService(LocaleManager::class.java)
                 ?.applicationLocales = LocaleList.forLanguageTags(language.tag)
         } else {
-            prefs(activity).edit().putString(KEY_LANGUAGE, language.tag).apply()
+            prefs(activity).edit { putString(KEY_LANGUAGE, language.tag) }
             Locale.setDefault(Locale.forLanguageTag(language.tag))
             activity.recreate()
         }

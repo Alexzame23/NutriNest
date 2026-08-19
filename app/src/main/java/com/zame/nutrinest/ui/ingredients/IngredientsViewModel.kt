@@ -14,10 +14,12 @@ import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.util.TextNormalizer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -87,7 +89,7 @@ private data class Filters(
     val customOnly: Boolean = false
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class IngredientsViewModel(
     private val repository: IngredientRepository,
     referenceRepository: FoodReferenceRepository,
@@ -123,7 +125,7 @@ class IngredientsViewModel(
         val selection: List<Long> = emptyList()
     )
 
-    private val ingredients = filters.flatMapLatest { f ->
+    private val ingredients = filters.debounce(200).flatMapLatest { f ->
         when (f.view) {
             // "Recent" is ordered by the database, then narrowed in memory so
             // the search box still works inside it.

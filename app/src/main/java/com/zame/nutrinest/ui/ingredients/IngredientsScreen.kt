@@ -18,13 +18,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.CompareArrows
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.CompareArrows
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Warning
@@ -329,7 +329,7 @@ private fun FilterRow(
 
         IconButton(onClick = onCompareModeToggled) {
             Icon(
-                Icons.Rounded.CompareArrows,
+                Icons.AutoMirrored.Rounded.CompareArrows,
                 contentDescription = stringResource(R.string.ingredients_compare_start),
                 tint = if (state.compareMode) {
                     MaterialTheme.colorScheme.primary
@@ -356,7 +356,7 @@ private fun SortMenu(selected: IngredientSort, onSelected: (IngredientSort) -> U
     Box {
         IconButton(onClick = { expanded = true }) {
             Icon(
-                Icons.Rounded.Sort,
+                Icons.AutoMirrored.Rounded.Sort,
                 contentDescription = stringResource(R.string.ingredients_sort_label),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -511,7 +511,8 @@ private fun IngredientRow(
 
             if (compareMode) {
                 Icon(
-                    if (selectedForCompare) Icons.Rounded.Check else Icons.Rounded.CompareArrows,
+                    if (selectedForCompare) Icons.Rounded.Check
+                    else Icons.AutoMirrored.Rounded.CompareArrows,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(end = 8.dp)

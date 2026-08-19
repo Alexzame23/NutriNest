@@ -37,10 +37,16 @@ object WeekUtils {
     }
 
     fun nextWeekStart(time: Long = System.currentTimeMillis()): Long =
-        weekStartOf(time) + 7L * 24 * 60 * 60 * 1000
+        shiftedWeekStart(weekStartOf(time), 1)
 
     fun previousWeekStart(weekStart: Long): Long =
-        weekStart - 7L * 24 * 60 * 60 * 1000
+        shiftedWeekStart(weekStartOf(weekStart), -1)
+
+    private fun shiftedWeekStart(weekStart: Long, weeks: Int): Long =
+        Calendar.getInstance().apply {
+            timeInMillis = weekStart
+            add(Calendar.WEEK_OF_YEAR, weeks)
+        }.timeInMillis
 
     /** 0 = Monday … 6 = Sunday for "today". */
     fun todayIndex(): Int {

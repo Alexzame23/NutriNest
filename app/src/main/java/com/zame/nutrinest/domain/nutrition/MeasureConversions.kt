@@ -94,6 +94,37 @@ object MeasureConversions {
         else "%.1f g".format(locale, grams)
 
     /**
+     * Formats a recipe quantity in the unit chosen by the cook. The canonical
+     * stored grams remain the source of truth for nutrition and menu planning.
+     */
+    fun formatRecipeQuantity(
+        grams: Double,
+        unit: MeasureUnit,
+        isLiquid: Boolean,
+        densityGml: Double?,
+        locale: Locale = Locale.getDefault()
+    ): String {
+        val amount = fromGrams(grams, unit, isLiquid, densityGml) ?: grams
+        val symbol = when (unit) {
+            MeasureUnit.GRAM -> "g"
+            MeasureUnit.KILOGRAM -> "kg"
+            MeasureUnit.MILLILITRE -> "ml"
+            MeasureUnit.LITRE -> "L"
+            MeasureUnit.OUNCE -> "oz"
+            MeasureUnit.POUND -> "lb"
+            MeasureUnit.CUP -> "cup"
+            MeasureUnit.TABLESPOON -> "tbsp"
+            MeasureUnit.TEASPOON -> "tsp"
+        }
+        val number = if (amount == amount.roundToInt().toDouble()) {
+            amount.roundToInt().toString()
+        } else {
+            trimTrailingZeros("%.3f".format(locale, amount))
+        }
+        return "$number $symbol"
+    }
+
+    /**
      * A quantity that may be large: grams below a kilo, kilograms above it.
      *
      * A week of meals for a household runs into thousands of grams, and

@@ -116,7 +116,7 @@ class FoodImportTest {
         assertNotNull(reference.meta(FoodDatasetMetaEntity.DATASET_VERSION))
         assertTrue(
             "BEDCA must be credited wherever its figures are shown",
-            reference.attribution()?.contains("BEDCA") == true
+            reference.meta(FoodDatasetMetaEntity.ATTRIBUTION)?.contains("BEDCA") == true
         )
     }
 
@@ -127,6 +127,12 @@ class FoodImportTest {
             "imported ids belong in their reserved block",
             imported.all { it.id > FoodDatabaseImporter.IMPORTED_ID_OFFSET }
         )
+    }
+
+    @Test
+    fun excludesHumanMilkFromTheCatalogue() = runBlocking {
+        val ingredients = database.ingredientDao().observeAll().first()
+        assertTrue(ingredients.none { it.sourceKey == "BEDCA:2494" })
     }
 
     @Test
