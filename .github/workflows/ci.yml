@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [Development]
+
+# A second push to a PR makes the first run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, test and check the database
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # These need no Android SDK, so they fail fast — before the ten minutes
+      # of Gradle. They replay the real migrations against a database shaped
+      # like a user's install and compile every DAO query against the result.
+      - name: Migrations and shipped food database
+        run: python3 tools/verify_migration.py
+
+      - name: DAO queries compile against the migrated schema
+        run: python3 tools/check_dao_sql.py
+
+      - name: Translations are complete and consistent
+        run: python3 tools/check_strings.py
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # The wrapper is checked in without its executable bit.
+      - name: Make the Gradle wrapper runnable
+        run: chmod +x gradlew
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Assemble
+        run: ./gradlew --no-daemon assembleDebug
+
+      # KSP writes app/schemas during the build above, so this is the first
+      # point at which Room's own view of the schema exists to compare against.
+      #
+      # Not blocking yet: the exported schemas are not checked in, so nobody
+      # has seen this check pass or fail on the existing migrations. Once
+      # app/schemas is committed and the run below is green, drop the
+      # continue-on-error and it starts guarding every future migration.
+      - name: Room would accept the migrated schema
+        continue-on-error: true
+        run: python3 tools/check_room_schema.py
+
+      - name: Upload the exported Room schemas
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schemas
+          path: app/schemas/
+          if-no-files-found: warn
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+# Not covered here: app/src/androidTest, which includes the migration test.
+# Those need an emulator, so they stay a local `./gradlew connectedDebugAndroidTest`
+# until someone decides the CI minutes are worth it.

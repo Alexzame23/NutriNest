@@ -20,12 +20,14 @@ import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.local.entity.IngredientNutrientEntity
 import com.zame.nutrinest.data.local.entity.IngredientPortionEntity
 import com.zame.nutrinest.data.local.entity.IngredientQualityIssueEntity
+import com.zame.nutrinest.data.local.entity.IntakeEntryEntity
 import com.zame.nutrinest.data.local.entity.MealPortionEntity
 import com.zame.nutrinest.data.local.entity.MenuConverters
 import com.zame.nutrinest.data.local.entity.NutrientDefEntity
 import com.zame.nutrinest.data.local.entity.PlannedMealEntity
 import com.zame.nutrinest.data.local.entity.ProfileConverters
 import com.zame.nutrinest.data.local.entity.ProfileEntity
+import com.zame.nutrinest.data.local.entity.ProfileMealPlanEntity
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.local.entity.RecipeIngredientCrossRef
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
@@ -50,13 +52,15 @@ import com.zame.nutrinest.util.TextNormalizer
         RecipeIngredientCrossRef::class,
         RecipeStepEntity::class,
         ProfileEntity::class,
+        ProfileMealPlanEntity::class,
         WeightEntryEntity::class,
         WeeklyMenuEntity::class,
         PlannedMealEntity::class,
         MealPortionEntity::class,
-        ShoppingItemEntity::class
+        ShoppingItemEntity::class,
+        IntakeEntryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(ProfileConverters::class, MenuConverters::class)
@@ -231,6 +235,137 @@ abstract class NutriNestDatabase : RoomDatabase() {
                 mapLegacyFoodTypes(db)
                 backfillNormalisedNames(db)
             }
+        }
+
+        /**
+         * v5 → v6: per-person menus.
+         *
+         * A planned meal stops being one row for the whole household. It gains
+         * a `profileId` (null = shared, as every existing row is), a `course`
+         * so one slot can hold a first course, a main and a dessert, and a
+         * nullable `recipeId` for free slots — which is the one change SQLite
+         * cannot make in place, so `planned_meals` is rebuilt and copied
+         * across. Everything the user already had comes with it: menus keep
+         * their meals, meals keep their locks, and the shopping lists hanging
+         * off them are never touched.
+         *
+         * Two tables arrive alongside: how each profile splits their day, and
+         * the ad-hoc intake log that re-portions the rest of it.
+         */
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                addMenuScopeColumns(db)
+                rebuildPlannedMeals(db)
+                addPortionBaseFactor(db)
+                createPerPersonTables(db)
+            }
+        }
+
+        private fun addMenuScopeColumns(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `weekly_menus` ADD COLUMN `scope` TEXT NOT NULL DEFAULT 'SHARED'"
+            )
+            db.execSQL(
+                "ALTER TABLE `weekly_menus` ADD COLUMN `coursesSpec` TEXT NOT NULL DEFAULT ''"
+            )
+        }
+
+        /**
+         * Rebuilds `planned_meals` so `recipeId` can be null.
+         *
+         * Migrations run before Room turns foreign keys on for the connection,
+         * so dropping the old table does not cascade into `meal_portions`;
+         * the portions are left exactly where they are and re-attach to the
+         * rebuilt table, which keeps the same row ids.
+         */
+        private fun rebuildPlannedMeals(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `planned_meals_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `menuId` INTEGER NOT NULL,
+                    `dayOfWeek` INTEGER NOT NULL,
+                    `slot` TEXT NOT NULL,
+                    `recipeId` INTEGER,
+                    `isLocked` INTEGER NOT NULL,
+                    `isCheatMeal` INTEGER NOT NULL,
+                    `course` TEXT NOT NULL,
+                    `profileId` INTEGER,
+                    `isFree` INTEGER NOT NULL,
+                    FOREIGN KEY(`menuId`) REFERENCES `weekly_menus`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`)
+                        ON UPDATE NO ACTION ON DELETE RESTRICT,
+                    FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            // Everything planned so far was one dish shared by everyone.
+            db.execSQL(
+                """
+                INSERT INTO `planned_meals_new`
+                    (`id`, `menuId`, `dayOfWeek`, `slot`, `recipeId`, `isLocked`,
+                     `isCheatMeal`, `course`, `profileId`, `isFree`)
+                SELECT `id`, `menuId`, `dayOfWeek`, `slot`, `recipeId`, `isLocked`,
+                       `isCheatMeal`, 'SINGLE', NULL, 0
+                FROM `planned_meals`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `planned_meals`")
+            db.execSQL("ALTER TABLE `planned_meals_new` RENAME TO `planned_meals`")
+            listOf("menuId", "recipeId", "profileId").forEach {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_planned_meals_$it` " +
+                            "ON `planned_meals` (`$it`)"
+                )
+            }
+        }
+
+        /** Existing portions are, by definition, exactly what was planned. */
+        private fun addPortionBaseFactor(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `meal_portions` ADD COLUMN `baseFactor` REAL NOT NULL DEFAULT 0"
+            )
+            db.execSQL("UPDATE `meal_portions` SET `baseFactor` = `factor`")
+        }
+
+        private fun createPerPersonTables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `profile_meal_plans` (
+                    `profileId` INTEGER NOT NULL,
+                    `slot` TEXT NOT NULL,
+                    `share` REAL NOT NULL,
+                    `isFree` INTEGER NOT NULL,
+                    PRIMARY KEY(`profileId`, `slot`),
+                    FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `intake_entries` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `profileId` INTEGER NOT NULL,
+                    `dayStart` INTEGER NOT NULL,
+                    `label` TEXT NOT NULL,
+                    `grams` REAL,
+                    `kcal` REAL NOT NULL,
+                    `carbs` REAL NOT NULL,
+                    `fats` REAL NOT NULL,
+                    `protein` REAL NOT NULL,
+                    `loggedAt` INTEGER NOT NULL,
+                    FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_intake_entries_profileId_dayStart` " +
+                        "ON `intake_entries` (`profileId`, `dayStart`)"
+            )
         }
 
         private fun addIngredientColumns(db: SupportSQLiteDatabase) {
@@ -453,7 +588,9 @@ abstract class NutriNestDatabase : RoomDatabase() {
         /** Internal so instrumented tests can open a fresh, uncached instance. */
         internal fun build(appContext: Context): NutriNestDatabase =
             Room.databaseBuilder(appContext, NutriNestDatabase::class.java, "nutrinest.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6
+                )
                 .addCallback(FoodImportCallback(appContext))
                 .build()
     }

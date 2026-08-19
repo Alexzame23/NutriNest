@@ -57,6 +57,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.MealSlot
+import com.zame.nutrinest.data.local.entity.MenuScope
+import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.KeyedDropdown
@@ -78,8 +80,10 @@ fun MenuConfigScreen(
     val shortDays = remember(configuration) { WeekUtils.shortDayNames(configuration.locales[0]) }
     val recipes by viewModel.allRecipes.collectAsState()
     val folders by viewModel.allFolders.collectAsState()
+    val profiles by viewModel.profiles.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showLockDialog by remember { mutableStateOf(false) }
+    var showOverrideDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.done) { if (state.done) onGenerated() }
     // The generator reports a code; the wording belongs to this layer.
@@ -153,6 +157,19 @@ fun MenuConfigScreen(
                 }
             }
 
+            // ── Who eats what ───────────────────────────────────────
+            if (profiles.size > 1) {
+                item { SectionTitle(stringResource(R.string.menu_config_scope)) }
+                items(MenuScope.entries.size) { index ->
+                    val scope = MenuScope.entries[index]
+                    ScopeCard(
+                        scope = scope,
+                        selected = state.scope == scope,
+                        onClick = { viewModel.onScopeChange(scope) }
+                    )
+                }
+            }
+
             // ── Meal importance sliders ─────────────────────────────
             item { SectionTitle(stringResource(R.string.menu_config_meal_sizes)) }
             item {
@@ -195,6 +212,106 @@ fun MenuConfigScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+
+            // ── Courses within a meal ───────────────────────────────
+            if (state.courseCapableSlots.isNotEmpty()) {
+                item { SectionTitle(stringResource(R.string.menu_config_courses)) }
+                item {
+                    Text(
+                        stringResource(R.string.menu_config_courses_note),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                items(state.courseCapableSlots.size) { index ->
+                    val slot = state.courseCapableSlots[index]
+                    Card(
+                        shape = MaterialTheme.shapes.medium,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text(
+                                stringResource(slot.labelRes),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            ToggleRow(
+                                label = stringResource(R.string.menu_config_two_courses),
+                                checked = slot in state.twoCourseSlots,
+                                onToggle = { viewModel.toggleTwoCourses(slot) }
+                            )
+                            ToggleRow(
+                                label = stringResource(R.string.menu_config_dessert),
+                                checked = slot in state.dessertSlots,
+                                onToggle = { viewModel.toggleDessert(slot) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Per-meal exceptions ─────────────────────────────────
+            if (state.scope == MenuScope.PER_MEAL && profiles.size > 1) {
+                item { SectionTitle(stringResource(R.string.menu_config_exceptions)) }
+                item {
+                    Text(
+                        stringResource(R.string.menu_config_exceptions_note),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                val overrides = state.sortedOverrides
+                items(overrides.size) { index ->
+                    val override = overrides[index]
+                    val who = profiles.find { it.id == override.profileId }?.name ?: "?"
+                    Card(
+                        shape = MaterialTheme.shapes.medium,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Row(
+                            Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    who,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    stringResource(override.slot.labelRes) + " · " +
+                                        shortDays[override.day],
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { viewModel.removeOverride(override) }) {
+                                Icon(
+                                    Icons.Rounded.Delete,
+                                    contentDescription =
+                                        stringResource(R.string.menu_config_remove_exception),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = { showOverrideDialog = true },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.Add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.menu_config_add_exception))
                     }
                 }
             }
@@ -322,9 +439,13 @@ fun MenuConfigScreen(
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
+                            val who = lock.profileId
+                                ?.let { id -> profiles.find { it.id == id }?.name }
+                                ?: stringResource(R.string.menu_scope_everyone)
                             Text(
                                 stringResource(lock.slot.labelRes) + " · " +
-                                    lock.days.sorted().joinToString(", ") { shortDays[it] },
+                                    lock.days.sorted().joinToString(", ") { shortDays[it] } +
+                                    " · " + who,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -356,51 +477,149 @@ fun MenuConfigScreen(
 
     if (showLockDialog) {
         AddLockDialog(
-            slots = state.slotWeights.keys.sortedBy { it.ordinal },
+            slots = state.slots,
             recipes = recipes,
+            profiles = profiles,
             onDismiss = { showLockDialog = false },
-            onConfirm = { days, slot, recipe ->
-                viewModel.addLock(days, slot, recipe)
+            onConfirm = { days, slot, recipe, profileId ->
+                viewModel.addLock(days, slot, recipe, profileId)
                 showLockDialog = false
+            }
+        )
+    }
+
+    if (showOverrideDialog) {
+        AddOverrideDialog(
+            slots = state.slots,
+            profiles = profiles,
+            onDismiss = { showOverrideDialog = false },
+            onConfirm = { days, slot, profileId ->
+                viewModel.addOverride(days, slot, profileId)
+                showOverrideDialog = false
             }
         )
     }
 }
 
+/** One of the three ways a week can be split across the household. */
+@Composable
+private fun ScopeCard(scope: MenuScope, selected: Boolean, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                stringResource(scope.labelRes),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                stringResource(scope.descriptionRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = { onToggle() })
+    }
+}
+
+/** Day chips shared by the lock and exception dialogs. */
 @OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DayChips(selected: Set<Int>, onToggle: (Int) -> Unit) {
+    Text(stringResource(R.string.menu_config_days), style = MaterialTheme.typography.bodyLarge)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Short forms: seven full day names never fit on one row.
+        WeekUtils.shortDayNames().forEachIndexed { index, name ->
+            FilterChip(
+                selected = index in selected,
+                onClick = { onToggle(index) },
+                label = { Text(name) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddOverrideDialog(
+    slots: List<MealSlot>,
+    profiles: List<ProfileEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (Set<Int>, MealSlot, Long) -> Unit
+) {
+    var selectedDays by remember { mutableStateOf(setOf<Int>()) }
+    var selectedSlot by remember { mutableStateOf(slots.first()) }
+    var selectedProfile by remember { mutableStateOf(profiles.firstOrNull()?.id) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.menu_config_exception_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DayChips(selectedDays) { index ->
+                    selectedDays =
+                        if (index in selectedDays) selectedDays - index else selectedDays + index
+                }
+                KeyedDropdown(
+                    label = stringResource(R.string.menu_config_meal),
+                    options = slots.map { it to stringResource(it.labelRes) },
+                    selectedKey = selectedSlot,
+                    onSelected = { selectedSlot = it }
+                )
+                KeyedDropdown(
+                    label = stringResource(R.string.menu_config_who),
+                    options = profiles.map { it.id to it.name },
+                    selectedKey = selectedProfile,
+                    onSelected = { selectedProfile = it }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = selectedDays.isNotEmpty() && selectedProfile != null,
+                onClick = { selectedProfile?.let { onConfirm(selectedDays, selectedSlot, it) } }
+            ) { Text(stringResource(R.string.action_add)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
+    )
+}
+
 @Composable
 private fun AddLockDialog(
     slots: List<MealSlot>,
     recipes: List<RecipeEntity>,
+    profiles: List<ProfileEntity>,
     onDismiss: () -> Unit,
-    onConfirm: (Set<Int>, MealSlot, RecipeEntity) -> Unit
+    onConfirm: (Set<Int>, MealSlot, RecipeEntity, Long?) -> Unit
 ) {
     var selectedDays by remember { mutableStateOf(setOf<Int>()) }
     var selectedSlot by remember { mutableStateOf(slots.first()) }
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
+    // null = the whole household, which is what a lock has always meant.
+    var lockedFor by remember { mutableStateOf<Long?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.menu_config_lock_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    stringResource(R.string.menu_config_days),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Short forms: seven full day names never fit on one row.
-                    WeekUtils.shortDayNames().forEachIndexed { index, name ->
-                        FilterChip(
-                            selected = index in selectedDays,
-                            onClick = {
-                                selectedDays =
-                                    if (index in selectedDays) selectedDays - index
-                                    else selectedDays + index
-                            },
-                            label = { Text(name) }
-                        )
-                    }
+                DayChips(selectedDays) { index ->
+                    selectedDays =
+                        if (index in selectedDays) selectedDays - index else selectedDays + index
                 }
                 KeyedDropdown(
                     label = stringResource(R.string.menu_config_meal),
@@ -416,13 +635,23 @@ private fun AddLockDialog(
                         selectedRecipe = recipes.find { it.name == name }
                     }
                 )
+                if (profiles.size > 1) {
+                    KeyedDropdown(
+                        label = stringResource(R.string.menu_config_who),
+                        options = listOf(
+                            null to stringResource(R.string.menu_scope_everyone)
+                        ) + profiles.map { it.id to it.name },
+                        selectedKey = lockedFor,
+                        onSelected = { lockedFor = it }
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 enabled = selectedDays.isNotEmpty() && selectedRecipe != null,
                 onClick = {
-                    selectedRecipe?.let { onConfirm(selectedDays, selectedSlot, it) }
+                    selectedRecipe?.let { onConfirm(selectedDays, selectedSlot, it, lockedFor) }
                 }
             ) { Text(stringResource(R.string.action_add)) }
         },

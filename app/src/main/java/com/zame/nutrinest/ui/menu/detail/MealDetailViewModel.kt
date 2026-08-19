@@ -12,8 +12,11 @@ import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.PlannedMealWithRecipe
 import com.zame.nutrinest.data.local.entity.PortionWithProfile
+import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
+import com.zame.nutrinest.data.repository.MealScopeTarget
 import com.zame.nutrinest.data.repository.MenuRepository
+import com.zame.nutrinest.data.repository.RecipeRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -21,13 +24,22 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class MealDetailUiState(
     val meal: PlannedMealWithRecipe? = null,
     val steps: List<RecipeStepEntity> = emptyList(),
     val baseIngredients: List<IngredientWithQuantity> = emptyList(),
-    val portions: List<PortionWithProfile> = emptyList()
+    val portions: List<PortionWithProfile> = emptyList(),
+    val profiles: List<ProfileEntity> = emptyList()
 ) {
+    /** A free slot: a placeholder with nothing to cook. False while loading. */
+    val isFree: Boolean
+        get() = meal?.let { it.meal.isFree || it.recipe == null } ?: false
+
+    /** null when the household shares this dish, otherwise whose it is. */
+    val ownerProfileId: Long? get() = meal?.meal?.profileId
+
     /** Base recipe nutrition (factor 1.0). */
     val baseNutrition: NutritionValues
         get() = baseIngredients.fold(NutritionValues()) { acc, i -> acc + i.nutrition }
@@ -51,15 +63,23 @@ data class MealDetailUiState(
             val f = portion.portion.factor
             NutritionValues(it.kcal * f, it.carbs * f, it.fats * f, it.protein * f)
         }
+
+    /** True when today's logging has moved this person off the planned portion. */
+    fun isAdjusted(portion: PortionWithProfile): Boolean =
+        kotlin.math.abs(portion.portion.factor - portion.portion.baseFactor) > 0.01
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MealDetailViewModel(
-    repository: MenuRepository,
+    private val repository: MenuRepository,
+    recipeRepository: RecipeRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val mealId: Long = savedStateHandle["mealId"] ?: -1L
+
+    val allRecipes = recipeRepository.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val uiState = repository.observeMeal(mealId)
         .flatMapLatest { mealWithRecipe ->
@@ -67,26 +87,63 @@ class MealDetailViewModel(
                 flowOf(MealDetailUiState())
             } else {
                 combine(
-                    repository.observeSteps(mealWithRecipe.recipe.id),
+                    mealWithRecipe.recipe
+                        ?.let { repository.observeSteps(it.id) }
+                        ?: flowOf(emptyList()),
                     repository.observePortions(mealId),
-                    flow { emit(repository.getIngredientsOf(mealWithRecipe.recipe.id)) }
-                ) { steps, portions, ingredients ->
+                    repository.observeProfiles(),
+                    flow {
+                        emit(
+                            mealWithRecipe.recipe
+                                ?.let { repository.getIngredientsOf(it.id) }
+                                ?: emptyList()
+                        )
+                    }
+                ) { steps, portions, profiles, ingredients ->
                     MealDetailUiState(
                         meal = mealWithRecipe,
                         steps = steps,
                         baseIngredients = ingredients,
-                        portions = portions.sortedBy { it.profile.name }
+                        portions = portions.sortedBy { it.profile.name },
+                        profiles = profiles
                     )
                 }
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MealDetailUiState())
 
+    /** The lock's reach is the row's own: household row, household lock. */
+    fun toggleLock() {
+        val meal = uiState.value.meal?.meal ?: return
+        viewModelScope.launch { repository.setMealLocked(meal.id, !meal.isLocked) }
+    }
+
+    /**
+     * Swaps this dish. [profileId] null changes it for everyone eating it;
+     * otherwise only that person moves, and their portions are recalculated
+     * from their own calorie target.
+     */
+    fun replaceMeal(recipeId: Long, profileId: Long?) {
+        viewModelScope.launch {
+            repository.replaceMeal(
+                mealId = mealId,
+                newRecipeId = recipeId,
+                target = profileId
+                    ?.let { MealScopeTarget.Person(it) }
+                    ?: MealScopeTarget.Household
+            )
+        }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp
-                MealDetailViewModel(app.container.menuRepository, createSavedStateHandle())
+                MealDetailViewModel(
+                    app.container.menuRepository,
+                    app.container.recipeRepository,
+                    createSavedStateHandle()
+                )
             }
         }
     }

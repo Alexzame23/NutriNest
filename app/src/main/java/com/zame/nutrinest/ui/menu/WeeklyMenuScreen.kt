@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,13 +25,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,13 +46,16 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -54,22 +64,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.MealCourse
 import com.zame.nutrinest.data.local.entity.PlannedMealWithRecipe
 import com.zame.nutrinest.util.WeekUtils
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun WeeklyMenuScreen(
     onBack: () -> Unit,
     onConfigure: (Long) -> Unit,
     onOpenMeal: (Long) -> Unit,
     onOpenShoppingList: () -> Unit,
+    onOpenIntake: () -> Unit,
     viewModel: WeeklyMenuViewModel = viewModel(factory = WeeklyMenuViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsState()
     // Day names come from the JDK for the device's locale, not from strings.xml.
     val configuration = LocalConfiguration.current
     val dayNames = remember(configuration) { WeekUtils.dayNames(configuration.locales[0]) }
+    var showEraseDialog by remember { mutableStateOf(false) }
 
     // Politely ask for notification permission once (Android 13+) so the
     // weekend planning reminder can be delivered.
@@ -101,11 +114,23 @@ fun WeeklyMenuScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenIntake) {
+                        Icon(
+                            Icons.Rounded.Restaurant,
+                            contentDescription = stringResource(R.string.intake_title)
+                        )
+                    }
                     if (state.menu != null) {
                         IconButton(onClick = { onConfigure(state.weekStart) }) {
                             Icon(
                                 Icons.Rounded.Refresh,
                                 contentDescription = stringResource(R.string.weekly_menu_regenerate)
+                            )
+                        }
+                        IconButton(onClick = { showEraseDialog = true }) {
+                            Icon(
+                                Icons.Rounded.DeleteSweep,
+                                contentDescription = stringResource(R.string.weekly_menu_erase)
                             )
                         }
                     }
@@ -154,6 +179,25 @@ fun WeeklyMenuScreen(
             }
             Spacer(Modifier.height(12.dp))
 
+            // ── Whose menu is on screen ─────────────────────────────
+            if (state.profiles.size > 1) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = state.selectedProfileId == null,
+                        onClick = { viewModel.selectProfile(null) },
+                        label = { Text(stringResource(R.string.weekly_menu_everyone)) }
+                    )
+                    state.profiles.forEach { profile ->
+                        FilterChip(
+                            selected = state.selectedProfileId == profile.id,
+                            onClick = { viewModel.selectProfile(profile.id) },
+                            label = { Text(profile.name) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
             if (state.menu == null) {
                 EmptyMenuState(isCurrentWeek = state.isCurrentWeek)
             } else {
@@ -174,7 +218,7 @@ fun WeeklyMenuScreen(
                                 )
                             }
                             items(todayMeals.size) { i ->
-                                MealRow(todayMeals[i], onOpenMeal, highlight = true)
+                                MealRow(todayMeals[i], state, onOpenMeal, highlight = true)
                             }
                             item { Spacer(Modifier.height(8.dp)) }
                         }
@@ -183,11 +227,73 @@ fun WeeklyMenuScreen(
                         if (state.isCurrentWeek && day == state.todayIndex) continue
                         val meals = state.mealsByDay[day] ?: continue
                         item { DayHeader(dayNames[day]) }
-                        items(meals.size) { i -> MealRow(meals[i], onOpenMeal) }
+                        items(meals.size) { i -> MealRow(meals[i], state, onOpenMeal) }
                     }
                 }
             }
         }
+    }
+
+    if (showEraseDialog) {
+        EraseMenuDialog(
+            onDismiss = { showEraseDialog = false },
+            onConfirm = { current, next ->
+                viewModel.eraseWeeks(current, next)
+                showEraseDialog = false
+            }
+        )
+    }
+}
+
+/** Wipe this week, next week, or both. Nothing is erased until confirmed. */
+@Composable
+private fun EraseMenuDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Boolean, Boolean) -> Unit
+) {
+    var current by remember { mutableStateOf(true) }
+    var next by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.weekly_menu_erase_title)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.weekly_menu_erase_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                WeekCheckbox(
+                    label = stringResource(R.string.week_current),
+                    checked = current,
+                    onToggle = { current = it }
+                )
+                WeekCheckbox(
+                    label = stringResource(R.string.week_next),
+                    checked = next,
+                    onToggle = { next = it }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = current || next,
+                onClick = { onConfirm(current, next) }
+            ) { Text(stringResource(R.string.weekly_menu_erase_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun WeekCheckbox(label: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = onToggle)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -202,20 +308,29 @@ private fun DayHeader(text: String, highlight: Boolean = false) {
     )
 }
 
+/**
+ * One dish. A free slot has no recipe, so it renders as a muted placeholder —
+ * present in the day, but with nothing to cook and nothing to buy.
+ */
 @Composable
 private fun MealRow(
     item: PlannedMealWithRecipe,
+    state: WeeklyMenuUiState,
     onOpenMeal: (Long) -> Unit,
     highlight: Boolean = false
 ) {
+    val free = item.meal.isFree || item.recipe == null
     Card(
         onClick = { onOpenMeal(item.meal.id) },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = if (highlight) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surface
+            containerColor = when {
+                highlight && !free -> MaterialTheme.colorScheme.primaryContainer
+                free -> MaterialTheme.colorScheme.surfaceVariant
+                else -> MaterialTheme.colorScheme.surface
+            }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (free) 0.dp else 1.dp)
     ) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -224,20 +339,36 @@ private fun MealRow(
             Box(
                 Modifier
                     .size(8.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .background(
+                        if (free) MaterialTheme.colorScheme.outline
+                        else MaterialTheme.colorScheme.primary,
+                        CircleShape
+                    )
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
+                // "Lunch · First course · Marta", trimmed to what is worth saying.
+                val caption = buildList {
+                    add(stringResource(item.meal.slot.labelRes))
+                    if (item.meal.course != MealCourse.SINGLE) {
+                        add(stringResource(item.meal.course.labelRes))
+                    }
+                    // Only in the household view: whose plate this is.
+                    if (state.selectedProfileId == null) {
+                        item.meal.profileId?.let { add(state.nameOf(it)) }
+                    }
+                }.joinToString(" · ")
                 Text(
-                    stringResource(item.meal.slot.labelRes),
+                    caption,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    item.recipe.name,
+                    item.recipe?.name ?: stringResource(R.string.meal_free_placeholder),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (free) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface
                 )
             }
             if (item.meal.isCheatMeal) {

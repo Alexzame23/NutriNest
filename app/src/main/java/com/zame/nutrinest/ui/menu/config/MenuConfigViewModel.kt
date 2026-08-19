@@ -8,7 +8,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.zame.nutrinest.NutriNestApp
+import com.zame.nutrinest.data.local.entity.MealCourse
 import com.zame.nutrinest.data.local.entity.MealSlot
+import com.zame.nutrinest.data.local.entity.MenuScope
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.repository.MenuRepository
 import com.zame.nutrinest.data.repository.RecipeRepository
@@ -16,6 +18,7 @@ import com.zame.nutrinest.domain.planner.FailureReason
 import com.zame.nutrinest.domain.planner.GenerationConfig
 import com.zame.nutrinest.domain.planner.GenerationResult
 import com.zame.nutrinest.domain.planner.MealLock
+import com.zame.nutrinest.domain.planner.MealOverride
 import com.zame.nutrinest.util.WeekUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +29,13 @@ import kotlinx.coroutines.launch
 data class MenuConfigUiState(
     val mealsPerDay: Int = 3,
     val slotWeights: Map<MealSlot, Float> = MealSlot.defaultWeights(MealSlot.forMealsPerDay(3)),
+    val scope: MenuScope = MenuScope.SHARED,
+    /** Slots served as a first course plus a main. */
+    val twoCourseSlots: Set<MealSlot> = emptySet(),
+    /** Slots that finish with a dessert. */
+    val dessertSlots: Set<MealSlot> = emptySet(),
+    /** Only meaningful for [MenuScope.PER_MEAL]. */
+    val overrides: Set<MealOverride> = emptySet(),
     val cheatMeals: Int = 0,
     val maxRepeats: Int = 2,
     val excludedCategories: Set<String> = emptySet(),
@@ -37,7 +47,26 @@ data class MenuConfigUiState(
     val isGenerating: Boolean = false,
     val error: FailureReason? = null,
     val done: Boolean = false
-)
+) {
+    val slots: List<MealSlot> get() = slotWeights.keys.sortedBy { it.ordinal }
+
+    /** Stable order for the exception list, which is otherwise a set. */
+    val sortedOverrides: List<MealOverride>
+        get() = overrides.sortedWith(
+            compareBy<MealOverride>({ it.day }, { it.slot.ordinal }, { it.profileId })
+        )
+
+    /** Slots that can take a first course or a dessert at all. */
+    val courseCapableSlots: List<MealSlot> get() = slots.filter { it.allowsCourses }
+
+    /** The structure handed to the generator; single-course slots are implicit. */
+    val slotCourses: Map<MealSlot, List<MealCourse>>
+        get() = courseCapableSlots
+            .associateWith {
+                MealCourse.structure(it in twoCourseSlots, it in dessertSlots)
+            }
+            .filterValues { it != listOf(MealCourse.SINGLE) }
+}
 
 class MenuConfigViewModel(
     private val menuRepository: MenuRepository,
@@ -56,18 +85,46 @@ class MenuConfigViewModel(
     val allFolders = recipeRepository.observeFolders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** The household. With one profile the scope options don't apply. */
+    val profiles = menuRepository.observeProfiles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun onMealsPerDayChange(count: Int) = update {
         val slots = MealSlot.forMealsPerDay(count)
         copy(
             mealsPerDay = count,
             slotWeights = MealSlot.defaultWeights(slots),
-            // Locks referencing slots that no longer exist are dropped.
-            locks = locks.filter { it.slot in slots }
+            // Anything pinned to a slot that no longer exists is dropped.
+            locks = locks.filter { it.slot in slots },
+            overrides = overrides.filterTo(mutableSetOf()) { it.slot in slots },
+            twoCourseSlots = twoCourseSlots.filterTo(mutableSetOf()) { it in slots },
+            dessertSlots = dessertSlots.filterTo(mutableSetOf()) { it in slots }
         )
     }
 
     fun onSlotWeightChange(slot: MealSlot, weight: Float) = update {
         copy(slotWeights = slotWeights + (slot to weight.coerceIn(0.05f, 1f)))
+    }
+
+    fun onScopeChange(scope: MenuScope) = update {
+        // Overrides only mean anything in the per-meal scope.
+        copy(scope = scope, overrides = if (scope == MenuScope.PER_MEAL) overrides else emptySet())
+    }
+
+    fun toggleTwoCourses(slot: MealSlot) = update {
+        copy(twoCourseSlots = twoCourseSlots.toggle(slot))
+    }
+
+    fun toggleDessert(slot: MealSlot) = update {
+        copy(dessertSlots = dessertSlots.toggle(slot))
+    }
+
+    fun addOverride(days: Set<Int>, slot: MealSlot, profileId: Long) = update {
+        copy(overrides = overrides + days.map { MealOverride(it, slot, profileId) })
+    }
+
+    fun removeOverride(override: MealOverride) = update {
+        copy(overrides = overrides - override)
     }
 
     fun onCheatMealsChange(count: Int) = update { copy(cheatMeals = count.coerceIn(0, 7)) }
@@ -94,8 +151,9 @@ class MenuConfigViewModel(
         copy(includedFolders = includedFolders.toggle(folder))
     }
 
-    fun addLock(days: Set<Int>, slot: MealSlot, recipe: RecipeEntity) = update {
-        copy(locks = locks + MealLock(days, slot, recipe.id))
+    /** [profileId] null pins the meal for everyone; otherwise for that person. */
+    fun addLock(days: Set<Int>, slot: MealSlot, recipe: RecipeEntity, profileId: Long?) = update {
+        copy(locks = locks + MealLock(days, slot, recipe.id, profileId))
     }
 
     fun removeLock(index: Int) = update {
@@ -112,6 +170,9 @@ class MenuConfigViewModel(
                 weekStart = weekStart,
                 config = GenerationConfig(
                     slotWeights = s.slotWeights,
+                    scope = s.scope,
+                    slotCourses = s.slotCourses,
+                    overrides = s.overrides,
                     cheatMeals = s.cheatMeals,
                     maxRecipeRepeats = s.maxRepeats,
                     excludedCategories = s.excludedCategories,
@@ -131,7 +192,7 @@ class MenuConfigViewModel(
         }
     }
 
-    private fun Set<String>.toggle(value: String): Set<String> =
+    private fun <T> Set<T>.toggle(value: T): Set<T> =
         if (value in this) this - value else this + value
 
     private inline fun update(block: MenuConfigUiState.() -> MenuConfigUiState) {

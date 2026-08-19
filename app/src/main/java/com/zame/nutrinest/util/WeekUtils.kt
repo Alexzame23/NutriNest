@@ -47,4 +47,36 @@ object WeekUtils {
         val cal = Calendar.getInstance()
         return (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
     }
+
+    /** Epoch millis of local midnight — the key a day's intake log is filed under. */
+    fun dayStartOf(time: Long = System.currentTimeMillis()): Long =
+        Calendar.getInstance().apply {
+            timeInMillis = time
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+    /** 0 = Monday … 6 = Sunday for the day starting at [dayStart]. */
+    fun dayIndexOf(dayStart: Long): Int {
+        val cal = Calendar.getInstance().apply { timeInMillis = dayStart }
+        return (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+    }
+
+    /**
+     * How far through [dayStart] we are, as an hour 0–24.
+     *
+     * A day still ahead reads 0 (every meal is to come) and a day already gone
+     * reads 24 (none are), so rebalancing a past or future day does the
+     * sensible thing without the caller having to check which it is.
+     */
+    fun hourWithin(dayStart: Long, now: Long = System.currentTimeMillis()): Int {
+        val today = dayStartOf(now)
+        return when {
+            dayStart > today -> 0
+            dayStart < today -> 24
+            else -> Calendar.getInstance().apply { timeInMillis = now }.get(Calendar.HOUR_OF_DAY)
+        }
+    }
 }

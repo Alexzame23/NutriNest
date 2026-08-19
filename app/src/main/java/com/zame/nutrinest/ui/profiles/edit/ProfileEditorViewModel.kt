@@ -14,7 +14,9 @@ import com.zame.nutrinest.data.local.entity.ActivityLevel
 import com.zame.nutrinest.data.local.entity.BiologicalSex
 import com.zame.nutrinest.data.local.entity.BmrFormula
 import com.zame.nutrinest.data.local.entity.Goal
+import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.ProfileEntity
+import com.zame.nutrinest.data.local.entity.ProfileMealPlanEntity
 import com.zame.nutrinest.data.local.entity.UnitSystem
 import com.zame.nutrinest.data.local.entity.WeightLossRate
 import com.zame.nutrinest.data.repository.ProfileRepository
@@ -23,6 +25,7 @@ import com.zame.nutrinest.domain.nutrition.NutritionTargets
 import com.zame.nutrinest.domain.nutrition.UnitConversions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** What is wrong with the form, as a code the UI layer translates. */
@@ -52,10 +55,44 @@ data class ProfileEditorState(
     val formula: BmrFormula = BmrFormula.AUTO,
     val dietaryPreferences: String = "",
     val allergies: String = "",
+    // ── How the day is split ────────────────────────────────────────────
+    val mealsPerDay: Int = 3,
+    /** Fraction of the daily target per slot; deliberately not normalised. */
+    val slotShares: Map<MealSlot, Float> =
+        MealSlot.defaultWeights(MealSlot.forMealsPerDay(3)),
+    val freeSlots: Set<MealSlot> = emptySet(),
     val error: ProfileFormError? = null,
     val saved: Boolean = false,
     val isLoading: Boolean = false
 ) {
+    val slots: List<MealSlot> get() = MealSlot.forMealsPerDay(mealsPerDay)
+
+    /** Share of the day the plan actually puts on a plate. */
+    val plannedShare: Float
+        get() = slots.filterNot { it in freeSlots }.sumOf {
+            (slotShares[it] ?: 0f).toDouble()
+        }.toFloat()
+
+    /** Everything assigned, free slots included — should come to 100%. */
+    val totalShare: Float
+        get() = slots.sumOf { (slotShares[it] ?: 0f).toDouble() }.toFloat()
+
+    /**
+     * Absolute budget of a slot in kcal. Free slots keep theirs on paper —
+     * that is what makes them untracked rather than redistributed.
+     */
+    fun slotKcal(slot: MealSlot): Int? =
+        liveTargets?.let { ((slotShares[slot] ?: 0f) * it.dailyCalories).toInt() }
+
+    fun mealPlanRows(profileId: Long = 0): List<ProfileMealPlanEntity> = slots.map { slot ->
+        ProfileMealPlanEntity(
+            profileId = profileId,
+            slot = slot,
+            share = slotShares[slot] ?: 0f,
+            isFree = slot in freeSlots
+        )
+    }
+
     /** Height in cm parsed from the current inputs, or null if invalid. */
     val heightCm: Double?
         get() = when (unitSystem) {
@@ -114,7 +151,28 @@ class ProfileEditorViewModel(
 
     init {
         val profileId: Long = savedStateHandle["profileId"] ?: -1L
-        if (profileId > 0) loadProfile(profileId)
+        if (profileId > 0) {
+            loadProfile(profileId)
+            loadMealPlan(profileId)
+        }
+    }
+
+    /**
+     * Only the first emission is taken: after that the sliders belong to the
+     * user, and echoing the database back would fight them mid-drag.
+     */
+    private fun loadMealPlan(id: Long) {
+        viewModelScope.launch {
+            val rows = repository.observeMealPlan(id).first()
+            if (rows.isEmpty()) return@launch
+            update {
+                copy(
+                    mealsPerDay = rows.size,
+                    slotShares = rows.associate { it.slot to it.share },
+                    freeSlots = rows.filter { it.isFree }.map { it.slot }.toSet()
+                )
+            }
+        }
     }
 
     private fun loadProfile(id: Long) {
@@ -173,6 +231,28 @@ class ProfileEditorViewModel(
     fun onDietaryChange(v: String) = update { copy(dietaryPreferences = v) }
     fun onAllergiesChange(v: String) = update { copy(allergies = v) }
     fun dismissError() = update { copy(error = null) }
+
+    fun onMealsPerDayChange(count: Int) = update {
+        val slots = MealSlot.forMealsPerDay(count)
+        copy(
+            mealsPerDay = count,
+            slotShares = MealSlot.defaultWeights(slots),
+            freeSlots = freeSlots.filter { it in slots }.toSet()
+        )
+    }
+
+    fun onSlotShareChange(slot: MealSlot, share: Float) = update {
+        copy(slotShares = slotShares + (slot to share.coerceIn(0f, 1f)))
+    }
+
+    /**
+     * Marking a slot free does not touch the other shares: the calories that
+     * belonged to it stay unplanned rather than being pushed onto the meals
+     * that are still tracked.
+     */
+    fun onSlotFreeToggle(slot: MealSlot) = update {
+        copy(freeSlots = if (slot in freeSlots) freeSlots - slot else freeSlots + slot)
+    }
 
     /** Switching units converts the current values instead of clearing them. */
     fun onUnitSystemChange(target: UnitSystem) {
@@ -241,8 +321,8 @@ class ProfileEditorViewModel(
                     kotlin.math.abs(it) % 4
                 }
             )
-            if (s.editingId == null) repository.create(entity)
-            else repository.update(entity)
+            if (s.editingId == null) repository.create(entity, s.mealPlanRows())
+            else repository.update(entity, s.mealPlanRows(entity.id))
             update { copy(saved = true) }
         }
     }

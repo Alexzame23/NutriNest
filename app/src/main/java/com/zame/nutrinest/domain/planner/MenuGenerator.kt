@@ -3,25 +3,47 @@ package com.zame.nutrinest.domain.planner
 import androidx.annotation.StringRes
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
+import com.zame.nutrinest.data.local.entity.MealCourse
 import com.zame.nutrinest.data.local.entity.MealSlot
+import com.zame.nutrinest.data.local.entity.MenuScope
 import com.zame.nutrinest.data.local.entity.NutritionValues
-import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
-import com.zame.nutrinest.domain.nutrition.NutritionCalculator
 import kotlin.random.Random
 
 // ── Configuration ────────────────────────────────────────────────────────
 
-/** A user-defined lock: on these days, this slot must be this recipe. */
+/**
+ * A user-defined lock: on these days, this slot must be this recipe.
+ *
+ * [profileId] gives the lock its scope — null pins the meal for the whole
+ * household, a value pins it for that person only and leaves everyone else to
+ * the generator. [course] is null for "whichever course the slot's main dish
+ * is", which is what a lock means unless the user says otherwise.
+ */
 data class MealLock(
     val days: Set<Int>,        // 0=Mon … 6=Sun
     val slot: MealSlot,
-    val recipeId: Long
+    val recipeId: Long,
+    val profileId: Long? = null,
+    val course: MealCourse? = null
+)
+
+/** "This person eats something else here" — the per-meal escape hatch. */
+data class MealOverride(
+    val day: Int,
+    val slot: MealSlot,
+    val profileId: Long
 )
 
 data class GenerationConfig(
     val slotWeights: Map<MealSlot, Float>,
+    val scope: MenuScope = MenuScope.SHARED,
+    /** Slots that hold more than one dish, e.g. LUNCH to [FIRST, MAIN]. */
+    val slotCourses: Map<MealSlot, List<MealCourse>> = emptyMap(),
+    /** Only consulted when [scope] is [MenuScope.PER_MEAL]. */
+    val overrides: Set<MealOverride> = emptySet(),
+    /** Randomly scattered free meals, on top of each profile's own free slots. */
     val cheatMeals: Int = 0,
     val maxRecipeRepeats: Int = 2,
     /** Recipe categories to skip, e.g. "Dessert". */
@@ -33,7 +55,11 @@ data class GenerationConfig(
     val includedFolders: Set<String> = emptySet(),
     val excludeRecentlyUsed: Boolean = true,
     val locks: List<MealLock> = emptyList()
-)
+) {
+    /** The courses a slot is planned with; every slot has at least one. */
+    fun coursesOf(slot: MealSlot): List<MealCourse> =
+        slotCourses[slot]?.takeIf { it.isNotEmpty() } ?: listOf(MealCourse.SINGLE)
+}
 
 // ── Inputs & outputs ─────────────────────────────────────────────────────
 
@@ -51,9 +77,14 @@ data class PlannableRecipe(
 data class GeneratedMeal(
     val dayOfWeek: Int,
     val slot: MealSlot,
-    val recipeId: Long,
+    val course: MealCourse,
+    /** null = the whole household eats this; otherwise this person's own meal. */
+    val profileId: Long?,
+    /** null only for a free slot. */
+    val recipeId: Long?,
     val isLocked: Boolean,
     val isCheatMeal: Boolean,
+    val isFree: Boolean,
     /** profileId → portion factor (multiplier of base recipe grams). */
     val portions: Map<Long, Double>
 )
@@ -83,25 +114,41 @@ enum class FailureReason(@StringRes val messageRes: Int) {
  * Weekly menu generator. Pure Kotlin, deterministic given a [Random] seed —
  * which makes it unit-testable and easy to swap for a smarter (or AI-based)
  * implementation later: everything upstream only depends on
- * [GenerationConfig] in and [GeneratedMenu] out.
+ * [GenerationConfig] + [DailyPlan] in and [GeneratedMenu] out.
  *
- * Selection is score-based per (day, slot):
- *   + slot/category affinity  (breakfast recipes at breakfast, etc.)
- *   + leftover bonus          (moderate: reduces waste without killing variety)
- *   − repetition penalty      (grows with each use; hard cap at maxRepeats)
+ * A week is filled (day, slot, course) at a time. For each of those the
+ * household is split into *audiences*: the people eating the same dish. A
+ * shared menu has one audience, an individual menu has one per person, and a
+ * per-meal menu has one shared audience plus one for every person with an
+ * override or a lock of their own here.
+ *
+ * Selection within an audience is score-based:
+ *   + slot/course affinity   (breakfast recipes at breakfast, desserts last)
+ *   + leftover bonus         (moderate: reduces waste without killing variety)
+ *   − repetition penalty     (grows with each use; hard cap at maxRepeats)
  *   − same-recipe-yesterday penalty
- *   + small random jitter     (keeps weeks from looking identical)
+ *   + small random jitter    (keeps weeks from looking identical)
  */
 class MenuGenerator(private val random: Random = Random.Default) {
 
+    private data class LockKey(
+        val day: Int,
+        val slot: MealSlot,
+        val course: MealCourse,
+        val profileId: Long?
+    )
+
+    /** The people sharing one dish, and whose row it is. */
+    private data class Audience(val owner: Long?, val plans: List<DailyPlan>)
+
     fun generate(
-        profiles: List<ProfileEntity>,
+        plans: List<DailyPlan>,
         recipes: List<PlannableRecipe>,
         config: GenerationConfig,
         recentRecipeIds: Set<Long> = emptySet(),
         leftoverIngredientIds: Set<Long> = emptySet()
     ): GenerationResult {
-        if (profiles.isEmpty()) {
+        if (plans.isEmpty()) {
             return GenerationResult.Failure(FailureReason.NO_PROFILES)
         }
 
@@ -126,24 +173,24 @@ class MenuGenerator(private val random: Random = Random.Default) {
 
         val byId = recipes.associateBy { it.recipe.id }
         val slots = config.slotWeights.keys.sortedBy { it.ordinal }
-        val normalizedWeights = normalize(config.slotWeights)
-        val targetsByProfile = profiles.associate {
-            it.id to NutritionCalculator.targetsFor(it)
-        }
 
-        // ── Resolve locks into a (day, slot) → recipeId map ────────────
-        val lockMap = mutableMapOf<Pair<Int, MealSlot>, Long>()
+        // ── Resolve locks into a (day, slot, course, who) → recipeId map ─
+        val lockMap = mutableMapOf<LockKey, Long>()
         for (lock in config.locks) {
             if (byId[lock.recipeId] == null) continue // locked recipe was deleted
-            for (day in lock.days) lockMap[day to lock.slot] = lock.recipeId
+            val course = lock.course ?: MealCourse.principal(config.coursesOf(lock.slot))
+            for (day in lock.days) {
+                lockMap[LockKey(day, lock.slot, course, lock.profileId)] = lock.recipeId
+            }
         }
+        val lockedDaySlots = lockMap.keys.map { it.day to it.slot }.toSet()
 
-        // ── Pick cheat-meal slots among non-locked ones ────────────────
-        val allSlots = (0..6).flatMap { day -> slots.map { day to it } }
-        val cheatSlots = allSlots
-            .filter { it !in lockMap.keys }
+        // ── Scatter the random free meals among the untouched slots ─────
+        val allDaySlots = (0..6).flatMap { day -> slots.map { day to it } }
+        val cheatSlots = allDaySlots
+            .filterNot { it in lockedDaySlots }
             .shuffled(random)
-            .take(config.cheatMeals.coerceIn(0, allSlots.size))
+            .take(config.cheatMeals.coerceIn(0, allDaySlots.size))
             .toSet()
 
         // ── Fill the week ──────────────────────────────────────────────
@@ -151,82 +198,135 @@ class MenuGenerator(private val random: Random = Random.Default) {
         val meals = mutableListOf<GeneratedMeal>()
 
         for (day in 0..6) {
+            val yesterdayRecipeIds = meals
+                .filter { it.dayOfWeek == day - 1 }
+                .mapNotNull { it.recipeId }
+                .toSet()
+
             for (slot in slots) {
-                val key = day to slot
-                val lockedId = lockMap[key]
-                val chosen: PlannableRecipe = if (lockedId != null) {
-                    byId.getValue(lockedId)
-                } else {
-                    pickRecipe(
-                        pool = freshPool,
-                        slot = slot,
-                        day = day,
-                        useCount = useCount,
-                        maxRepeats = config.maxRecipeRepeats,
-                        leftoverIngredientIds = leftoverIngredientIds,
-                        yesterdayRecipeIds = meals
-                            .filter { it.dayOfWeek == day - 1 }
-                            .map { it.recipeId }
-                            .toSet()
-                    ) ?: return GenerationResult.Failure(FailureReason.NOT_ENOUGH_RECIPES)
-                }
-                useCount[chosen.recipe.id] = (useCount[chosen.recipe.id] ?: 0) + 1
+                val courses = config.coursesOf(slot)
+                val householdCheat = (day to slot) in cheatSlots
 
-                val isCheat = key in cheatSlots
-                val slotWeight = normalizedWeights.getValue(slot).toDouble()
-                val portions = profiles.associate { profile ->
-                    val factor = if (isCheat) 1.0 else {
-                        val slotKcal =
-                            targetsByProfile.getValue(profile.id).dailyCalories * slotWeight
-                        (slotKcal / chosen.totalNutrition.kcal).coerceIn(0.25, 4.0)
+                // Free = this person left the slot untracked, or the whole
+                // household drew a random free meal here.
+                val free = if (householdCheat) plans else plans.filter { it.isFree(slot) }
+                val eating = plans - free.toSet()
+
+                if (free.isNotEmpty()) {
+                    if (eating.isEmpty()) {
+                        // Nobody is planning this slot: one household placeholder.
+                        meals += freeMeal(day, slot, profileId = null, cheat = householdCheat)
+                    } else {
+                        free.forEach {
+                            meals += freeMeal(day, slot, it.profileId, cheat = false)
+                        }
                     }
-                    profile.id to factor
+                }
+                if (eating.isEmpty()) continue
+
+                // Anyone with a reason to eat apart gets their own row; the
+                // rest share one. A profile-scoped lock is an override too —
+                // it says this person eats something specific, so it can't be
+                // served from the household dish.
+                val apart = eating.filter { plan ->
+                    config.scope == MenuScope.INDIVIDUAL ||
+                        (config.scope == MenuScope.PER_MEAL &&
+                            MealOverride(day, slot, plan.profileId) in config.overrides) ||
+                        lockMap.keys.any {
+                            it.day == day && it.slot == slot && it.profileId == plan.profileId
+                        }
+                }
+                val together = eating - apart.toSet()
+                val audiences = buildList {
+                    apart.forEach { add(Audience(it.profileId, listOf(it))) }
+                    if (together.isNotEmpty()) add(Audience(owner = null, plans = together))
                 }
 
-                meals += GeneratedMeal(
-                    dayOfWeek = day,
-                    slot = slot,
-                    recipeId = chosen.recipe.id,
-                    isLocked = lockedId != null,
-                    isCheatMeal = isCheat,
-                    portions = portions
-                )
+                val courseShares = MealCourse.shares(courses)
+                val usedHere = mutableSetOf<Long>()
+
+                for (audience in audiences) {
+                    for (course in courses) {
+                        val lockedId = lockMap[LockKey(day, slot, course, audience.owner)]
+                        val chosen = if (lockedId != null) {
+                            byId.getValue(lockedId)
+                        } else {
+                            pickRecipe(
+                                pool = freshPool,
+                                slot = slot,
+                                course = course,
+                                useCount = useCount,
+                                maxRepeats = config.maxRecipeRepeats,
+                                leftoverIngredientIds = leftoverIngredientIds,
+                                yesterdayRecipeIds = yesterdayRecipeIds,
+                                alreadyInSlot = usedHere
+                            ) ?: return GenerationResult.Failure(FailureReason.NOT_ENOUGH_RECIPES)
+                        }
+                        useCount[chosen.recipe.id] = (useCount[chosen.recipe.id] ?: 0) + 1
+                        usedHere += chosen.recipe.id
+
+                        val share = courseShares[course] ?: 1.0
+                        val portions = audience.plans.associate { plan ->
+                            val kcal = plan.slotKcal(slot) * share
+                            plan.profileId to portionFactor(kcal, chosen.totalNutrition.kcal)
+                        }
+
+                        meals += GeneratedMeal(
+                            dayOfWeek = day,
+                            slot = slot,
+                            course = course,
+                            profileId = audience.owner,
+                            recipeId = chosen.recipe.id,
+                            isLocked = lockedId != null,
+                            isCheatMeal = false,
+                            isFree = false,
+                            portions = portions
+                        )
+                    }
+                }
             }
         }
 
-        // ── Aggregate the household shopping list ──────────────────────
-        val totals = mutableMapOf<Long, Double>()
-        for (meal in meals) {
-            val recipe = byId.getValue(meal.recipeId)
-            val householdFactor = meal.portions.values.sum()
-            for (ingredient in recipe.ingredients) {
-                val grams = ingredient.grams * householdFactor
-                totals.merge(ingredient.ingredient.id, grams, Double::plus)
-            }
-        }
-
-        return GenerationResult.Success(GeneratedMenu(meals, totals))
+        return GenerationResult.Success(
+            GeneratedMenu(meals, ShoppingListCalculator.totalsOf(meals, byId))
+        )
     }
+
+    private fun freeMeal(day: Int, slot: MealSlot, profileId: Long?, cheat: Boolean) =
+        GeneratedMeal(
+            dayOfWeek = day,
+            slot = slot,
+            course = MealCourse.SINGLE,
+            profileId = profileId,
+            recipeId = null,
+            isLocked = false,
+            isCheatMeal = cheat,
+            isFree = true,
+            portions = emptyMap()
+        )
 
     private fun pickRecipe(
         pool: List<PlannableRecipe>,
         slot: MealSlot,
-        day: Int,
+        course: MealCourse,
         useCount: Map<Long, Int>,
         maxRepeats: Int,
         leftoverIngredientIds: Set<Long>,
-        yesterdayRecipeIds: Set<Long>
+        yesterdayRecipeIds: Set<Long>,
+        alreadyInSlot: Set<Long>
     ): PlannableRecipe? {
-        // Hard cap first; if that empties the pool, allow repeats as a fallback
-        // so a small recipe collection still yields a full week.
+        // Hard caps first, each falling back to the wider pool rather than
+        // failing: a small recipe collection should still yield a full week.
         val candidates = pool
+            .filterNot { it.recipe.id in alreadyInSlot }
+            .ifEmpty { pool }
             .filter { (useCount[it.recipe.id] ?: 0) < maxRepeats }
             .ifEmpty { pool }
             .ifEmpty { return null }
 
         return candidates.maxByOrNull { candidate ->
             var score = 0.0
-            score += slotAffinity(candidate.recipe, slot)
+            score += affinity(candidate.recipe, slot, course)
             score -= 2.5 * (useCount[candidate.recipe.id] ?: 0)
             if (candidate.recipe.id in yesterdayRecipeIds) score -= 2.0
             // Moderate leftover bonus, deliberately smaller than the variety
@@ -238,7 +338,32 @@ class MenuGenerator(private val random: Random = Random.Default) {
         }
     }
 
-    /** Category ↔ slot affinity, mild enough that any recipe CAN appear anywhere. */
+    /**
+     * Category ↔ position affinity, mild enough that any recipe CAN appear
+     * anywhere — except a dessert outside the dessert course, which is the one
+     * thing worth being firm about.
+     */
+    private fun affinity(recipe: RecipeEntity, slot: MealSlot, course: MealCourse): Double =
+        when (course) {
+            MealCourse.DESSERT ->
+                if (recipe.category == RecipeCategories.DESSERT) 4.0 else -3.0
+            MealCourse.FIRST -> when (recipe.category) {
+                RecipeCategories.SIDE_DISH -> 3.0
+                RecipeCategories.MAIN_DISH -> 1.0
+                RecipeCategories.SNACK -> 0.5
+                RecipeCategories.DESSERT -> -3.0
+                else -> 0.0
+            }
+            MealCourse.MAIN -> when (recipe.category) {
+                RecipeCategories.MAIN_DISH -> 3.0
+                RecipeCategories.SIDE_DISH -> 0.5
+                RecipeCategories.DESSERT -> -3.0
+                RecipeCategories.BREAKFAST, RecipeCategories.SNACK -> -1.0
+                else -> 0.0
+            }
+            MealCourse.SINGLE -> slotAffinity(recipe, slot)
+        }
+
     private fun slotAffinity(recipe: RecipeEntity, slot: MealSlot): Double = when (slot) {
         MealSlot.BREAKFAST ->
             if (recipe.category == RecipeCategories.BREAKFAST) 3.0 else 0.0
@@ -255,8 +380,23 @@ class MenuGenerator(private val random: Random = Random.Default) {
         }
     }
 
-    private fun normalize(weights: Map<MealSlot, Float>): Map<MealSlot, Float> {
-        val sum = weights.values.sum().takeIf { it > 0f } ?: 1f
-        return weights.mapValues { it.value / sum }
+    companion object {
+        /**
+         * Sanity rails on a portion. The floor is low because a dessert course
+         * is a genuinely small slice of a recipe — clamping it higher would
+         * silently push a slot over the budget it was given.
+         */
+        const val MIN_FACTOR = 0.1
+        const val MAX_FACTOR = 4.0
+
+        /**
+         * How much of a recipe covers [targetKcal]. Shared by generation and by
+         * every later recalculation (swaps, intake logging), so a portion always
+         * means the same thing.
+         */
+        fun portionFactor(targetKcal: Double, recipeKcal: Double): Double {
+            if (recipeKcal <= 0.0) return 1.0
+            return (targetKcal / recipeKcal).coerceIn(MIN_FACTOR, MAX_FACTOR)
+        }
     }
 }
