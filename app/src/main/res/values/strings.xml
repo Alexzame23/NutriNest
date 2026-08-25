@@ -391,8 +391,28 @@
     <string name="menu_config_avoid_recent_note">Skipped automatically if it would leave too few recipes</string>
     <string name="menu_config_exclude_categories">Exclude categories</string>
     <string name="menu_config_exclude_ingredients">Exclude ingredient categories</string>
-    <string name="menu_config_only_folders">Use only these folders</string>
-    <string name="menu_config_exclude_recipes">Exclude specific recipes</string>
+    <string name="menu_config_only_folders">Recipe books</string>
+    <string name="menu_config_recipe_books_note">Choose one, several or all books, then fine-tune the recipes inside each one.</string>
+    <string name="menu_config_personal_recipes">Recipes without a book</string>
+    <string name="menu_config_select_all_books">Select all books</string>
+    <string name="menu_config_deselect_all_books">Deselect all</string>
+    <string name="menu_config_enable_all">Enable all</string>
+    <string name="menu_config_disable_all">Disable all</string>
+    <string name="menu_config_recipe_search">Search recipes</string>
+    <string name="menu_config_favorites_only">Favorites</string>
+    <plurals name="menu_config_enabled_count">
+        <item quantity="one">%1$d of %2$d recipe enabled for menu generation</item>
+        <item quantity="other">%1$d of %2$d recipes enabled for menu generation</item>
+    </plurals>
+    <plurals name="menu_config_book_enabled_count">
+        <item quantity="one">%1$d of %2$d enabled</item>
+        <item quantity="other">%1$d of %2$d enabled</item>
+    </plurals>
+    <plurals name="menu_config_variety_warning">
+        <item quantity="one">Only %1$d recipe is enabled. Enable at least %2$d or increase the repeat limit to generate a varied week.</item>
+        <item quantity="other">Only %1$d recipes are enabled. Enable at least %2$d or increase the repeat limit to generate a varied week.</item>
+    </plurals>
+    <string name="menu_config_no_recipe_matches">No recipes match these search and meal-type filters.</string>
     <string name="menu_config_locked_meals">Locked meals</string>
     <string name="menu_config_locked_meals_note">Fix a recipe to specific days and meals — the generator plans around them.</string>
     <string name="menu_config_add_lock">Add locked meal</string>

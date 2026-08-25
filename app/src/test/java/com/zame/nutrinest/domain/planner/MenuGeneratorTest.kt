@@ -162,6 +162,36 @@ class MenuGeneratorTest {
         assertTrue("with nothing planned", free.all { it.recipeId == null })
     }
 
+    // ── Recipe books ───────────────────────────────────────────────────
+
+    @Test
+    fun `generation only uses recipes from selected books`() {
+        val recipes = (1L..24L).map { id ->
+            PlannerFixtures.recipe(id, folder = if (id <= 12) "Book A" else "Book B")
+        }
+        val menu = generator.generate(
+            listOf(ana),
+            recipes,
+            config { copy(includedFolders = setOf("Book A")) }
+        ).menu()
+
+        assertTrue(menu.meals.mapNotNull { it.recipeId }.all { it <= 12L })
+    }
+
+    @Test
+    fun `selecting no books is an explicit no matching recipes failure`() {
+        val result = generator.generate(
+            listOf(ana),
+            recipePool(),
+            config { copy(includedFolders = emptySet()) }
+        )
+
+        assertEquals(
+            GenerationResult.Failure(FailureReason.NO_MATCHING_RECIPES),
+            result
+        )
+    }
+
     // ── Courses ─────────────────────────────────────────────────────────
 
     @Test

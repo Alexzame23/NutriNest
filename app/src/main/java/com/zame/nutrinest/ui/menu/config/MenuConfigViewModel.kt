@@ -41,7 +41,8 @@ data class MenuConfigUiState(
     val excludedCategories: Set<String> = emptySet(),
     val excludedIngredientCategories: Set<String> = emptySet(),
     val excludedRecipeIds: Set<Long> = emptySet(),
-    val includedFolders: Set<String> = emptySet(),
+    /** null means all books; empty means the user deliberately selected none. */
+    val includedFolders: Set<String?>? = null,
     val excludeRecentlyUsed: Boolean = true,
     val locks: List<MealLock> = emptyList(),
     val isGenerating: Boolean = false,
@@ -147,8 +148,29 @@ class MenuConfigViewModel(
         )
     }
 
-    fun toggleFolder(folder: String) = update {
-        copy(includedFolders = includedFolders.toggle(folder))
+    fun toggleFolder(folder: String?, availableFolders: Set<String?>) = update {
+        val selected = includedFolders ?: availableFolders
+        copy(includedFolders = selected.toggle(folder))
+    }
+
+    fun selectAllFolders() = update { copy(includedFolders = null) }
+
+    fun deselectAllFolders() = update { copy(includedFolders = emptySet()) }
+
+    /** Enables or disables a recipe without changing the selected books. */
+    fun setRecipeEnabled(recipeId: Long, enabled: Boolean) = update {
+        copy(
+            excludedRecipeIds = if (enabled) excludedRecipeIds - recipeId
+            else excludedRecipeIds + recipeId
+        )
+    }
+
+    fun enableRecipes(recipeIds: Set<Long>) = update {
+        copy(excludedRecipeIds = excludedRecipeIds - recipeIds)
+    }
+
+    fun disableRecipes(recipeIds: Set<Long>) = update {
+        copy(excludedRecipeIds = excludedRecipeIds + recipeIds)
     }
 
     /** [profileId] null pins the meal for everyone; otherwise for that person. */
@@ -172,6 +194,9 @@ class MenuConfigViewModel(
                     weekStart = weekStart,
                     config = GenerationConfig(
                         slotWeights = s.slotWeights,
+                        scope = s.scope,
+                        slotCourses = s.slotCourses,
+                        overrides = s.overrides,
                         cheatMeals = s.cheatMeals,
                         maxRecipeRepeats = s.maxRepeats,
                         excludedCategories = s.excludedCategories,

@@ -23,7 +23,26 @@ data class RecipeEntity(
     /** Reserved for future community sync. */
     val remoteId: String? = null,
     val isFavorite: Boolean = false
-)
+) {
+    /** Shipped recipes use a stable remote id so seeding is idempotent. */
+    val isBuiltIn: Boolean get() = remoteId?.startsWith(RecipeBooks.BUILT_IN_ID_PREFIX) == true
+}
+
+/**
+ * Stable names for the three recipe books included with a fresh installation.
+ *
+ * Books intentionally reuse the existing `folder` column. A user-created
+ * folder and a built-in book therefore participate in the same browsing,
+ * filtering and planner code instead of creating a second organisation model.
+ */
+object RecipeBooks {
+    const val MEDITERRANEAN = "Mediterranean Cuisine"
+    const val LOW_CALORIE = "Low-Calorie Recipes"
+    const val WORLD = "World Cuisine"
+    const val BUILT_IN_ID_PREFIX = "builtin:"
+
+    val BUILT_IN = listOf(MEDITERRANEAN, LOW_CALORIE, WORLD)
+}
 
 /** Stable, storage-friendly cover-image crop anchors. */
 object RecipeImageCrop {

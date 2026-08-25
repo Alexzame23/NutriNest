@@ -17,10 +17,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -28,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -50,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,13 +67,16 @@ import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.MenuScope
 import com.zame.nutrinest.data.local.entity.ProfileEntity
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
+import com.zame.nutrinest.util.TextNormalizer
 import com.zame.nutrinest.util.WeekUtils
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -84,6 +95,18 @@ fun MenuConfigScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showLockDialog by remember { mutableStateOf(false) }
     var showOverrideDialog by remember { mutableStateOf(false) }
+    val bookFolders = remember(recipes, folders) {
+        buildList<String?> {
+            RecipeBooks.BUILT_IN.filterTo(this) { it in folders }
+            folders.filterTo(this) { it !in RecipeBooks.BUILT_IN }
+            if (recipes.any { it.folder == null }) add(null)
+        }
+    }
+    val availableBookFolders = bookFolders.toSet()
+    val selectedBookFolders = state.includedFolders ?: availableBookFolders
+    val enabledRecipes = recipes.filter {
+        it.folder in selectedBookFolders && it.id !in state.excludedRecipeIds
+    }
 
     LaunchedEffect(state.done) { if (state.done) onGenerated() }
     // The generator reports a code; the wording belongs to this layer.
@@ -121,7 +144,9 @@ fun MenuConfigScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { if (!state.isGenerating) viewModel.generate() },
+                onClick = {
+                    if (!state.isGenerating && enabledRecipes.isNotEmpty()) viewModel.generate()
+                },
                 icon = { Icon(Icons.Rounded.AutoAwesome, null) },
                 text = {
                     Text(
@@ -382,32 +407,25 @@ fun MenuConfigScreen(
                     }
                 }
             }
-            if (folders.isNotEmpty()) {
+            if (recipes.isNotEmpty()) {
                 item { SectionTitle(stringResource(R.string.menu_config_only_folders)) }
                 item {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        folders.forEach { folder ->
-                            FilterChip(
-                                selected = folder in state.includedFolders,
-                                onClick = { viewModel.toggleFolder(folder) },
-                                label = { Text(folder) }
-                            )
-                        }
-                    }
-                }
-            }
-            if (recipes.isNotEmpty()) {
-                item { SectionTitle(stringResource(R.string.menu_config_exclude_recipes)) }
-                item {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        recipes.forEach { recipe ->
-                            FilterChip(
-                                selected = recipe.id in state.excludedRecipeIds,
-                                onClick = { viewModel.toggleRecipeExclusion(recipe.id) },
-                                label = { Text(recipe.name) }
-                            )
-                        }
-                    }
+                    RecipeLibrarySelector(
+                        recipes = recipes,
+                        bookFolders = bookFolders,
+                        selectedBookFolders = selectedBookFolders,
+                        excludedRecipeIds = state.excludedRecipeIds,
+                        enabledRecipeCount = enabledRecipes.size,
+                        minimumForVariety = minimumRecipesForVariety(state, profiles.size),
+                        onToggleBook = {
+                            viewModel.toggleFolder(it, availableBookFolders)
+                        },
+                        onSelectAllBooks = viewModel::selectAllFolders,
+                        onDeselectAllBooks = viewModel::deselectAllFolders,
+                        onSetRecipeEnabled = viewModel::setRecipeEnabled,
+                        onEnableRecipes = viewModel::enableRecipes,
+                        onDisableRecipes = viewModel::disableRecipes
+                    )
                 }
             }
 
@@ -499,6 +517,275 @@ fun MenuConfigScreen(
             }
         )
     }
+}
+
+/**
+ * Book-first recipe picker. Search and course filters only affect what is
+ * shown; book and recipe checkboxes are the complete source of truth handed to
+ * the generator.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecipeLibrarySelector(
+    recipes: List<RecipeEntity>,
+    bookFolders: List<String?>,
+    selectedBookFolders: Set<String?>,
+    excludedRecipeIds: Set<Long>,
+    enabledRecipeCount: Int,
+    minimumForVariety: Int,
+    onToggleBook: (String?) -> Unit,
+    onSelectAllBooks: () -> Unit,
+    onDeselectAllBooks: () -> Unit,
+    onSetRecipeEnabled: (Long, Boolean) -> Unit,
+    onEnableRecipes: (Set<Long>) -> Unit,
+    onDisableRecipes: (Set<Long>) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    var categoryFilters by remember { mutableStateOf(emptySet<String>()) }
+    var favoritesOnly by remember { mutableStateOf(false) }
+    var expandedBooks by remember { mutableStateOf(emptySet<String?>()) }
+
+    val normalizedQuery = TextNormalizer.normalize(query)
+    val visibleRecipes = recipes.filter { recipe ->
+        (normalizedQuery.isEmpty() ||
+            TextNormalizer.normalize(recipe.name).contains(normalizedQuery)) &&
+            (categoryFilters.isEmpty() || recipe.category in categoryFilters) &&
+            (!favoritesOnly || recipe.isFavorite)
+    }
+    val enabledSummary = pluralStringResource(
+        R.plurals.menu_config_enabled_count,
+        enabledRecipeCount,
+        enabledRecipeCount,
+        recipes.size
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            stringResource(R.string.menu_config_recipe_books_note),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (enabledRecipeCount < minimumForVariety)
+                    MaterialTheme.colorScheme.errorContainer
+                else MaterialTheme.colorScheme.primaryContainer
+            ),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(enabledSummary, fontWeight = FontWeight.SemiBold)
+                if (enabledRecipeCount < minimumForVariety) {
+                    Text(
+                        pluralStringResource(
+                            R.plurals.menu_config_variety_warning,
+                            enabledRecipeCount,
+                            enabledRecipeCount,
+                            minimumForVariety
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onSelectAllBooks,
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.small
+            ) { Text(stringResource(R.string.menu_config_select_all_books)) }
+            OutlinedButton(
+                onClick = onDeselectAllBooks,
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.small
+            ) { Text(stringResource(R.string.menu_config_deselect_all_books)) }
+        }
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text(stringResource(R.string.menu_config_recipe_search)) },
+            leadingIcon = { Icon(Icons.Rounded.Search, null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Rounded.Close, stringResource(R.string.action_clear))
+                    }
+                }
+            },
+            singleLine = true,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = favoritesOnly,
+                onClick = { favoritesOnly = !favoritesOnly },
+                label = { Text(stringResource(R.string.menu_config_favorites_only)) }
+            )
+            RecipeCategories.ALL.forEach { category ->
+                FilterChip(
+                    selected = category in categoryFilters,
+                    onClick = {
+                        categoryFilters = if (category in categoryFilters)
+                            categoryFilters - category else categoryFilters + category
+                    },
+                    label = { Text(stringResource(recipeCategoryLabel(category))) }
+                )
+            }
+        }
+
+        if (visibleRecipes.isEmpty()) {
+            Text(
+                stringResource(R.string.menu_config_no_recipe_matches),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        bookFolders.forEach { folder ->
+            val allInBook = recipes.filter { it.folder == folder }
+            val visibleInBook = visibleRecipes.filter { it.folder == folder }
+            if (visibleInBook.isEmpty()) return@forEach
+
+            val bookSelected = folder in selectedBookFolders
+            val bookEnabledCount = allInBook.count {
+                bookSelected && it.id !in excludedRecipeIds
+            }
+            val expanded = folder in expandedBooks || query.isNotBlank()
+            RecipeBookCard(
+                title = folder ?: stringResource(R.string.menu_config_personal_recipes),
+                allRecipes = allInBook,
+                visibleRecipes = visibleInBook,
+                selected = bookSelected,
+                expanded = expanded,
+                enabledCount = bookEnabledCount,
+                excludedRecipeIds = excludedRecipeIds,
+                onToggleBook = { onToggleBook(folder) },
+                onToggleExpanded = {
+                    expandedBooks = if (folder in expandedBooks)
+                        expandedBooks - folder else expandedBooks + folder
+                },
+                onSetRecipeEnabled = onSetRecipeEnabled,
+                onEnableAll = { onEnableRecipes(allInBook.map { it.id }.toSet()) },
+                onDisableAll = { onDisableRecipes(allInBook.map { it.id }.toSet()) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecipeBookCard(
+    title: String,
+    allRecipes: List<RecipeEntity>,
+    visibleRecipes: List<RecipeEntity>,
+    selected: Boolean,
+    expanded: Boolean,
+    enabledCount: Int,
+    excludedRecipeIds: Set<Long>,
+    onToggleBook: () -> Unit,
+    onToggleExpanded: () -> Unit,
+    onSetRecipeEnabled: (Long, Boolean) -> Unit,
+    onEnableAll: () -> Unit,
+    onDisableAll: () -> Unit
+) {
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.surface
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        )
+    ) {
+        Column(Modifier.padding(vertical = 6.dp)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = selected, onCheckedChange = { onToggleBook() })
+                Icon(
+                    Icons.AutoMirrored.Rounded.MenuBook,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        pluralStringResource(
+                            R.plurals.menu_config_book_enabled_count,
+                            enabledCount,
+                            enabledCount,
+                            allRecipes.size
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onToggleExpanded) {
+                    Icon(
+                        if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        contentDescription = null
+                    )
+                }
+            }
+
+            if (expanded) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onEnableAll, enabled = selected) {
+                        Text(stringResource(R.string.menu_config_enable_all))
+                    }
+                    TextButton(onClick = onDisableAll, enabled = selected) {
+                        Text(stringResource(R.string.menu_config_disable_all))
+                    }
+                }
+                visibleRecipes.forEach { recipe ->
+                    val enabled = selected && recipe.id !in excludedRecipeIds
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = enabled,
+                            onCheckedChange = { onSetRecipeEnabled(recipe.id, it) },
+                            enabled = selected
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(recipe.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                stringResource(recipeCategoryLabel(recipe.category)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Conservative lower bound imposed by the generator's hard repeat cap. */
+private fun minimumRecipesForVariety(state: MenuConfigUiState, profileCount: Int): Int {
+    val dishesPerDay = state.slots.sumOf { slot -> state.slotCourses[slot]?.size ?: 1 }
+    val audiences = if (state.scope == MenuScope.INDIVIDUAL) profileCount.coerceAtLeast(1) else 1
+    val selections = 7 * dishesPerDay * audiences
+    return maxOf(8, ceil(selections.toDouble() / state.maxRepeats.coerceAtLeast(1)).toInt())
 }
 
 /** One of the three ways a week can be split across the household. */

@@ -52,8 +52,8 @@ data class GenerationConfig(
     /** Ingredient category keys to avoid, e.g. `IngredientCategories.FISH`. */
     val excludedIngredientCategories: Set<String> = emptySet(),
     val excludedRecipeIds: Set<Long> = emptySet(),
-    /** Empty = all folders allowed; otherwise only recipes in these folders (or no folder). */
-    val includedFolders: Set<String> = emptySet(),
+    /** null = every book; an empty set intentionally enables no recipe book. */
+    val includedFolders: Set<String?>? = null,
     val excludeRecentlyUsed: Boolean = true,
     val locks: List<MealLock> = emptyList()
 ) {
@@ -165,7 +165,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
             candidate.recipe.id !in config.excludedRecipeIds &&
                 candidate.recipe.category !in config.excludedCategories &&
                 candidate.ingredientCategories.none { it in config.excludedIngredientCategories } &&
-                (config.includedFolders.isEmpty() ||
+                (config.includedFolders == null ||
                     candidate.recipe.folder in config.includedFolders) &&
                 candidate.totalNutrition.kcal > 0
         }

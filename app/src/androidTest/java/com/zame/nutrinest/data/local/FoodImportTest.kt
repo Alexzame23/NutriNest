@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zame.nutrinest.data.local.entity.FoodDatasetMetaEntity
 import com.zame.nutrinest.data.local.entity.IngredientCategories
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -121,6 +122,36 @@ class FoodImportTest {
     }
 
     @Test
+    fun installsTheBedcaBackedStarterRecipeBooks() = runBlocking {
+        val recipes = database.recipeDao().observeAll().first()
+        val builtIns = recipes.filter { it.isBuiltIn }
+
+        assertEquals(72, builtIns.size)
+        assertEquals(RecipeBooks.BUILT_IN.toSet(), builtIns.mapNotNull { it.folder }.toSet())
+        assertTrue(
+            "each book should contain 24 recipes",
+            RecipeBooks.BUILT_IN.all { book -> builtIns.count { it.folder == book } == 24 }
+        )
+        builtIns.forEach { recipe ->
+            val ingredients = database.recipeDao().observeIngredientsOf(recipe.id).first()
+            assertTrue("${recipe.name} has no ingredients", ingredients.isNotEmpty())
+            assertTrue(
+                "${recipe.name} contains a non-BEDCA ingredient",
+                ingredients.all { it.ingredient.sourceKey?.startsWith("BEDCA:") == true }
+            )
+            if (recipe.folder == RecipeBooks.LOW_CALORIE) {
+                val kcal = ingredients.sumOf { it.nutrition.kcal }
+                assertTrue("${recipe.name} is not lower calorie: $kcal kcal", kcal < 600.0)
+            }
+            val withSteps = database.recipeDao().observeRecipeWithSteps(recipe.id).first()
+            assertTrue(
+                "${recipe.name} has no usable instructions",
+                withSteps?.steps?.any { it.text.isNotBlank() } == true
+            )
+        }
+    }
+
+    @Test
     fun importedIdsStayOutOfTheRangeUsersWillGet() = runBlocking {
         val imported = database.ingredientDao().observeAll().first().filter { !it.isCustom }
         assertTrue(
@@ -138,10 +169,12 @@ class FoodImportTest {
     @Test
     fun reopeningDoesNotImportTwice() = runBlocking {
         val before = database.ingredientDao().count()
+        val recipesBefore = database.recipeDao().observeAll().first().size
         database.close()
 
         database = NutriNestDatabase.build(context)
         assertEquals(before, database.ingredientDao().count())
+        assertEquals(recipesBefore, database.recipeDao().observeAll().first().size)
     }
 
     private companion object {

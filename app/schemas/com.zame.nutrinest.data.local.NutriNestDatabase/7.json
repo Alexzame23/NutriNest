@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 7,
-    "identityHash": "66b89057c86d15ed510130746c36fb69",
+    "identityHash": "96e614ce1759b167c8c2919faf49d2d4",
     "entities": [
       {
         "tableName": "ingredients",
@@ -1001,6 +1001,56 @@
         }
       },
       {
+        "tableName": "profile_meal_plans",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` INTEGER NOT NULL, `slot` TEXT NOT NULL, `share` REAL NOT NULL, `isFree` INTEGER NOT NULL, PRIMARY KEY(`profileId`, `slot`), FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slot",
+            "columnName": "slot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "share",
+            "columnName": "share",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFree",
+            "columnName": "isFree",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "slot"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
         "tableName": "weight_entries",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `weightKg` REAL NOT NULL, `recordedAt` INTEGER NOT NULL, FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
@@ -1062,7 +1112,7 @@
       },
       {
         "tableName": "weekly_menus",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `weekStart` INTEGER NOT NULL, `slotsSpec` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `remoteId` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `weekStart` INTEGER NOT NULL, `slotsSpec` TEXT NOT NULL, `scope` TEXT NOT NULL DEFAULT 'SHARED', `coursesSpec` TEXT NOT NULL DEFAULT '', `createdAt` INTEGER NOT NULL, `remoteId` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -1081,6 +1131,20 @@
             "columnName": "slotsSpec",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "scope",
+            "columnName": "scope",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'SHARED'"
+          },
+          {
+            "fieldPath": "coursesSpec",
+            "columnName": "coursesSpec",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
           },
           {
             "fieldPath": "createdAt",
@@ -1114,7 +1178,7 @@
       },
       {
         "tableName": "planned_meals",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `menuId` INTEGER NOT NULL, `dayOfWeek` INTEGER NOT NULL, `slot` TEXT NOT NULL, `recipeId` INTEGER NOT NULL, `isLocked` INTEGER NOT NULL, `isCheatMeal` INTEGER NOT NULL, FOREIGN KEY(`menuId`) REFERENCES `weekly_menus`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `menuId` INTEGER NOT NULL, `dayOfWeek` INTEGER NOT NULL, `slot` TEXT NOT NULL, `recipeId` INTEGER, `isLocked` INTEGER NOT NULL, `isCheatMeal` INTEGER NOT NULL, `course` TEXT NOT NULL, `profileId` INTEGER, `isFree` INTEGER NOT NULL, FOREIGN KEY(`menuId`) REFERENCES `weekly_menus`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1143,8 +1207,7 @@
           {
             "fieldPath": "recipeId",
             "columnName": "recipeId",
-            "affinity": "INTEGER",
-            "notNull": true
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "isLocked",
@@ -1155,6 +1218,23 @@
           {
             "fieldPath": "isCheatMeal",
             "columnName": "isCheatMeal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "course",
+            "columnName": "course",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isFree",
+            "columnName": "isFree",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -1185,15 +1265,13 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_planned_meals_recipeId` ON `${TABLE_NAME}` (`recipeId`)"
           },
           {
-            "name": "index_planned_meals_menuId_dayOfWeek_slot",
-            "unique": true,
+            "name": "index_planned_meals_profileId",
+            "unique": false,
             "columnNames": [
-              "menuId",
-              "dayOfWeek",
-              "slot"
+              "profileId"
             ],
             "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_planned_meals_menuId_dayOfWeek_slot` ON `${TABLE_NAME}` (`menuId`, `dayOfWeek`, `slot`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_planned_meals_profileId` ON `${TABLE_NAME}` (`profileId`)"
           }
         ],
         "foreignKeys": [
@@ -1218,12 +1296,23 @@
             "referencedColumns": [
               "id"
             ]
+          },
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
           }
         ]
       },
       {
         "tableName": "meal_portions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`plannedMealId` INTEGER NOT NULL, `profileId` INTEGER NOT NULL, `factor` REAL NOT NULL, PRIMARY KEY(`plannedMealId`, `profileId`), FOREIGN KEY(`plannedMealId`) REFERENCES `planned_meals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`plannedMealId` INTEGER NOT NULL, `profileId` INTEGER NOT NULL, `factor` REAL NOT NULL, `baseFactor` REAL NOT NULL DEFAULT 0, PRIMARY KEY(`plannedMealId`, `profileId`), FOREIGN KEY(`plannedMealId`) REFERENCES `planned_meals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "plannedMealId",
@@ -1242,6 +1331,13 @@
             "columnName": "factor",
             "affinity": "REAL",
             "notNull": true
+          },
+          {
+            "fieldPath": "baseFactor",
+            "columnName": "baseFactor",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -1372,11 +1468,107 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "intake_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `dayStart` INTEGER NOT NULL, `label` TEXT NOT NULL, `grams` REAL, `loggedAt` INTEGER NOT NULL, `kcal` REAL NOT NULL, `carbs` REAL NOT NULL, `fats` REAL NOT NULL, `protein` REAL NOT NULL, FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dayStart",
+            "columnName": "dayStart",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "loggedAt",
+            "columnName": "loggedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.kcal",
+            "columnName": "kcal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.carbs",
+            "columnName": "carbs",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.fats",
+            "columnName": "fats",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.protein",
+            "columnName": "protein",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_intake_entries_profileId_dayStart",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "dayStart"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_intake_entries_profileId_dayStart` ON `${TABLE_NAME}` (`profileId`, `dayStart`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '66b89057c86d15ed510130746c36fb69')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '96e614ce1759b167c8c2919faf49d2d4')"
     ]
   }
 }

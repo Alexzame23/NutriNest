@@ -393,8 +393,28 @@
     <string name="menu_config_avoid_recent_note">Se omite automáticamente si dejara muy pocas recetas</string>
     <string name="menu_config_exclude_categories">Excluir categorías</string>
     <string name="menu_config_exclude_ingredients">Excluir categorías de ingredientes</string>
-    <string name="menu_config_only_folders">Usar solo estas carpetas</string>
-    <string name="menu_config_exclude_recipes">Excluir recetas concretas</string>
+    <string name="menu_config_only_folders">Recetarios</string>
+    <string name="menu_config_recipe_books_note">Elige uno, varios o todos los recetarios y ajusta las recetas de cada uno.</string>
+    <string name="menu_config_personal_recipes">Recetas sin recetario</string>
+    <string name="menu_config_select_all_books">Seleccionar todos</string>
+    <string name="menu_config_deselect_all_books">Deseleccionar todos</string>
+    <string name="menu_config_enable_all">Activar todas</string>
+    <string name="menu_config_disable_all">Desactivar todas</string>
+    <string name="menu_config_recipe_search">Buscar recetas</string>
+    <string name="menu_config_favorites_only">Favoritas</string>
+    <plurals name="menu_config_enabled_count">
+        <item quantity="one">%1$d de %2$d receta activada para generar menús</item>
+        <item quantity="other">%1$d de %2$d recetas activadas para generar menús</item>
+    </plurals>
+    <plurals name="menu_config_book_enabled_count">
+        <item quantity="one">%1$d de %2$d activada</item>
+        <item quantity="other">%1$d de %2$d activadas</item>
+    </plurals>
+    <plurals name="menu_config_variety_warning">
+        <item quantity="one">Solo hay %1$d receta activada. Activa al menos %2$d o aumenta las repeticiones para generar una semana variada.</item>
+        <item quantity="other">Solo hay %1$d recetas activadas. Activa al menos %2$d o aumenta las repeticiones para generar una semana variada.</item>
+    </plurals>
+    <string name="menu_config_no_recipe_matches">Ninguna receta coincide con la búsqueda y los filtros de tipo de comida.</string>
     <string name="menu_config_locked_meals">Comidas fijadas</string>
     <string name="menu_config_locked_meals_note">Fija una receta a días y comidas concretos: el generador planificará alrededor.</string>
     <string name="menu_config_add_lock">Fijar una comida</string>

@@ -718,6 +718,7 @@ abstract class NutriNestDatabase : RoomDatabase() {
         override fun onOpen(db: SupportSQLiteDatabase) {
             super.onOpen(db)
             FoodDatabaseImporter.importIfNeeded(context, db)
+            BuiltInRecipeSeeder.seedIfNeeded(db)
         }
     }
 }
