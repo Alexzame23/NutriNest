@@ -151,7 +151,8 @@ interface IngredientDao {
 
     @Query(
         """
-        SELECT r.id AS recipeId, r.name AS recipeName, ri.grams AS grams
+        SELECT r.id AS recipeId, r.name AS recipeName, r.nameEs AS recipeNameEs,
+               ri.grams AS grams
         FROM recipe_ingredients ri
         JOIN recipes r ON r.id = ri.recipeId
         WHERE ri.ingredientId = :ingredientId

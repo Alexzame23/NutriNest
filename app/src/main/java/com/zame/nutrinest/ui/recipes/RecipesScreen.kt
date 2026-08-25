@@ -63,6 +63,7 @@ import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.CategoryDot
 import com.zame.nutrinest.ui.components.MacroBarChart
+import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
 import kotlin.math.roundToInt
@@ -349,6 +350,7 @@ private fun RecipeRow(
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit
 ) {
+    val spanish = rememberIsSpanish()
     Card(
         onClick = onClick,
         shape = MaterialTheme.shapes.small,
@@ -374,7 +376,7 @@ private fun RecipeRow(
 
             Column(Modifier.weight(1f)) {
                 Text(
-                    recipe.name,
+                    recipe.displayName(spanish),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,

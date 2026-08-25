@@ -13,7 +13,7 @@ import com.zame.nutrinest.data.local.entity.RecipeBooks
  */
 internal object BuiltInRecipeSeeder {
     private const val TAG = "BuiltInRecipeSeeder"
-    private const val LIBRARY_VERSION = "1"
+    private const val LIBRARY_VERSION = "2"
     private const val VERSION_META_KEY = "built_in_recipe_library_version"
     private const val WARNING_META_KEY = "built_in_recipe_library_warnings"
 
@@ -45,6 +45,7 @@ internal object BuiltInRecipeSeeder {
 
         val warnings = mutableListOf<String>()
         var inserted = 0
+        var updated = 0
         val startedTransaction = !db.inTransaction()
         if (startedTransaction) db.beginTransaction()
         try {
@@ -59,7 +60,24 @@ internal object BuiltInRecipeSeeder {
                 }
 
                 val remoteId = RecipeBooks.BUILT_IN_ID_PREFIX + recipe.key
-                if (db.longOrNull("SELECT id FROM recipes WHERE remoteId = ?", remoteId) != null) {
+                val existingId = db.longOrNull(
+                    "SELECT id FROM recipes WHERE remoteId = ?",
+                    remoteId
+                )
+                if (existingId != null) {
+                    // Library v2 adds Spanish text and fuller instructions.
+                    // Keep favorite state and ingredient links untouched while
+                    // upgrading the bundled editorial content in place.
+                    db.execSQL(
+                        "UPDATE recipes SET nameEs = ? WHERE id = ?",
+                        arrayOf<Any>(recipe.nameEs, existingId)
+                    )
+                    db.execSQL(
+                        "DELETE FROM recipe_steps WHERE recipeId = ?",
+                        arrayOf<Any>(existingId)
+                    )
+                    db.insertSteps(existingId, recipe)
+                    updated++
                     return@forEachIndexed
                 }
 
@@ -82,18 +100,19 @@ internal object BuiltInRecipeSeeder {
                 val recipeId = db.compileStatement(
                     """
                     INSERT INTO recipes (
-                        name, category, folder, coverImagePath, coverImageCrop,
+                        name, nameEs, category, folder, coverImagePath, coverImageCrop,
                         createdAt, remoteId, isFavorite
-                    ) VALUES (?, ?, ?, NULL, 'CENTER', ?, ?, 0)
+                    ) VALUES (?, ?, ?, ?, NULL, 'CENTER', ?, ?, 0)
                     """.trimIndent()
                 ).use { statement ->
                     statement.bindString(1, name)
-                    statement.bindString(2, recipe.category)
-                    statement.bindString(3, recipe.book)
+                    statement.bindString(2, recipe.nameEs)
+                    statement.bindString(3, recipe.category)
+                    statement.bindString(4, recipe.book)
                     // Stable ordering: built-ins appear together and do not
                     // masquerade as recipes the user recently created.
-                    statement.bindLong(4, BUILT_IN_CREATED_AT + index)
-                    statement.bindString(5, remoteId)
+                    statement.bindLong(5, BUILT_IN_CREATED_AT + index)
+                    statement.bindString(6, remoteId)
                     statement.executeInsert()
                 }
 
@@ -114,18 +133,7 @@ internal object BuiltInRecipeSeeder {
                     }
                 }
 
-                db.compileStatement(
-                    "INSERT INTO recipe_steps (recipeId, position, text, imagePath) " +
-                        "VALUES (?, ?, ?, NULL)"
-                ).use { statement ->
-                    recipe.steps.forEachIndexed { position, step ->
-                        statement.clearBindings()
-                        statement.bindLong(1, recipeId)
-                        statement.bindLong(2, position.toLong())
-                        statement.bindString(3, step)
-                        statement.executeInsert()
-                    }
-                }
+                db.insertSteps(recipeId, recipe)
                 inserted++
             }
 
@@ -137,7 +145,31 @@ internal object BuiltInRecipeSeeder {
         }
 
         warnings.forEach { Log.w(TAG, it) }
-        Log.i(TAG, "Installed $inserted built-in recipes; ${warnings.size} warnings")
+        Log.i(
+            TAG,
+            "Installed $inserted and updated $updated built-in recipes; " +
+                "${warnings.size} warnings"
+        )
+    }
+
+    private fun SupportSQLiteDatabase.insertSteps(
+        recipeId: Long,
+        recipe: BuiltInRecipe
+    ) {
+        check(recipe.steps.size == recipe.stepsEs.size)
+        compileStatement(
+            "INSERT INTO recipe_steps (recipeId, position, text, textEs, imagePath) " +
+                "VALUES (?, ?, ?, ?, NULL)"
+        ).use { statement ->
+            recipe.steps.forEachIndexed { position, step ->
+                statement.clearBindings()
+                statement.bindLong(1, recipeId)
+                statement.bindLong(2, position.toLong())
+                statement.bindString(3, step)
+                statement.bindString(4, recipe.stepsEs[position])
+                statement.executeInsert()
+            }
+        }
     }
 
     private fun SupportSQLiteDatabase.meta(key: String): String? =

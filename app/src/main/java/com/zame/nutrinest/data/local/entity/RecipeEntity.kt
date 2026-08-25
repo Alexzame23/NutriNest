@@ -11,7 +11,10 @@ import androidx.room.Relation
 @Entity(tableName = "recipes", indices = [Index(value = ["name"], unique = true)])
 data class RecipeEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Canonical English name; also the fallback for older user recipes. */
     val name: String,
+    /** Optional Spanish name. Built-ins always provide it. */
+    val nameEs: String? = null,
     val category: String,
     /** User-defined folder for organisation; null = not in any folder. */
     val folder: String? = null,
@@ -26,6 +29,9 @@ data class RecipeEntity(
 ) {
     /** Shipped recipes use a stable remote id so seeding is idempotent. */
     val isBuiltIn: Boolean get() = remoteId?.startsWith(RecipeBooks.BUILT_IN_ID_PREFIX) == true
+
+    fun displayName(spanish: Boolean): String =
+        if (spanish) nameEs?.takeIf(String::isNotBlank) ?: name else name
 }
 
 /**
@@ -120,8 +126,12 @@ data class RecipeStepEntity(
     val recipeId: Long,
     val position: Int,
     val text: String,
+    val textEs: String? = null,
     val imagePath: String? = null
-)
+) {
+    fun displayText(spanish: Boolean): String =
+        if (spanish) textEs?.takeIf(String::isNotBlank) ?: text else text
+}
 
 /** Result row for the JOIN of ingredients with their quantity in a recipe. */
 data class IngredientWithQuantity(

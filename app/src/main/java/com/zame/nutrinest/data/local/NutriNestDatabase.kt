@@ -60,7 +60,7 @@ import com.zame.nutrinest.util.TextNormalizer
         ShoppingItemEntity::class,
         IntakeEntryEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(ProfileConverters::class, MenuConverters::class)
@@ -463,6 +463,18 @@ abstract class NutriNestDatabase : RoomDatabase() {
             }
         }
 
+        /** v7 → v8: bilingual built-in recipe titles and instructions. */
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!columnExists(db, "recipes", "nameEs")) {
+                    db.execSQL("ALTER TABLE `recipes` ADD COLUMN `nameEs` TEXT")
+                }
+                if (!columnExists(db, "recipe_steps", "textEs")) {
+                    db.execSQL("ALTER TABLE `recipe_steps` ADD COLUMN `textEs` TEXT")
+                }
+            }
+        }
+
         private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
             db.query(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$table'"
@@ -700,7 +712,7 @@ abstract class NutriNestDatabase : RoomDatabase() {
             Room.databaseBuilder(appContext, NutriNestDatabase::class.java, "nutrinest.db")
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
-                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
                 )
                 .addCallback(FoodImportCallback(appContext))
                 .build()

@@ -589,6 +589,7 @@ private fun PortionsCard(portions: List<IngredientPortionEntity>, spanish: Boole
 
 @Composable
 private fun UsageCard(state: IngredientDetailUiState) {
+    val spanish = rememberIsSpanish()
     LabelledCard(stringResource(R.string.ingredient_used_in)) {
         if (state.usedIn.isEmpty()) {
             Text(
@@ -601,7 +602,7 @@ private fun UsageCard(state: IngredientDetailUiState) {
                 if (index > 0) Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        usage.recipeName,
+                        usage.displayName(spanish),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)

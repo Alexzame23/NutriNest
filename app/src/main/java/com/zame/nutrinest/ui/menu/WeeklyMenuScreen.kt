@@ -66,6 +66,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.MealCourse
 import com.zame.nutrinest.data.local.entity.PlannedMealWithRecipe
+import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.util.WeekUtils
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -319,6 +320,7 @@ private fun MealRow(
     onOpenMeal: (Long) -> Unit,
     highlight: Boolean = false
 ) {
+    val spanish = rememberIsSpanish()
     val free = item.meal.isFree || item.recipe == null
     Card(
         onClick = { onOpenMeal(item.meal.id) },
@@ -364,7 +366,8 @@ private fun MealRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    item.recipe?.name ?: stringResource(R.string.meal_free_placeholder),
+                    item.recipe?.displayName(spanish)
+                        ?: stringResource(R.string.meal_free_placeholder),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = if (free) MaterialTheme.colorScheme.onSurfaceVariant

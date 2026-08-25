@@ -172,6 +172,7 @@ class RecipesViewModel(
     /** Matches the name and the folder, so "desserts" finds a folder of them. */
     private fun RecipeEntity.matches(needle: String): Boolean =
         TextNormalizer.normalize(name).contains(needle) ||
+            nameEs?.let { TextNormalizer.normalize(it).contains(needle) } == true ||
             folder?.let { TextNormalizer.normalize(it).contains(needle) } == true
 
     private fun sort(
@@ -179,7 +180,8 @@ class RecipesViewModel(
         sort: RecipeSort,
         nutrition: Map<Long, NutritionValues>
     ): List<RecipeEntity> {
-        val byName = compareBy(collator()) { recipe: RecipeEntity -> recipe.name }
+        val spanish = locale().language.equals("es", ignoreCase = true)
+        val byName = compareBy(collator()) { recipe: RecipeEntity -> recipe.displayName(spanish) }
         return when (sort) {
             RecipeSort.NAME_ASC -> recipes.sortedWith(byName)
             RecipeSort.NAME_DESC -> recipes.sortedWith(byName.reversed())

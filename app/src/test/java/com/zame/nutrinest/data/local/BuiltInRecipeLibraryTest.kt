@@ -9,13 +9,18 @@ import org.junit.Test
 class BuiltInRecipeLibraryTest {
 
     @Test
-    fun `library has 24 varied recipes in each default book`() {
+    fun `library has 44 varied recipes and 30 main dishes in each default book`() {
         val recipes = BuiltInRecipeLibrary.recipes
 
-        assertEquals(72, recipes.size)
+        assertEquals(132, recipes.size)
         RecipeBooks.BUILT_IN.forEach { book ->
             val inBook = recipes.filter { it.book == book }
-            assertEquals("$book recipe count", 24, inBook.size)
+            assertEquals("$book recipe count", 44, inBook.size)
+            assertEquals(
+                "$book main-dish count",
+                30,
+                inBook.count { it.category == RecipeCategories.MAIN_DISH }
+            )
             assertTrue(
                 "$book covers every requested meal type",
                 inBook.map { it.category }.containsAll(
@@ -37,7 +42,15 @@ class BuiltInRecipeLibraryTest {
 
         assertEquals(recipes.size, recipes.map { it.key }.distinct().size)
         assertEquals(recipes.size, recipes.map { it.name }.distinct().size)
-        assertTrue(recipes.all { it.steps.isNotEmpty() && it.steps.all(String::isNotBlank) })
+        assertTrue(recipes.all { it.nameEs.isNotBlank() })
+        assertTrue(
+            recipes.all {
+                it.steps.size >= 5 &&
+                    it.steps.size == it.stepsEs.size &&
+                    it.steps.all(String::isNotBlank) &&
+                    it.stepsEs.all(String::isNotBlank)
+            }
+        )
         assertTrue(recipes.all { it.ingredients.isNotEmpty() })
         assertTrue(recipes.all { recipe ->
             recipe.ingredients.all { it.grams.isFinite() && it.grams > 0.0 } &&

@@ -95,7 +95,9 @@ fun RecipeDetailScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text(stringResource(R.string.recipe_delete_title)) },
-            text = { Text(stringResource(R.string.recipe_delete_body, recipe.name)) },
+            text = {
+                Text(stringResource(R.string.recipe_delete_body, recipe.displayName(spanish)))
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -114,7 +116,14 @@ fun RecipeDetailScreen(
         AlertDialog(
             onDismissRequest = viewModel::dismissDeleteBlocked,
             title = { Text(stringResource(R.string.recipe_delete_blocked_title)) },
-            text = { Text(stringResource(R.string.recipe_delete_blocked_body, recipe.name)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.recipe_delete_blocked_body,
+                        recipe.displayName(spanish)
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(onClick = viewModel::dismissDeleteBlocked) {
                     Text(stringResource(R.string.action_done))
@@ -142,7 +151,7 @@ fun RecipeDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        recipe.name,
+                        recipe.displayName(spanish),
                         style = MaterialTheme.typography.titleLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -298,7 +307,7 @@ fun RecipeDetailScreen(
                                 }
                                 Spacer(Modifier.height(6.dp))
                                 Text(
-                                    step.text,
+                                    step.displayText(spanish),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )

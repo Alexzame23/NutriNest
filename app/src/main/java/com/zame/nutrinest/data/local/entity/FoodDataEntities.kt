@@ -249,8 +249,12 @@ data class NutrientValueWithDef(
 data class RecipeUsage(
     val recipeId: Long,
     val recipeName: String,
-    val grams: Double
-)
+    val grams: Double,
+    val recipeNameEs: String? = null
+) {
+    fun displayName(spanish: Boolean): String =
+        if (spanish) recipeNameEs?.takeIf(String::isNotBlank) ?: recipeName else recipeName
+}
 
 /** A category with its live ingredient count, for the grouped list. */
 data class CategoryWithCount(

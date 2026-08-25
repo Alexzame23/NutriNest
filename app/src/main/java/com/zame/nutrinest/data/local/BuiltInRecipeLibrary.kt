@@ -14,14 +14,16 @@ internal data class BuiltInIngredient(
 internal data class BuiltInRecipe(
     val key: String,
     val name: String,
+    val nameEs: String,
     val book: String,
     val category: String,
     val ingredients: List<BuiltInIngredient>,
-    val steps: List<String>
+    val steps: List<String>,
+    val stepsEs: List<String>
 )
 
 /**
- * The offline starter library: 24 recipes per book and 72 in total.
+ * The offline starter library: 44 recipes per book and 132 in total.
  *
  * Quantities describe one practical serving. The menu planner's existing
  * portion factor scales that serving for each household member and the
@@ -553,6 +555,492 @@ internal object BuiltInRecipeLibrary {
             listOf(i(2245, 110), i(908, 18), i(788, 12)),
             "Slice the banana and dip one side in melted dark chocolate.",
             "Coat with dried coconut and chill until set."
+        ),
+
+        // Mediterranean Cuisine · additional main dishes
+        r(
+            "med-chicken-olive-stew", "Mediterranean Chicken and Olive Stew",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 160), i(481, 180), i(2214, 35), i(2424, 70), i(2382, 50), i(2543, 7)),
+            "Cut the chicken and vegetables into even pieces and warm the olive oil in a deep pan.",
+            "Brown the chicken, then soften the onion and carrot before adding tomato and olives.",
+            "Cover and simmer gently until the chicken is cooked through and the sauce has thickened."
+        ),
+        r(
+            "med-turkey-spinach-meatballs", "Turkey Spinach Meatballs in Tomato Sauce",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2285, 150), i(1282, 80), i(2171, 18), i(1173, 35), i(481, 180), i(2382, 40)),
+            "Chop the spinach finely and combine it with turkey, breadcrumbs and egg white.",
+            "Shape small meatballs and brown them in a non-stick pan while the onion softens.",
+            "Add tomato, cover and simmer until the meatballs are cooked to the centre."
+        ),
+        r(
+            "med-pork-mushroom-skillet", "Pork Tenderloin with Mushrooms",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(1021, 160), i(2384, 140), i(2382, 50), i(2421, 100), i(2361, 3), i(2543, 7)),
+            "Slice the pork across the grain and season it lightly.",
+            "Sear the pork, remove it briefly, and cook the mushrooms, onion and garlic in the same pan.",
+            "Return the pork with the tomato and cook gently until just done and juicy."
+        ),
+        r(
+            "med-rabbit-rosemary-stew", "Spanish Rabbit and Rosemary Stew",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(1162, 170), i(2403, 160), i(481, 150), i(2424, 60), i(2382, 45), i(2586, 2), i(2543, 7)),
+            "Cut the rabbit and vegetables into serving pieces and heat the oil in a casserole.",
+            "Brown the rabbit, then add onion, carrot, tomato and rosemary and stir well.",
+            "Add the potatoes and water, cover and simmer until the rabbit and potatoes are tender."
+        ),
+        r(
+            "med-lamb-eggplant-bake", "Greek Lamb and Eggplant Bake",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2693, 150), i(2370, 220), i(481, 160), i(2382, 45), i(2520, 60), i(2543, 6)),
+            "Roast the eggplant slices until flexible and lightly coloured.",
+            "Brown the lamb with onion, add tomato and simmer until the mixture is no longer watery.",
+            "Layer the eggplant and lamb, spread yogurt over the top and bake until browned."
+        ),
+        r(
+            "med-hake-garlic-parsley", "Hake with Garlic, Parsley and Potatoes",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(825, 180), i(2403, 190), i(2361, 3), i(2593, 10), i(411, 18), i(2543, 7)),
+            "Cut the potatoes into thin slices and start roasting them with half the oil.",
+            "Place the hake over the nearly tender potatoes and add garlic, parsley and lemon.",
+            "Bake until the fish is opaque and flakes easily, then spoon over the remaining oil."
+        ),
+        r(
+            "med-salmon-spinach-pasta", "Salmon and Spinach Whole-Wheat Pasta",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2626, 130), i(1074, 75), i(1282, 100), i(2421, 100), i(2361, 2), i(2543, 5)),
+            "Cook the pasta until al dente and reserve a little cooking water.",
+            "Cook the salmon separately, then wilt the spinach, tomato and garlic in the pan.",
+            "Flake in the salmon and toss with pasta and enough reserved water to coat."
+        ),
+        r(
+            "med-tuna-tomato-rice", "Tuna Tomato Rice Skillet",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2134, 150), i(2660, 70), i(481, 160), i(2409, 60), i(2382, 40), i(2543, 6)),
+            "Cut the tuna into large cubes and briefly sear it in the oil; set it aside.",
+            "Soften the onion and pepper, add tomato and rice, then pour in measured water.",
+            "Simmer until the rice is almost tender, return the tuna and finish without overcooking it."
+        ),
+        r(
+            "med-prawn-courgette-pasta", "Prawn and Courgette Pasta",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(581, 130), i(1117, 75), i(2376, 130), i(2421, 100), i(2361, 3), i(2543, 6)),
+            "Cook the pasta until al dente and slice the courgette into thin half-moons.",
+            "Sauté courgette and garlic, then add the prawns and cook until they turn opaque.",
+            "Add tomato and pasta, toss thoroughly and loosen with a little pasta water."
+        ),
+        r(
+            "med-white-bean-stew", "Tuscan-Style White Bean and Chard Stew",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(899, 65), i(2212, 120), i(481, 160), i(2424, 70), i(2382, 45), i(2543, 6)),
+            "Soak the dried beans as needed, drain them and start cooking them in fresh water.",
+            "Add onion, carrot and tomato and simmer until the beans are nearly tender.",
+            "Stir in the chopped chard and olive oil and cook until the greens are soft."
+        ),
+        r(
+            "med-lentil-moussaka", "Vegetarian Lentil Moussaka",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(1065, 65), i(2370, 220), i(481, 170), i(2382, 45), i(2520, 65), i(2543, 6)),
+            "Cook the lentils until tender and roast the eggplant in even slices.",
+            "Simmer onion, tomato and lentils until the filling is thick enough to layer.",
+            "Layer with eggplant, spread yogurt over the surface and bake until golden."
+        ),
+        r(
+            "med-chickpea-semolina-bowl", "Mediterranean Chickpea Semolina Bowl",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(1020, 60), i(1084, 55), i(2376, 90), i(2409, 60), i(2421, 100), i(2543, 6)),
+            "Soak and cook the chickpeas until tender and prepare the semolina with hot water.",
+            "Roast or sauté the courgette, pepper and tomato until soft at the edges.",
+            "Fluff the semolina and combine it with chickpeas, vegetables and olive oil."
+        ),
+        r(
+            "med-mushroom-risotto", "Italian Mushroom Risotto",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2660, 75), i(2384, 150), i(2382, 45), i(792, 280), i(1011, 18), i(2543, 6)),
+            "Warm the stock and sauté the mushrooms until browned; reserve half for serving.",
+            "Soften the onion, add rice and incorporate the hot stock gradually while stirring.",
+            "When the rice is creamy and tender, fold in cheese and the reserved mushrooms."
+        ),
+        r(
+            "med-spinach-cottage-pasta", "Spinach and Cottage Cheese Pasta",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(1074, 75), i(1282, 120), i(2517, 80), i(2421, 100), i(2361, 2), i(2543, 5)),
+            "Cook the pasta until al dente and keep a small cup of cooking water.",
+            "Wilt spinach with tomato and garlic, then lower the heat and add cottage cheese.",
+            "Toss in the pasta and add reserved water until the sauce lightly coats it."
+        ),
+        r(
+            "med-chickpea-patties", "Greek Chickpea Patties with Yogurt Salad",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2191, 160), i(2171, 20), i(2424, 45), i(2382, 35), i(2571, 2), i(2520, 60), i(2407, 70)),
+            "Mash the chickpeas and mix with breadcrumbs, grated carrot, onion and cumin.",
+            "Shape compact patties and cook them in a non-stick pan until browned on both sides.",
+            "Mix yogurt with diced cucumber and serve it alongside the hot patties."
+        ),
+        r(
+            "med-turkey-meatball-pasta", "Italian Turkey Meatball Pasta",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2285, 145), i(1117, 70), i(481, 180), i(2382, 40), i(2171, 15), i(2473, 6)),
+            "Mix turkey with breadcrumbs, shape small meatballs and brown them evenly.",
+            "Add onion and tomato to the pan and simmer the meatballs until cooked through.",
+            "Cook the pasta, combine it with the sauce and finish with fresh basil."
+        ),
+        r(
+            "med-chicken-spinach-rice", "Spanish Chicken and Spinach Rice",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 150), i(2660, 70), i(1282, 100), i(481, 140), i(2361, 3), i(2543, 6)),
+            "Cut and brown the chicken in a wide pan, then briefly cook the garlic.",
+            "Add tomato, rice and measured water and simmer until the rice is nearly tender.",
+            "Fold in the spinach and finish cooking until the chicken is done and the liquid absorbed."
+        ),
+        r(
+            "med-cod-chickpea-stew", "Cod and Chickpea Stew",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(795, 160), i(2191, 130), i(481, 170), i(1282, 90), i(2382, 40), i(2543, 5)),
+            "Soften the onion in oil and simmer it with tomato until the sauce concentrates.",
+            "Add chickpeas and spinach with a small splash of water and cook for several minutes.",
+            "Nestle in the cod and heat gently until the fish flakes without breaking it apart."
+        ),
+        r(
+            "med-stuffed-eggplant-beef", "Beef-Stuffed Mediterranean Eggplant",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(2370, 260), i(2680, 130), i(481, 150), i(2382, 40), i(2510, 30), i(2543, 5)),
+            "Halve the eggplant, score the flesh and roast until it can be scooped out.",
+            "Brown beef and onion, add chopped eggplant flesh and tomato, and reduce the filling.",
+            "Fill the shells, top with mozzarella and bake until thoroughly hot and golden."
+        ),
+        r(
+            "med-tofu-tomato-bake", "Mediterranean Tofu and Tomato Bake",
+            RecipeBooks.MEDITERRANEAN, RecipeCategories.MAIN_DISH,
+            listOf(i(1121, 170), i(481, 180), i(2370, 110), i(2376, 100), i(2510, 30), i(2543, 5)),
+            "Press and cube the tofu, then cut the eggplant and courgette into even pieces.",
+            "Roast the vegetables and tofu until lightly coloured, then stir through the tomato.",
+            "Top with mozzarella and bake again until the sauce bubbles and the cheese melts."
+        ),
+
+        // Low-Calorie Recipes · additional main dishes
+        r(
+            "light-lemon-turkey-quinoa", "Lemon Turkey Quinoa Plate",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2285, 150), i(1083, 50), i(2376, 100), i(2409, 60), i(411, 18), i(2543, 4)),
+            "Cook the quinoa in measured water and cut the turkey and vegetables evenly.",
+            "Cook the turkey in a non-stick pan, then add courgette and pepper until just tender.",
+            "Fluff the quinoa, add lemon and olive oil and serve it with the turkey mixture."
+        ),
+        r(
+            "light-chicken-broccoli-rice", "Chicken Broccoli Brown Rice Bowl",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 145), i(904, 50), i(1177, 160), i(2424, 60), i(2575, 10), i(752, 2)),
+            "Cook the brown rice until tender and cut the chicken into bite-sized pieces.",
+            "Stir-fry the chicken until almost done, then add broccoli and carrot with a splash of water.",
+            "Finish with soy sauce and sesame oil and spoon the mixture over the rice."
+        ),
+        r(
+            "light-hake-tomato-courgette", "Hake with Tomato and Courgette",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(825, 190), i(2376, 180), i(481, 150), i(2382, 35), i(411, 15), i(2543, 4)),
+            "Slice the courgette and onion and spread them in a shallow baking dish.",
+            "Add tomato and bake until the vegetables begin to soften, then place the hake on top.",
+            "Add lemon and bake again until the fish is opaque and flakes easily."
+        ),
+        r(
+            "light-prawn-cauliflower-rice", "Prawn Cauliflower Rice Skillet",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(581, 150), i(859, 230), i(1175, 50), i(2424, 55), i(2575, 10), i(752, 2)),
+            "Pulse or grate the cauliflower into rice-sized pieces and prepare the remaining vegetables.",
+            "Cook the prawns until just opaque and set them aside; stir-fry carrot, peas and cauliflower.",
+            "Return the prawns, add soy sauce and sesame oil and heat everything through."
+        ),
+        r(
+            "light-tuna-courgette-boats", "Tuna-Stuffed Courgette Boats",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2133, 120), i(2376, 280), i(481, 120), i(2382, 35), i(2510, 25)),
+            "Halve the courgette, scoop out the centre and bake the shells until partly tender.",
+            "Cook the chopped courgette centre with onion and tomato, then fold in drained tuna.",
+            "Fill the shells, sprinkle with mozzarella and bake until hot and lightly browned."
+        ),
+        r(
+            "light-turkey-meatballs", "Lean Turkey Meatballs with Tomato",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2285, 160), i(2171, 15), i(1173, 30), i(481, 180), i(2382, 40), i(2376, 120)),
+            "Mix turkey with breadcrumbs and egg white and shape evenly sized meatballs.",
+            "Brown the meatballs in a non-stick pan, remove them and soften the onion and courgette.",
+            "Add tomato and return the meatballs; cover and simmer until cooked through."
+        ),
+        r(
+            "light-tofu-broccoli-curry", "Light Tofu Broccoli Curry",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(1121, 160), i(1177, 170), i(481, 150), i(2382, 40), i(2621, 5), i(2530, 50)),
+            "Cube the tofu and cut the broccoli into small florets so they cook evenly.",
+            "Soften the onion with curry spice, add tomato and broccoli and simmer until nearly tender.",
+            "Add tofu, warm through and stir in yogurt away from the heat."
+        ),
+        r(
+            "light-white-bean-chard-soup", "White Bean and Chard Soup",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2199, 110), i(2212, 140), i(481, 140), i(2424, 65), i(2366, 45), i(792, 100)),
+            "Chop the chard, carrot and celery and bring the vegetable stock to a simmer.",
+            "Add carrot, celery, tomato and beans and cook until the vegetables are tender.",
+            "Stir in the chard for the final minutes and simmer until soft but still bright."
+        ),
+        r(
+            "light-lentil-stuffed-pepper", "Lentil-Stuffed Pepper",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(1065, 55), i(2409, 190), i(481, 130), i(2382, 35), i(2424, 45), i(2510, 20)),
+            "Cook the lentils until tender and halve and seed the pepper.",
+            "Cook onion, carrot and tomato, then mix in the drained lentils to make the filling.",
+            "Fill the pepper, add mozzarella and bake until the pepper is tender."
+        ),
+        r(
+            "light-egg-white-frittata", "Egg-White Vegetable Frittata",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(1173, 200), i(1282, 100), i(2384, 100), i(2409, 60), i(2421, 100), i(2543, 3)),
+            "Slice the mushrooms and pepper and chop the spinach and tomato.",
+            "Cook the vegetables in an oven-safe non-stick pan until their excess moisture evaporates.",
+            "Pour in the egg whites and cook gently, then finish under the grill until set."
+        ),
+        r(
+            "light-pork-cabbage", "Lean Pork with Savoy Cabbage",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(1021, 155), i(852, 200), i(2424, 60), i(2382, 40), i(2575, 10), i(752, 2)),
+            "Slice the pork thinly and shred the cabbage, carrot and onion.",
+            "Sear the pork in a hot non-stick pan and remove it as soon as it colours.",
+            "Stir-fry the vegetables, return the pork and finish with soy sauce and sesame oil."
+        ),
+        r(
+            "light-chicken-mushroom-wraps", "Chicken Mushroom Lettuce Wraps",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 150), i(2384, 140), i(2424, 55), i(2382, 35), i(2399, 100), i(2575, 10)),
+            "Dice the chicken and mushrooms finely and separate sturdy lettuce leaves.",
+            "Cook the chicken until nearly done, then add mushrooms, carrot and onion.",
+            "Season with soy sauce and spoon the hot filling into the lettuce leaves."
+        ),
+        r(
+            "light-salmon-cucumber-quinoa", "Salmon Cucumber Quinoa Salad",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2626, 120), i(1083, 45), i(2407, 120), i(2421, 100), i(411, 18), i(2530, 45)),
+            "Cook and cool the quinoa, then cook the salmon until it flakes.",
+            "Dice the cucumber and tomato and whisk the lemon into the yogurt.",
+            "Flake the salmon over the quinoa and vegetables and spoon over the dressing."
+        ),
+        r(
+            "light-chickpea-spinach-salad", "Warm Chickpea Spinach Salad",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2191, 145), i(1282, 130), i(2421, 120), i(2407, 80), i(411, 16), i(2543, 4)),
+            "Drain the chickpeas and chop the tomato and cucumber into even pieces.",
+            "Warm the chickpeas in a pan and wilt the spinach only until tender.",
+            "Combine with the raw vegetables and dress with lemon and olive oil."
+        ),
+        r(
+            "light-hake-cabbage-parcel", "Hake and Cabbage Parcels",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(825, 190), i(2386, 180), i(2424, 60), i(2411, 45), i(411, 18), i(2543, 3)),
+            "Soften large cabbage leaves briefly and shred the carrot and leek.",
+            "Place hake and vegetables inside the leaves, add lemon and fold into secure parcels.",
+            "Bake or steam the parcels until the hake is fully opaque and flakes easily."
+        ),
+        r(
+            "light-turkey-pumpkin-stew", "Turkey Pumpkin Stew",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2285, 150), i(2378, 220), i(481, 140), i(2424, 60), i(2382, 40), i(792, 180)),
+            "Cut the turkey and pumpkin into similar bite-sized pieces.",
+            "Brown the turkey in a non-stick casserole and soften the onion and carrot.",
+            "Add pumpkin, tomato and stock and simmer until the turkey is done and pumpkin tender."
+        ),
+        r(
+            "light-tofu-eggplant-bowl", "Tofu Eggplant Tomato Bowl",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(1121, 160), i(2370, 200), i(481, 160), i(2376, 100), i(2575, 10), i(2543, 3)),
+            "Press and cube the tofu and cut the eggplant and courgette evenly.",
+            "Roast the vegetables until tender and brown the tofu in a non-stick pan.",
+            "Warm the tomato with soy sauce and combine it with the vegetables and tofu."
+        ),
+        r(
+            "light-chicken-cauliflower-curry", "Chicken Cauliflower Curry",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 145), i(859, 200), i(481, 150), i(2382, 40), i(2621, 5), i(2530, 50)),
+            "Cut the chicken and cauliflower into small, even pieces.",
+            "Soften onion with curry spice, add tomato and chicken and simmer until almost done.",
+            "Add cauliflower, cook until tender and stir in yogurt after removing the pan from heat."
+        ),
+        r(
+            "light-tuna-broccoli-pasta", "Tuna Broccoli Whole-Wheat Pasta",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(2133, 110), i(1074, 55), i(1177, 160), i(2421, 100), i(2361, 2), i(2543, 3)),
+            "Cook the pasta and add the broccoli for the final minutes so both finish together.",
+            "Warm tomato and garlic in a wide pan and fold in the drained tuna.",
+            "Drain the pasta and broccoli, toss with the sauce and finish with olive oil."
+        ),
+        r(
+            "light-beef-pepper-bowl", "Lean Beef and Pepper Bowl",
+            RecipeBooks.LOW_CALORIE, RecipeCategories.MAIN_DISH,
+            listOf(i(981, 145), i(2409, 120), i(2384, 100), i(2382, 40), i(2399, 80), i(2575, 10)),
+            "Slice the beef thinly across the grain and cut the pepper, mushrooms and onion evenly.",
+            "Sear the beef quickly in a very hot non-stick pan and set it aside.",
+            "Cook the vegetables, return the beef with soy sauce and serve over shredded lettuce."
+        ),
+
+        // World Cuisine · additional main dishes
+        r(
+            "world-chicken-taco-bowl", "Mexican Chicken Taco Bowl",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 150), i(2660, 65), i(2191, 80), i(2421, 100), i(2409, 60), i(2571, 3)),
+            "Cook the rice and cut the chicken, tomato and pepper into bite-sized pieces.",
+            "Brown the chicken with cumin, add the pepper and cook until the chicken is done.",
+            "Arrange rice, chickpeas, chicken and tomato in a bowl and serve while warm."
+        ),
+        r(
+            "world-fish-taco-bowl", "Baja-Style Fish Taco Bowl",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(825, 180), i(2660, 60), i(2386, 100), i(2421, 90), i(1001, 25), i(2530, 45)),
+            "Cook the rice, shred the cabbage and dice the tomato while the rice rests.",
+            "Season and cook the hake in a non-stick pan until opaque, then break it into large flakes.",
+            "Layer the rice, cabbage, tomato and fish and finish with lime yogurt."
+        ),
+        r(
+            "world-turkey-quesadilla", "Turkey and Pepper Quesadilla",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(1113, 70), i(2285, 140), i(2409, 80), i(2382, 35), i(1005, 35), i(2421, 80)),
+            "Mix the flour with enough water to make a soft dough, rest it and roll two thin tortillas.",
+            "Cook the turkey, onion and pepper thoroughly and place the filling and cheese between the tortillas.",
+            "Toast the quesadilla on both sides until crisp, cut into wedges and serve with tomato."
+        ),
+        r(
+            "world-chicken-tikka", "Indian Chicken Tikka Rice Bowl",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 155), i(2660, 65), i(2530, 70), i(481, 140), i(2621, 5), i(2606, 3)),
+            "Coat the chicken with half the yogurt, curry and ginger and leave it to marinate briefly.",
+            "Cook the rice and sear the chicken until browned and fully cooked, then simmer the tomato.",
+            "Stir the remaining yogurt into the sauce away from the heat and serve with chicken and rice."
+        ),
+        r(
+            "world-palak-tofu", "Indian Spinach Tofu with Rice",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(1121, 170), i(1282, 180), i(2660, 60), i(2382, 40), i(2361, 3), i(2621, 4)),
+            "Cook the rice, press and cube the tofu and wash the spinach thoroughly.",
+            "Brown the tofu, then soften the onion and garlic with curry before wilting the spinach.",
+            "Blend or finely chop the spinach sauce, return the tofu and serve with rice."
+        ),
+        r(
+            "world-teriyaki-salmon", "Japanese-Style Teriyaki Salmon",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(2626, 150), i(904, 60), i(1177, 140), i(2575, 14), i(2606, 3), i(752, 2)),
+            "Cook the brown rice and steam the broccoli until tender but still bright.",
+            "Mix soy sauce and ginger, brush it over the salmon and cook the fish until it flakes.",
+            "Reduce the remaining sauce briefly and spoon it over the salmon, rice and broccoli."
+        ),
+        r(
+            "world-tuna-sushi-bowl", "Japanese Tuna Sushi Bowl",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(2134, 140), i(2660, 65), i(2407, 100), i(2424, 60), i(2575, 12), i(752, 2)),
+            "Cook the rice until tender and cool it slightly while cutting the vegetables evenly.",
+            "Sear the tuna on every side while keeping the centre at the preferred doneness, then slice it.",
+            "Arrange tuna, cucumber and carrot over the rice and season with soy and sesame oil."
+        ),
+        r(
+            "world-korean-beef-bowl", "Korean-Style Beef Rice Bowl",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(981, 145), i(2660, 65), i(1177, 120), i(2575, 13), i(2606, 3), i(793, 2)),
+            "Cook the rice and slice the beef thinly across the grain for quick, even cooking.",
+            "Sear the beef with ginger and chilli, then add soy sauce and let it coat the meat.",
+            "Steam the broccoli and serve it beside the beef over the hot rice."
+        ),
+        r(
+            "world-thai-prawn-noodles", "Thai-Style Prawn Noodles",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(581, 150), i(1074, 70), i(2409, 70), i(2424, 55), i(2575, 12), i(1001, 20)),
+            "Cook the noodles until just tender, drain them and prepare the pepper and carrot.",
+            "Stir-fry the prawns until almost opaque, add the vegetables and keep them slightly crisp.",
+            "Toss in the noodles with soy sauce and lime and heat everything through."
+        ),
+        r(
+            "world-tofu-satay-rice", "Indonesian-Style Tofu Satay Bowl",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(1121, 170), i(2660, 60), i(1177, 120), i(979, 18), i(2575, 10), i(1001, 18)),
+            "Cook the rice, press and cube the tofu and cut the broccoli into small florets.",
+            "Brown the tofu and steam the broccoli while whisking peanut butter, soy and lime with warm water.",
+            "Coat the tofu lightly with the satay sauce and serve it with the broccoli and rice."
+        ),
+        r(
+            "world-moroccan-chicken", "Moroccan-Spiced Chicken with Chickpeas",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 150), i(2191, 110), i(481, 160), i(2424, 65), i(2571, 3), i(2592, 3)),
+            "Cut the chicken and carrot evenly and drain and rinse the chickpeas.",
+            "Brown the chicken, add cumin and paprika, then simmer it with tomato and carrot.",
+            "Fold in the chickpeas and cook until hot and the sauce has thickened."
+        ),
+        r(
+            "world-lebanese-kofta", "Lebanese-Style Beef Kofta Plate",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(2680, 150), i(1084, 55), i(2407, 100), i(2421, 100), i(2520, 55), i(2571, 3)),
+            "Mix the beef with cumin, shape it into small kofta and prepare the semolina with hot water.",
+            "Cook the kofta on every side until browned and safely cooked through.",
+            "Serve with semolina, chopped cucumber and tomato and a spoonful of yogurt."
+        ),
+        r(
+            "world-turkish-eggplant", "Turkish-Style Stuffed Eggplant",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(2370, 260), i(2285, 130), i(481, 150), i(2382, 40), i(2361, 3), i(2543, 5)),
+            "Halve and score the eggplant, brush it with oil and roast until the centre softens.",
+            "Cook the turkey with onion and garlic, add tomato and reduce to a thick filling.",
+            "Spoon the filling into the eggplant halves and bake again until piping hot."
+        ),
+        r(
+            "world-jerk-chicken", "Caribbean Jerk-Style Chicken Rice",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 155), i(2660, 65), i(2409, 80), i(2421, 90), i(793, 2), i(2592, 3)),
+            "Cook the rice and season the chicken with paprika and a controlled amount of chilli.",
+            "Brown and cook the chicken through, then sauté the pepper until tender at the edges.",
+            "Serve the sliced chicken and pepper over rice with fresh chopped tomato."
+        ),
+        r(
+            "world-brazilian-beef-beans", "Brazilian-Style Beef and Bean Bowl",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(981, 140), i(2199, 120), i(2660, 60), i(2409, 65), i(2382, 40), i(481, 120)),
+            "Cook the rice, slice the beef and prepare the pepper and onion.",
+            "Sear the beef and set it aside, then soften the onion and pepper and add the tomato.",
+            "Warm the beans in the sauce, return the beef and serve the mixture over rice."
+        ),
+        r(
+            "world-bbq-chicken-burger", "Barbecue Chicken Burger",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 150), i(2174, 75), i(481, 80), i(1005, 25), i(2399, 35), i(2382, 30)),
+            "Flatten the chicken to an even thickness and cook the onion and tomato into a thick relish.",
+            "Cook the chicken completely, add the cheese for the final minute and lightly toast the bun.",
+            "Build the burger with lettuce, chicken and tomato-onion relish and serve immediately."
+        ),
+        r(
+            "world-mango-chicken-burger", "Mango Chicken Burger",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(994, 150), i(2174, 75), i(1186, 80), i(2399, 40), i(2407, 45), i(1001, 18)),
+            "Flatten the chicken evenly, slice the mango and cucumber and wash the lettuce.",
+            "Cook the chicken through and toast the cut sides of the bun until lightly crisp.",
+            "Fill the bun with lettuce, chicken, cucumber and mango and finish with lime."
+        ),
+        r(
+            "world-mushroom-cheese-burger", "Mushroom Cheeseburger",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(2680, 145), i(2174, 75), i(2384, 110), i(1005, 25), i(2399, 35), i(2421, 70)),
+            "Shape the beef into a patty and slice the mushrooms to an even thickness.",
+            "Cook the mushrooms until browned, cook the patty through and melt the cheese on top.",
+            "Toast the bun and assemble it with lettuce, tomato, the patty and mushrooms."
+        ),
+        r(
+            "world-white-spinach-pizza", "White Spinach and Mushroom Pizza",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(1113, 90), i(2510, 65), i(1282, 90), i(2384, 100), i(2517, 55), i(2543, 5)),
+            "Mix the flour with water into a soft dough, knead briefly, rest it and roll it thin.",
+            "Wilt the spinach, brown the mushrooms and spread cottage cheese over the dough.",
+            "Add vegetables and mozzarella and bake at high heat until crisp and golden."
+        ),
+        r(
+            "world-mexican-vegetable-pizza", "Mexican-Style Vegetable Pizza",
+            RecipeBooks.WORLD, RecipeCategories.MAIN_DISH,
+            listOf(i(1113, 90), i(481, 110), i(2510, 55), i(2409, 70), i(1175, 55), i(2191, 65)),
+            "Make a soft flour-and-water dough, knead it, let it rest and roll it into a thin base.",
+            "Spread tomato over the base and scatter on pepper, peas and drained chickpeas.",
+            "Top with mozzarella and bake at high heat until the base is cooked and the cheese bubbles."
         )
     )
 
@@ -566,5 +1054,46 @@ internal object BuiltInRecipeLibrary {
         category: String,
         ingredients: List<BuiltInIngredient>,
         vararg steps: String
-    ) = BuiltInRecipe(key, name, book, category, ingredients, steps.toList())
+    ): BuiltInRecipe {
+        val spanish = BuiltInRecipeTranslations.forKey(key)
+        val englishCore = steps.toList()
+        require(englishCore.size == spanish.coreSteps.size) {
+            "$key has ${englishCore.size} English core steps and " +
+                "${spanish.coreSteps.size} Spanish core steps"
+        }
+        return BuiltInRecipe(
+            key = key,
+            name = name,
+            nameEs = spanish.name,
+            book = book,
+            category = category,
+            ingredients = ingredients,
+            steps = detailedEnglishSteps(englishCore),
+            stepsEs = detailedSpanishSteps(spanish.coreSteps)
+        )
+    }
+
+    private fun detailedEnglishSteps(core: List<String>): List<String> = buildList {
+        add("Gather and measure every ingredient. Wash the fresh produce and prepare a clean work surface.")
+        add(core.first())
+        if (core.size == 2) {
+            add("Prepare the remaining ingredients in even pieces and keep the heat controlled so everything cooks consistently.")
+            add(core.last())
+        } else {
+            addAll(core.drop(1))
+        }
+        add("Check the texture and doneness, adjust the seasoning to taste, and serve at the suggested temperature.")
+    }
+
+    private fun detailedSpanishSteps(core: List<String>): List<String> = buildList {
+        add("Reúne y mide todos los ingredientes. Lava los productos frescos y prepara una superficie de trabajo limpia.")
+        add(core.first())
+        if (core.size == 2) {
+            add("Prepara el resto de los ingredientes en trozos uniformes y controla el fuego para que todo se cocine por igual.")
+            add(core.last())
+        } else {
+            addAll(core.drop(1))
+        }
+        add("Comprueba la textura y el punto de cocción, ajusta el condimento al gusto y sirve a la temperatura indicada.")
+    }
 }

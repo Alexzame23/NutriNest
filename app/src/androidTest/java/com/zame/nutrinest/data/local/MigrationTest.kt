@@ -212,4 +212,43 @@ class MigrationTest {
             assertEquals(1, it.getInt(0))
         }
     }
+
+    @Test
+    fun migrate7To8_keepsRecipesAndAddsOptionalSpanishText() {
+        helper.createDatabase(TEST_DB, 7).use { db ->
+            db.execSQL(
+                "INSERT INTO recipes (id, name, category, folder, coverImageCrop, " +
+                    "createdAt, isFavorite) VALUES " +
+                    "(1, 'Family soup', 'Main Dish', 'My recipes', 'CENTER', 10, 1)"
+            )
+            db.execSQL(
+                "INSERT INTO recipe_steps (id, recipeId, position, text) " +
+                    "VALUES (1, 1, 0, 'Simmer gently')"
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(
+            TEST_DB, 8, true, NutriNestDatabase.MIGRATION_7_8
+        )
+
+        db.query("SELECT name, nameEs, isFavorite FROM recipes WHERE id = 1").use {
+            it.moveToFirst()
+            assertEquals("Family soup", it.getString(0))
+            assertTrue("a user recipe needs no fabricated translation", it.isNull(1))
+            assertEquals(1, it.getInt(2))
+        }
+        db.query("SELECT text, textEs FROM recipe_steps WHERE id = 1").use {
+            it.moveToFirst()
+            assertEquals("Simmer gently", it.getString(0))
+            assertTrue("a user step needs no fabricated translation", it.isNull(1))
+        }
+
+        // The new nullable columns can hold the bundled bilingual library.
+        db.execSQL("UPDATE recipes SET nameEs = 'Sopa familiar' WHERE id = 1")
+        db.execSQL("UPDATE recipe_steps SET textEs = 'Cuece suavemente' WHERE id = 1")
+        db.query("SELECT nameEs FROM recipes WHERE id = 1").use {
+            it.moveToFirst()
+            assertEquals("Sopa familiar", it.getString(0))
+        }
+    }
 }

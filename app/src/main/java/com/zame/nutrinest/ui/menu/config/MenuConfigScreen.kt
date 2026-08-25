@@ -92,6 +92,7 @@ fun MenuConfigScreen(
     val recipes by viewModel.allRecipes.collectAsState()
     val folders by viewModel.allFolders.collectAsState()
     val profiles by viewModel.profiles.collectAsState()
+    val spanish = rememberIsSpanish()
     val snackbarHostState = remember { SnackbarHostState() }
     var showLockDialog by remember { mutableStateOf(false) }
     var showOverrideDialog by remember { mutableStateOf(false) }
@@ -440,7 +441,8 @@ fun MenuConfigScreen(
             }
             items(state.locks.size) { index ->
                 val lock = state.locks[index]
-                val recipeName = recipes.find { it.id == lock.recipeId }?.name ?: "?"
+                val recipeName = recipes.find { it.id == lock.recipeId }
+                    ?.displayName(spanish) ?: "?"
                 Card(
                     shape = MaterialTheme.shapes.medium,
                     colors = CardDefaults.cardColors(
@@ -548,7 +550,8 @@ private fun RecipeLibrarySelector(
     val normalizedQuery = TextNormalizer.normalize(query)
     val visibleRecipes = recipes.filter { recipe ->
         (normalizedQuery.isEmpty() ||
-            TextNormalizer.normalize(recipe.name).contains(normalizedQuery)) &&
+            (TextNormalizer.normalize(recipe.name).contains(normalizedQuery) ||
+                recipe.nameEs?.let { TextNormalizer.normalize(it).contains(normalizedQuery) } == true)) &&
             (categoryFilters.isEmpty() || recipe.category in categoryFilters) &&
             (!favoritesOnly || recipe.isFavorite)
     }
@@ -696,6 +699,7 @@ private fun RecipeBookCard(
     onEnableAll: () -> Unit,
     onDisableAll: () -> Unit
 ) {
+    val spanish = rememberIsSpanish()
     Card(
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
@@ -766,7 +770,10 @@ private fun RecipeBookCard(
                             enabled = selected
                         )
                         Column(Modifier.weight(1f)) {
-                            Text(recipe.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                recipe.displayName(spanish),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                             Text(
                                 stringResource(recipeCategoryLabel(recipe.category)),
                                 style = MaterialTheme.typography.bodySmall,
@@ -893,6 +900,7 @@ private fun AddLockDialog(
     onDismiss: () -> Unit,
     onConfirm: (Set<Int>, MealSlot, RecipeEntity, Long?) -> Unit
 ) {
+    val spanish = rememberIsSpanish()
     var selectedDays by remember { mutableStateOf(setOf<Int>()) }
     var selectedSlot by remember { mutableStateOf(slots.first()) }
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
@@ -916,10 +924,10 @@ private fun AddLockDialog(
                 )
                 OptionDropdown(
                     label = stringResource(R.string.menu_config_recipe),
-                    options = recipes.map { it.name },
-                    selected = selectedRecipe?.name,
+                    options = recipes.map { it.displayName(spanish) },
+                    selected = selectedRecipe?.displayName(spanish),
                     onSelected = { name ->
-                        selectedRecipe = recipes.find { it.name == name }
+                        selectedRecipe = recipes.find { it.displayName(spanish) == name }
                     }
                 )
                 if (profiles.size > 1) {
