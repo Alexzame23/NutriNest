@@ -7,6 +7,7 @@ import com.zame.nutrinest.data.local.entity.MealCourse
 import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.MenuScope
 import com.zame.nutrinest.data.local.entity.NutritionValues
+import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import kotlin.random.Random
@@ -146,6 +147,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
         plans: List<DailyPlan>,
         recipes: List<PlannableRecipe>,
         config: GenerationConfig,
+        profiles: List<ProfileEntity> = emptyList(),
         recentRecipeIds: Set<Long> = emptySet(),
         leftoverIngredientIds: Set<Long> = emptySet()
     ): GenerationResult {
@@ -196,7 +198,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
         val cheatSlots = allDaySlots
             .filterNot { it in lockedDaySlots }
             .shuffled(random)
-            .take(config.cheatMeals.coerceIn(0, (allSlots.size - lockMap.size).coerceAtLeast(0)))
+            .take(config.cheatMeals.coerceAtLeast(0))
             .toSet()
 
         // ── Fill the week ──────────────────────────────────────────────
@@ -210,36 +212,67 @@ class MenuGenerator(private val random: Random = Random.Default) {
                 .toSet()
 
             for (slot in slots) {
-                val key = day to slot
-                val lockedId = lockMap[key]
-                val chosen: PlannableRecipe = if (lockedId != null) {
-                    byId.getValue(lockedId)
-                } else {
-                    pickRecipe(
-                        pool = freshPool,
-                        slot = slot,
-                        day = day,
-                        useCount = useCount,
-                        maxRepeats = config.maxRecipeRepeats.coerceAtLeast(1),
-                        leftoverIngredientIds = leftoverIngredientIds,
-                        yesterdayRecipeIds = meals
-                            .filter { it.dayOfWeek == day - 1 }
-                            .map { it.recipeId }
-                            .toSet()
-                    ) ?: return GenerationResult.Failure(FailureReason.NOT_ENOUGH_RECIPES)
-                }
-                useCount[chosen.recipe.id] = (useCount[chosen.recipe.id] ?: 0) + 1
+                val courses = config.coursesOf(slot)
+                val householdCheat = (day to slot) in cheatSlots
 
-                val isCheat = key in cheatSlots
-                val slotWeight = normalizedWeights.getValue(slot).toDouble()
-                val portions = profiles.associate { profile ->
-                    val factor = if (isCheat) 1.0 else {
-                        val slotKcal =
-                            targetsByProfile.getValue(profile.id).dailyCalories * slotWeight
-                        (slotKcal / chosen.totalNutrition.kcal).coerceIn(0.25, 4.0)
+                // Free = this person left the slot untracked, or the whole
+                // household drew a random free meal here.
+                val free = if (householdCheat) plans else plans.filter { it.isFree(slot) }
+                val eating = plans - free.toSet()
+
+                if (free.isNotEmpty()) {
+                    if (eating.isEmpty()) {
+                        meals += freeMeal(day, slot, profileId = null, cheat = householdCheat)
+                    } else {
+                        free.forEach {
+                            meals += freeMeal(day, slot, it.profileId, cheat = false)
+                        }
                     }
-                    profile.id to factor
                 }
+                if (eating.isEmpty()) continue
+
+                val apart = eating.filter { plan ->
+                    config.scope == MenuScope.INDIVIDUAL ||
+                        (config.scope == MenuScope.PER_MEAL &&
+                            MealOverride(day, slot, plan.profileId) in config.overrides) ||
+                        lockMap.keys.any {
+                            it.day == day && it.slot == slot && it.profileId == plan.profileId
+                        }
+                }
+                val together = eating - apart.toSet()
+                val audiences = buildList {
+                    apart.forEach { add(Audience(it.profileId, listOf(it))) }
+                    if (together.isNotEmpty()) add(Audience(owner = null, plans = together))
+                }
+
+                val courseShares = MealCourse.shares(courses)
+                val usedHere = mutableSetOf<Long>()
+
+                for (audience in audiences) {
+                    for (course in courses) {
+                        val lockedId = lockMap[LockKey(day, slot, course, audience.owner)]
+                        val chosen = if (lockedId != null) {
+                            byId.getValue(lockedId)
+                        } else {
+                            pickRecipe(
+                                pool = freshPool,
+                                slot = slot,
+                                course = course,
+                                useCount = useCount,
+                                maxRepeats = config.maxRecipeRepeats.coerceAtLeast(1),
+                                leftoverIngredientIds = leftoverIngredientIds,
+                                yesterdayRecipeIds = yesterdayRecipeIds,
+                                alreadyInSlot = usedHere
+                            ) ?: return GenerationResult.Failure(FailureReason.NOT_ENOUGH_RECIPES)
+                        }
+                        useCount[chosen.recipe.id] = (useCount[chosen.recipe.id] ?: 0) + 1
+                        usedHere += chosen.recipe.id
+
+                        val share = courseShares[course] ?: 1.0
+                        val portions = audience.plans.associate { plan ->
+                            val kcal = plan.slotKcal(slot) * share
+                            plan.profileId to portionFactor(kcal, chosen.totalNutrition.kcal)
+                        }
 
                         meals += GeneratedMeal(
                             dayOfWeek = day,

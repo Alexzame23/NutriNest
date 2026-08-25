@@ -122,6 +122,7 @@ class LocalMenuRepository(
     ): GenerationResult {
         val slots = config.slotWeights.keys.sortedBy { it.ordinal }
         val plans = buildPlans(slots, config.slotWeights)
+        val profiles = dao.getProfiles()
         val recipes = dao.getAllRecipes().map { recipe ->
             PlannableRecipe(recipe, dao.getIngredientsOf(recipe.id))
         }
@@ -154,6 +155,7 @@ class LocalMenuRepository(
             plans = plans,
             recipes = recipes,
             config = config.copy(locks = carriedLocks + config.locks),
+            profiles = profiles,
             recentRecipeIds = recentRecipeIds,
             leftoverIngredientIds = leftoverIngredientIds
         )

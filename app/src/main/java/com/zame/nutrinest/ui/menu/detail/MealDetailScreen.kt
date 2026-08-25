@@ -48,6 +48,7 @@ import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
+import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.components.formatRecipeQuantity
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
