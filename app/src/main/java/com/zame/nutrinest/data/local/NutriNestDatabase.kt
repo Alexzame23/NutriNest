@@ -304,23 +304,124 @@ abstract class NutriNestDatabase : RoomDatabase() {
             }
         }
 
-        /** Prevents two recipes from occupying the same meal slot. */
+        /**
+         * v5 → v6: per-person menus.
+         *
+         * Existing meals remain shared, while the new schema also supports
+         * profile-specific meals, courses, free slots, and intake tracking.
+         */
         internal val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // A pre-constraint database could contain duplicates after two
-                // concurrent generations. Keep the newest row before adding
-                // the index so that such users can still upgrade.
+                addMenuScopeColumns(db)
+                rebuildPlannedMeals(db)
+                addPortionBaseFactor(db)
+                createPerPersonTables(db)
+            }
+        }
+
+        private fun addMenuScopeColumns(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "weekly_menus", "scope")) {
                 db.execSQL(
-                    "DELETE FROM `planned_meals` WHERE `id` NOT IN (" +
-                        "SELECT MAX(`id`) FROM `planned_meals` " +
-                        "GROUP BY `menuId`, `dayOfWeek`, `slot`)"
-                )
-                db.execSQL(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS " +
-                        "`index_planned_meals_menuId_dayOfWeek_slot` " +
-                        "ON `planned_meals` (`menuId`, `dayOfWeek`, `slot`)"
+                    "ALTER TABLE `weekly_menus` ADD COLUMN `scope` TEXT NOT NULL DEFAULT 'SHARED'"
                 )
             }
+            if (!columnExists(db, "weekly_menus", "coursesSpec")) {
+                db.execSQL(
+                    "ALTER TABLE `weekly_menus` ADD COLUMN `coursesSpec` TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
+        /** Rebuilds `planned_meals` so a free slot may have no recipe. */
+        private fun rebuildPlannedMeals(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `planned_meals_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `menuId` INTEGER NOT NULL,
+                    `dayOfWeek` INTEGER NOT NULL,
+                    `slot` TEXT NOT NULL,
+                    `recipeId` INTEGER,
+                    `isLocked` INTEGER NOT NULL,
+                    `isCheatMeal` INTEGER NOT NULL,
+                    `course` TEXT NOT NULL,
+                    `profileId` INTEGER,
+                    `isFree` INTEGER NOT NULL,
+                    FOREIGN KEY(`menuId`) REFERENCES `weekly_menus`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`)
+                        ON UPDATE NO ACTION ON DELETE RESTRICT,
+                    FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO `planned_meals_new`
+                    (`id`, `menuId`, `dayOfWeek`, `slot`, `recipeId`, `isLocked`,
+                     `isCheatMeal`, `course`, `profileId`, `isFree`)
+                SELECT `id`, `menuId`, `dayOfWeek`, `slot`, `recipeId`, `isLocked`,
+                       `isCheatMeal`, 'SINGLE', NULL, 0
+                FROM `planned_meals`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `planned_meals`")
+            db.execSQL("ALTER TABLE `planned_meals_new` RENAME TO `planned_meals`")
+            listOf("menuId", "recipeId", "profileId").forEach {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_planned_meals_$it` " +
+                        "ON `planned_meals` (`$it`)"
+                )
+            }
+        }
+
+        /** Existing portions are, by definition, exactly what was planned. */
+        private fun addPortionBaseFactor(db: SupportSQLiteDatabase) {
+            if (!columnExists(db, "meal_portions", "baseFactor")) {
+                db.execSQL(
+                    "ALTER TABLE `meal_portions` ADD COLUMN `baseFactor` REAL NOT NULL DEFAULT 0"
+                )
+                db.execSQL("UPDATE `meal_portions` SET `baseFactor` = `factor`")
+            }
+        }
+
+        private fun createPerPersonTables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `profile_meal_plans` (
+                    `profileId` INTEGER NOT NULL,
+                    `slot` TEXT NOT NULL,
+                    `share` REAL NOT NULL,
+                    `isFree` INTEGER NOT NULL,
+                    PRIMARY KEY(`profileId`, `slot`),
+                    FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `intake_entries` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `profileId` INTEGER NOT NULL,
+                    `dayStart` INTEGER NOT NULL,
+                    `label` TEXT NOT NULL,
+                    `grams` REAL,
+                    `kcal` REAL NOT NULL,
+                    `carbs` REAL NOT NULL,
+                    `fats` REAL NOT NULL,
+                    `protein` REAL NOT NULL,
+                    `loggedAt` INTEGER NOT NULL,
+                    FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_intake_entries_profileId_dayStart` " +
+                    "ON `intake_entries` (`profileId`, `dayStart`)"
+            )
         }
 
         /**
@@ -330,14 +431,26 @@ abstract class NutriNestDatabase : RoomDatabase() {
          */
         internal val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "ALTER TABLE `recipes` ADD COLUMN `coverImageCrop` " +
-                        "TEXT NOT NULL DEFAULT 'CENTER'"
-                )
-                db.execSQL(
-                    "ALTER TABLE `recipe_ingredients` ADD COLUMN `quantityUnit` " +
-                        "TEXT NOT NULL DEFAULT 'GRAM'"
-                )
+                // Some pre-release v6 databases ran an incomplete per-person
+                // migration. Finish it here so those installs can recover.
+                if (!tableExists(db, "profile_meal_plans")) {
+                    addMenuScopeColumns(db)
+                    rebuildPlannedMeals(db)
+                    addPortionBaseFactor(db)
+                    createPerPersonTables(db)
+                }
+                if (!columnExists(db, "recipes", "coverImageCrop")) {
+                    db.execSQL(
+                        "ALTER TABLE `recipes` ADD COLUMN `coverImageCrop` " +
+                            "TEXT NOT NULL DEFAULT 'CENTER'"
+                    )
+                }
+                if (!columnExists(db, "recipe_ingredients", "quantityUnit")) {
+                    db.execSQL(
+                        "ALTER TABLE `recipe_ingredients` ADD COLUMN `quantityUnit` " +
+                            "TEXT NOT NULL DEFAULT 'GRAM'"
+                    )
+                }
                 // Do not discard a user's historic recipe or shopping entry.
                 // Referenced legacy rows are hidden from ingredient browsing.
                 db.execSQL(
@@ -348,6 +461,21 @@ abstract class NutriNestDatabase : RoomDatabase() {
                         "WHERE `ingredientId` = `ingredients`.`id`)"
                 )
             }
+        }
+
+        private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
+            db.query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$table'"
+            ).use { it.moveToFirst() }
+
+        private fun columnExists(
+            db: SupportSQLiteDatabase,
+            table: String,
+            column: String
+        ): Boolean = db.query("PRAGMA table_info(`$table`)").use { cursor ->
+            val nameIndex = cursor.getColumnIndexOrThrow("name")
+            generateSequence { if (cursor.moveToNext()) cursor.getString(nameIndex) else null }
+                .any { it == column }
         }
 
         private fun addIngredientColumns(db: SupportSQLiteDatabase) {

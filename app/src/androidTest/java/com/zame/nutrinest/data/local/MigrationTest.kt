@@ -118,12 +118,12 @@ class MigrationTest {
     }
 
     /**
-     * v5 → v6 rebuilds `planned_meals` so a free slot can have no recipe. The
+     * v5 → v7 rebuilds `planned_meals` so a free slot can have no recipe. The
      * rebuild is the risky part: portions hang off those rows by id, so the
      * ids have to survive it along with everything the user planned.
      */
     @Test
-    fun migrate5To6_keepsMenusLocksPortionsAndTheShoppingList() {
+    fun migrate5To7_keepsMenusLocksPortionsAndTheShoppingList() {
         helper.createDatabase(TEST_DB, 5).use { db ->
             db.execSQL(
                 "INSERT INTO ingredients (id, name, foodType, kcal, carbs, fats, protein, " +
@@ -158,7 +158,9 @@ class MigrationTest {
         }
 
         val db = helper.runMigrationsAndValidate(
-            TEST_DB, 6, true, NutriNestDatabase.MIGRATION_5_6
+            TEST_DB, 7, false,
+            NutriNestDatabase.MIGRATION_5_6,
+            NutriNestDatabase.MIGRATION_6_7
         )
 
         db.query(
