@@ -64,6 +64,7 @@ import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.CategoryDot
 import com.zame.nutrinest.ui.components.MacroBarChart
+import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
@@ -377,13 +378,12 @@ private fun RecipeRow(
             }
 
             Column(Modifier.weight(1f)) {
-                Text(
-                    recipe.displayName(spanish),
+                SlowMarqueeText(
+                    text = recipe.displayName(spanish),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(

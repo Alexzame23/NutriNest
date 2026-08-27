@@ -72,6 +72,7 @@ import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.OptionDropdown
+import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
 import com.zame.nutrinest.util.TextNormalizer
@@ -454,10 +455,11 @@ fun MenuConfigScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                recipeName,
+                            SlowMarqueeText(
+                                text = recipeName,
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.fillMaxWidth()
                             )
                             val who = lock.profileId
                                 ?.let { id -> profiles.find { it.id == id }?.name }
@@ -777,9 +779,10 @@ private fun RecipeBookCard(
                             enabled = selected
                         )
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                recipe.displayName(spanish),
-                                style = MaterialTheme.typography.bodyLarge
+                            SlowMarqueeText(
+                                text = recipe.displayName(spanish),
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.fillMaxWidth()
                             )
                             Text(
                                 stringResource(recipeCategoryLabel(recipe.category)),

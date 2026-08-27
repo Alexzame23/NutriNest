@@ -49,6 +49,7 @@ import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.OptionDropdown
+import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.components.formatRecipeQuantity
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
@@ -72,13 +73,14 @@ fun MealDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        meal?.recipe?.displayName(spanish)
+                    SlowMarqueeText(
+                        text = meal?.recipe?.displayName(spanish)
                             ?: stringResource(
                                 if (state.isFree) R.string.meal_free_placeholder
                                 else R.string.meal_detail_title
                             ),
-                        style = MaterialTheme.typography.headlineSmall
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
                 navigationIcon = {

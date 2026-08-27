@@ -46,7 +46,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -54,6 +53,7 @@ import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
+import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.components.StatusChip
 import com.zame.nutrinest.ui.components.formatGrams
 import com.zame.nutrinest.ui.components.formatRecipeQuantity
@@ -151,11 +151,10 @@ fun RecipeDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        recipe.displayName(spanish),
+                    SlowMarqueeText(
+                        text = recipe.displayName(spanish),
                         style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
                 navigationIcon = {
