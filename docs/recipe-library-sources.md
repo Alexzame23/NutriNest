@@ -6,15 +6,31 @@ reliable public sources; no source instructions, photographs, or other creative
 content are copied into the application.
 
 - [Recipes from Spain — Spain's official tourism portal](https://www.spain.info/en/query/recipes-spain/)
+- [Traditional paella method — Spain's official tourism portal](https://www.spain.info/en/recipe/paella/)
 - [Food and wine in Italy — Italy's official tourism portal](https://www.italia.it/en/italy/things-to-do/food-and-wine)
+- [Traditional pizza technique — Italy's official tourism portal](https://www.italia.it/en/campania/naples/things-to-do/pizza)
+- [Italian pasta traditions and preparations — Italia.it](https://www.italia.it/en/italy/things-to-do/pasta-types-italian-formats-and-recipes)
 - [Traditional Greek cuisine — Visit Greece](https://www.visitgreece.gr/experiences/gastronomy/traditional-cuisine/)
+- [Greek recipe collection — Visit Greece](https://www.visitgreece.gr/en/blog/recipes)
+- [Traditional moussaka method — Visit Greece](https://www.visitgreece.gr/el/experiences/gastronomy/recipes/mousaka/)
 - [Healthier family recipes — NHS](https://www.nhs.uk/healthier-families/recipes/)
+- [Healthier dinner collection — NHS](https://www.nhs.uk/healthier-families/recipes/dinner/)
+- [Easy overnight oats method — NHS](https://www.nhs.uk/healthier-families/recipes/easy-overnight-oats/)
+- [Fruity French toast method — NHS](https://www.nhs.uk/healthier-families/recipes/fruity-french-toast/)
+- [No-pastry mushroom quiche method — NHS](https://www.nhs.uk/healthier-families/recipes/no-pastry-mini-mushroom-quiches/)
 - [Healthy eating while trying to lose weight — NHS](https://www.nhs.uk/better-health/lose-weight/healthy-eating-when-trying-to-lose-weight/)
+- [USDA MyPlate recipe cookbooks](https://www.myplate.gov/myplate-kitchen/recipes-cookbooks-and-menus)
+- [A Harvest of Recipes — USDA](https://www.myplate.gov/sites/default/files/cookbooks/HarvestofRecipes.pdf)
+- [Our Regional Cuisines recipe database — Japan MAFF](https://www.maff.go.jp/e/policies/market/k_ryouri/index.html)
 
 ## Adaptation and data rules
 
-- The library contains 72 one-serving recipes: 24 each in Mediterranean
-  Cuisine, Low-Calorie Recipes, and World Cuisine.
+- The library contains 250 one-serving recipes. Every book has at least 10
+  breakfasts, 50 main dishes, and 10 desserts, plus sides and snacks.
+- Recipe titles and instructions are stored separately in English and Spanish.
+  Step counts follow the actual method: simple assembled dishes stay concise,
+  while doughs, layered bakes, paellas, stews, and similar dishes use longer
+  methods with explicit heat, timing, texture, resting, and food-safety cues.
 - Every book covers breakfast, main dishes, sides/appetizers, snacks, and
   desserts.
 - Every ingredient is linked by an exact `BEDCA:<food id>` key to the bundled

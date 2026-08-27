@@ -23,7 +23,7 @@ internal data class BuiltInRecipe(
 )
 
 /**
- * The offline starter library: 44 recipes per book and 132 in total.
+ * The offline starter library: 250 recipes across three bilingual books.
  *
  * Quantities describe one practical serving. The menu planner's existing
  * portion factor scales that serving for each household member and the
@@ -1042,7 +1042,9 @@ internal object BuiltInRecipeLibrary {
             "Spread tomato over the base and scatter on pepper, peas and drained chickpeas.",
             "Top with mozzarella and bake at high heat until the base is cooked and the cheese bubbles."
         )
-    )
+    ) + MediterraneanRecipeExpansion.recipes +
+        LowCalorieRecipeExpansion.recipes +
+        WorldRecipeExpansion.recipes
 
     private fun i(foodId: Long, grams: Number, unit: String = "GRAM") =
         BuiltInIngredient(foodId, grams.toDouble(), unit)
@@ -1056,10 +1058,12 @@ internal object BuiltInRecipeLibrary {
         vararg steps: String
     ): BuiltInRecipe {
         val spanish = BuiltInRecipeTranslations.forKey(key)
-        val englishCore = steps.toList()
-        require(englishCore.size == spanish.coreSteps.size) {
-            "$key has ${englishCore.size} English core steps and " +
-                "${spanish.coreSteps.size} Spanish core steps"
+        val researched = BuiltInRecipeInstructionOverrides.forKey(key)
+        val englishSteps = researched?.map { it.en } ?: steps.toList()
+        val spanishSteps = researched?.map { it.es } ?: spanish.coreSteps
+        require(englishSteps.size == spanishSteps.size) {
+            "$key has ${englishSteps.size} English steps and " +
+                "${spanishSteps.size} Spanish steps"
         }
         return BuiltInRecipe(
             key = key,
@@ -1068,32 +1072,8 @@ internal object BuiltInRecipeLibrary {
             book = book,
             category = category,
             ingredients = ingredients,
-            steps = detailedEnglishSteps(englishCore),
-            stepsEs = detailedSpanishSteps(spanish.coreSteps)
+            steps = englishSteps,
+            stepsEs = spanishSteps
         )
-    }
-
-    private fun detailedEnglishSteps(core: List<String>): List<String> = buildList {
-        add("Gather and measure every ingredient. Wash the fresh produce and prepare a clean work surface.")
-        add(core.first())
-        if (core.size == 2) {
-            add("Prepare the remaining ingredients in even pieces and keep the heat controlled so everything cooks consistently.")
-            add(core.last())
-        } else {
-            addAll(core.drop(1))
-        }
-        add("Check the texture and doneness, adjust the seasoning to taste, and serve at the suggested temperature.")
-    }
-
-    private fun detailedSpanishSteps(core: List<String>): List<String> = buildList {
-        add("Reúne y mide todos los ingredientes. Lava los productos frescos y prepara una superficie de trabajo limpia.")
-        add(core.first())
-        if (core.size == 2) {
-            add("Prepara el resto de los ingredientes en trozos uniformes y controla el fuego para que todo se cocine por igual.")
-            add(core.last())
-        } else {
-            addAll(core.drop(1))
-        }
-        add("Comprueba la textura y el punto de cocción, ajusta el condimento al gusto y sirve a la temperatura indicada.")
     }
 }

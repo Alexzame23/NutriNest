@@ -542,6 +542,7 @@ private fun RecipeLibrarySelector(
     onEnableRecipes: (Set<Long>) -> Unit,
     onDisableRecipes: (Set<Long>) -> Unit
 ) {
+    val spanish = rememberIsSpanish()
     var query by remember { mutableStateOf("") }
     var categoryFilters by remember { mutableStateOf(emptySet<String>()) }
     var favoritesOnly by remember { mutableStateOf(false) }
@@ -551,7 +552,12 @@ private fun RecipeLibrarySelector(
     val visibleRecipes = recipes.filter { recipe ->
         (normalizedQuery.isEmpty() ||
             (TextNormalizer.normalize(recipe.name).contains(normalizedQuery) ||
-                recipe.nameEs?.let { TextNormalizer.normalize(it).contains(normalizedQuery) } == true)) &&
+                recipe.nameEs?.let { TextNormalizer.normalize(it).contains(normalizedQuery) } == true ||
+                recipe.folder?.let { folder ->
+                    RecipeBooks.searchableNames(folder).any {
+                        TextNormalizer.normalize(it).contains(normalizedQuery)
+                    }
+                } == true)) &&
             (categoryFilters.isEmpty() || recipe.category in categoryFilters) &&
             (!favoritesOnly || recipe.isFavorite)
     }
@@ -664,7 +670,8 @@ private fun RecipeLibrarySelector(
             }
             val expanded = folder in expandedBooks || query.isNotBlank()
             RecipeBookCard(
-                title = folder ?: stringResource(R.string.menu_config_personal_recipes),
+                title = folder?.let { RecipeBooks.displayName(it, spanish) }
+                    ?: stringResource(R.string.menu_config_personal_recipes),
                 allRecipes = allInBook,
                 visibleRecipes = visibleInBook,
                 selected = bookSelected,

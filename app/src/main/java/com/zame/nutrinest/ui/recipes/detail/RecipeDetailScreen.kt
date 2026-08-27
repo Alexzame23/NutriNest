@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.StatusChip
@@ -323,6 +324,7 @@ fun RecipeDetailScreen(
 @Composable
 private fun Header(state: RecipeDetailUiState) {
     val recipe = state.recipe ?: return
+    val spanish = rememberIsSpanish()
     val tint = recipeCategoryColor(recipe.category)
 
     Column {
@@ -361,7 +363,7 @@ private fun Header(state: RecipeDetailUiState) {
             )
             recipe.folder?.let { folder ->
                 StatusChip(
-                    label = folder,
+                    label = RecipeBooks.displayName(folder, spanish),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     icon = Icons.Rounded.Folder
                 )

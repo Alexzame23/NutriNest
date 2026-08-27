@@ -67,6 +67,7 @@ import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.local.entity.RecipeImageCrop
 import com.zame.nutrinest.data.local.entity.RecipeCategories
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.domain.nutrition.MeasureConversions
 import com.zame.nutrinest.ui.components.ImagePickerBox
 import com.zame.nutrinest.ui.components.KeyedDropdown
@@ -290,12 +291,13 @@ private fun FolderPicker(
     onFolderSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val spanish = rememberIsSpanish()
     var enteringNewFolder by remember {
         mutableStateOf(selectedFolder.isNotBlank() && selectedFolder !in folders)
     }
     val options = buildList {
         add("" to stringResource(R.string.create_recipe_no_folder))
-        folders.distinct().forEach { add(it to it) }
+        folders.distinct().forEach { add(it to RecipeBooks.displayName(it, spanish)) }
         add(NEW_FOLDER_OPTION to stringResource(R.string.create_recipe_new_folder))
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {

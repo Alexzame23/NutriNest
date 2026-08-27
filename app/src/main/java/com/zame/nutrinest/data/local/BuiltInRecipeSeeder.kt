@@ -13,7 +13,7 @@ import com.zame.nutrinest.data.local.entity.RecipeBooks
  */
 internal object BuiltInRecipeSeeder {
     private const val TAG = "BuiltInRecipeSeeder"
-    private const val LIBRARY_VERSION = "2"
+    private const val LIBRARY_VERSION = "3"
     private const val VERSION_META_KEY = "built_in_recipe_library_version"
     private const val WARNING_META_KEY = "built_in_recipe_library_warnings"
 
@@ -65,9 +65,10 @@ internal object BuiltInRecipeSeeder {
                     remoteId
                 )
                 if (existingId != null) {
-                    // Library v2 adds Spanish text and fuller instructions.
-                    // Keep favorite state and ingredient links untouched while
-                    // upgrading the bundled editorial content in place.
+                    // Later library versions add translations and refine the
+                    // source-checked instructions without touching user state.
+                    // Keep the recipe id and favorite state while refreshing
+                    // the bundled instructions and BEDCA ingredient amounts.
                     db.execSQL(
                         "UPDATE recipes SET nameEs = ? WHERE id = ?",
                         arrayOf<Any>(recipe.nameEs, existingId)
@@ -76,6 +77,11 @@ internal object BuiltInRecipeSeeder {
                         "DELETE FROM recipe_steps WHERE recipeId = ?",
                         arrayOf<Any>(existingId)
                     )
+                    db.execSQL(
+                        "DELETE FROM recipe_ingredients WHERE recipeId = ?",
+                        arrayOf<Any>(existingId)
+                    )
+                    db.insertIngredients(existingId, recipe, ingredientIds)
                     db.insertSteps(existingId, recipe)
                     updated++
                     return@forEachIndexed
@@ -116,23 +122,7 @@ internal object BuiltInRecipeSeeder {
                     statement.executeInsert()
                 }
 
-                db.compileStatement(
-                    """
-                    INSERT INTO recipe_ingredients
-                        (recipeId, ingredientId, grams, quantityUnit)
-                    VALUES (?, ?, ?, ?)
-                    """.trimIndent()
-                ).use { statement ->
-                    recipe.ingredients.forEach { ingredient ->
-                        statement.clearBindings()
-                        statement.bindLong(1, recipeId)
-                        statement.bindLong(2, ingredientIds.getValue(ingredient.bedcaFoodId))
-                        statement.bindDouble(3, ingredient.grams)
-                        statement.bindString(4, ingredient.quantityUnit)
-                        statement.executeInsert()
-                    }
-                }
-
+                db.insertIngredients(recipeId, recipe, ingredientIds)
                 db.insertSteps(recipeId, recipe)
                 inserted++
             }
@@ -167,6 +157,29 @@ internal object BuiltInRecipeSeeder {
                 statement.bindLong(2, position.toLong())
                 statement.bindString(3, step)
                 statement.bindString(4, recipe.stepsEs[position])
+                statement.executeInsert()
+            }
+        }
+    }
+
+    private fun SupportSQLiteDatabase.insertIngredients(
+        recipeId: Long,
+        recipe: BuiltInRecipe,
+        ingredientIds: Map<Long, Long>
+    ) {
+        compileStatement(
+            """
+            INSERT INTO recipe_ingredients
+                (recipeId, ingredientId, grams, quantityUnit)
+            VALUES (?, ?, ?, ?)
+            """.trimIndent()
+        ).use { statement ->
+            recipe.ingredients.forEach { ingredient ->
+                statement.clearBindings()
+                statement.bindLong(1, recipeId)
+                statement.bindLong(2, ingredientIds.getValue(ingredient.bedcaFoodId))
+                statement.bindDouble(3, ingredient.grams)
+                statement.bindString(4, ingredient.quantityUnit)
                 statement.executeInsert()
             }
         }

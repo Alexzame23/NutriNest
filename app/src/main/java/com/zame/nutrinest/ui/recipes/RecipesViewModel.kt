@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeCategories
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.repository.RecipeRepository
 import com.zame.nutrinest.util.TextNormalizer
@@ -173,7 +174,11 @@ class RecipesViewModel(
     private fun RecipeEntity.matches(needle: String): Boolean =
         TextNormalizer.normalize(name).contains(needle) ||
             nameEs?.let { TextNormalizer.normalize(it).contains(needle) } == true ||
-            folder?.let { TextNormalizer.normalize(it).contains(needle) } == true
+            folder?.let { value ->
+                RecipeBooks.searchableNames(value).any {
+                    TextNormalizer.normalize(it).contains(needle)
+                }
+            } == true
 
     private fun sort(
         recipes: List<RecipeEntity>,

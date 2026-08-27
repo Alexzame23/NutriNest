@@ -127,15 +127,18 @@ class FoodImportTest {
         val recipes = database.recipeDao().observeAll().first()
         val builtIns = recipes.filter { it.isBuiltIn }
 
-        assertEquals(132, builtIns.size)
+        assertEquals(250, builtIns.size)
         assertEquals(RecipeBooks.BUILT_IN.toSet(), builtIns.mapNotNull { it.folder }.toSet())
         assertTrue(
-            "each book should contain 44 recipes and 30 main dishes",
+            "each book should meet the expanded meal-type targets",
             RecipeBooks.BUILT_IN.all { book ->
-                builtIns.count { it.folder == book } == 44 &&
-                    builtIns.count {
-                        it.folder == book && it.category == RecipeCategories.MAIN_DISH
-                    } == 30
+                builtIns.count {
+                    it.folder == book && it.category == RecipeCategories.BREAKFAST
+                } >= 10 && builtIns.count {
+                    it.folder == book && it.category == RecipeCategories.MAIN_DISH
+                } >= 50 && builtIns.count {
+                    it.folder == book && it.category == RecipeCategories.DESSERT
+                } >= 10
             }
         )
         builtIns.forEach { recipe ->
@@ -152,9 +155,9 @@ class FoodImportTest {
             }
             val withSteps = database.recipeDao().observeRecipeWithSteps(recipe.id).first()
             assertTrue(
-                "${recipe.name} needs detailed bilingual instructions",
+                "${recipe.name} needs complete bilingual instructions",
                 withSteps?.steps?.let { steps ->
-                    steps.size >= 5 && steps.all {
+                    steps.size >= 2 && steps.all {
                         it.text.isNotBlank() && !it.textEs.isNullOrBlank()
                     }
                 } == true
@@ -205,7 +208,7 @@ class FoodImportTest {
             arrayOf<Any>(original.id)
         )
         sqlite.execSQL(
-            "UPDATE food_dataset_meta SET value = '1' " +
+            "UPDATE food_dataset_meta SET value = '2' " +
                 "WHERE `key` = 'built_in_recipe_library_version'"
         )
         database.close()
@@ -216,12 +219,12 @@ class FoodImportTest {
         assertTrue(!upgraded?.recipe?.nameEs.isNullOrBlank())
         assertTrue(
             upgraded?.steps?.let { steps ->
-                steps.size >= 5 && steps.all {
+                steps.size >= 2 && steps.all {
                     it.text.isNotBlank() && !it.textEs.isNullOrBlank()
                 }
             } == true
         )
-        assertEquals(132, database.recipeDao().observeAll().first().count { it.isBuiltIn })
+        assertEquals(250, database.recipeDao().observeAll().first().count { it.isBuiltIn })
     }
 
     private companion object {

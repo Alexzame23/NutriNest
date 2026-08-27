@@ -59,6 +59,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.NutritionValues
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.ui.components.CategoryDot
@@ -208,6 +209,7 @@ private fun FilterRow(
     onClearFilters: () -> Unit,
     onSortChange: (RecipeSort) -> Unit
 ) {
+    val spanish = rememberIsSpanish()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,7 +236,7 @@ private fun FilterRow(
                 FilterChip(
                     selected = folder in state.selectedFolders,
                     onClick = { onFolderToggled(folder) },
-                    label = { Text(folder) },
+                    label = { Text(RecipeBooks.displayName(folder, spanish)) },
                     leadingIcon = { Icon(Icons.Rounded.Folder, null, Modifier.size(16.dp)) },
                     shape = MaterialTheme.shapes.small,
                     colors = FilterChipDefaults.filterChipColors(
@@ -387,7 +389,7 @@ private fun RecipeRow(
                 Text(
                     listOfNotNull(
                         stringResource(recipeCategoryLabel(recipe.category)),
-                        recipe.folder,
+                        recipe.folder?.let { RecipeBooks.displayName(it, spanish) },
                         stringResource(R.string.kcal_value, nutrition.kcal.roundToInt())
                     ).joinToString("  ·  "),
                     style = MaterialTheme.typography.bodySmall,

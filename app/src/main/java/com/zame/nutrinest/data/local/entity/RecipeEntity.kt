@@ -45,9 +45,30 @@ object RecipeBooks {
     const val MEDITERRANEAN = "Mediterranean Cuisine"
     const val LOW_CALORIE = "Low-Calorie Recipes"
     const val WORLD = "World Cuisine"
+    const val MEDITERRANEAN_ES = "Cocina mediterránea"
+    const val LOW_CALORIE_ES = "Recetas bajas en calorías"
+    const val WORLD_ES = "Cocina del mundo"
     const val BUILT_IN_ID_PREFIX = "builtin:"
 
     val BUILT_IN = listOf(MEDITERRANEAN, LOW_CALORIE, WORLD)
+
+    fun displayName(folder: String, spanish: Boolean): String = if (!spanish) {
+        folder
+    } else {
+        when (folder) {
+            MEDITERRANEAN -> MEDITERRANEAN_ES
+            LOW_CALORIE -> LOW_CALORIE_ES
+            WORLD -> WORLD_ES
+            else -> folder
+        }
+    }
+
+    fun searchableNames(folder: String): List<String> = when (folder) {
+        MEDITERRANEAN -> listOf(MEDITERRANEAN, MEDITERRANEAN_ES)
+        LOW_CALORIE -> listOf(LOW_CALORIE, LOW_CALORIE_ES)
+        WORLD -> listOf(WORLD, WORLD_ES)
+        else -> listOf(folder)
+    }
 }
 
 /** Stable, storage-friendly cover-image crop anchors. */
