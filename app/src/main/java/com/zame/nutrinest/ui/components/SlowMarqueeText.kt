@@ -2,6 +2,7 @@ package com.zame.nutrinest.ui.components
 
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,20 +25,24 @@ fun SlowMarqueeText(
     fontWeight: FontWeight? = null,
     style: TextStyle = LocalTextStyle.current
 ) {
-    Text(
-        text = text,
-        modifier = modifier.basicMarquee(
-            iterations = Int.MAX_VALUE,
-            repeatDelayMillis = 2_000,
-            initialDelayMillis = 1_200,
-            spacing = MarqueeSpacing(24.dp),
-            velocity = 18.dp
-        ),
-        color = color,
-        fontWeight = fontWeight,
-        style = style,
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Clip
-    )
+    // Keep the available title width outside the marquee. This gives the
+    // marquee a finite container to compare against the unconstrained text.
+    Box(modifier = modifier) {
+        Text(
+            text = text,
+            modifier = Modifier.basicMarquee(
+                iterations = Int.MAX_VALUE,
+                repeatDelayMillis = 1_500,
+                initialDelayMillis = 600,
+                spacing = MarqueeSpacing(24.dp),
+                velocity = 24.dp
+            ),
+            color = color,
+            fontWeight = fontWeight,
+            style = style,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip
+        )
+    }
 }

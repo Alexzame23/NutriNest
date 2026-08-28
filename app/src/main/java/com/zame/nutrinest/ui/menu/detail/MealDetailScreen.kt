@@ -230,7 +230,7 @@ fun MealDetailScreen(
                         state.baseIngredients.forEach { ingredient ->
                             Row(Modifier.fillMaxWidth()) {
                                 Text(
-                                    ingredient.ingredient.name,
+                                    ingredient.ingredient.displayName(spanish),
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -262,7 +262,7 @@ fun MealDetailScreen(
                         state.baseIngredients.forEach { ingredient ->
                             Row(Modifier.fillMaxWidth()) {
                                 Text(
-                                    ingredient.ingredient.name,
+                                    ingredient.ingredient.displayName(spanish),
                                     style = MaterialTheme.typography.bodyLarge,
                                     modifier = Modifier.weight(1f)
                                 )
