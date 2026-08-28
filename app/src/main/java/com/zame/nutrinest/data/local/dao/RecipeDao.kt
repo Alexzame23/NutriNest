@@ -7,6 +7,7 @@ import androidx.room.Transaction
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.local.entity.RecipeIngredientCrossRef
+import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
 import com.zame.nutrinest.data.local.entity.RecipeNutrition
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
 import com.zame.nutrinest.data.local.entity.RecipeWithSteps
@@ -24,7 +25,7 @@ interface RecipeDao {
 
     @Query(
         """
-        SELECT i.*, ri.grams FROM ingredients i
+        SELECT i.*, ri.grams, ri.quantityUnit FROM ingredients i
         INNER JOIN recipe_ingredients ri ON ri.ingredientId = i.id
         WHERE ri.recipeId = :recipeId
         """
@@ -87,13 +88,25 @@ interface RecipeDao {
     @Transaction
     suspend fun insertFullRecipe(
         recipe: RecipeEntity,
-        ingredients: List<Pair<Long, Double>>, // ingredientId to grams
+        ingredients: List<RecipeIngredientInput>,
         steps: List<Pair<String, String?>>     // text to optional imagePath
     ): Long {
+        require(ingredients.isNotEmpty()) { "A recipe needs at least one ingredient" }
+        require(ingredients.all { it.grams.isFinite() && it.grams > 0.0 }) {
+            "Ingredient quantities must be finite and positive"
+        }
+        require(steps.any { (text, _) -> text.isNotBlank() }) {
+            "A recipe needs at least one non-empty step"
+        }
         val recipeId = insertRecipe(recipe)
         insertCrossRefs(
-            ingredients.map { (ingredientId, grams) ->
-                RecipeIngredientCrossRef(recipeId, ingredientId, grams)
+            ingredients.map { input ->
+                RecipeIngredientCrossRef(
+                    recipeId = recipeId,
+                    ingredientId = input.ingredientId,
+                    grams = input.grams,
+                    quantityUnit = input.quantityUnit
+                )
             }
         )
         insertSteps(

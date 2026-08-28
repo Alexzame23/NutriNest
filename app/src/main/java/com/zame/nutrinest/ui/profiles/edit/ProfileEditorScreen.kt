@@ -120,7 +120,7 @@ fun ProfileEditorScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = viewModel::save,
+                onClick = { if (!state.isSaving && !state.isLoading) viewModel.save() },
                 icon = { Icon(Icons.Rounded.Check, null) },
                 text = { Text(stringResource(R.string.action_save)) },
                 containerColor = MaterialTheme.colorScheme.primary,

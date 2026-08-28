@@ -47,6 +47,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zame.nutrinest.R
+import com.zame.nutrinest.ui.components.SlowMarqueeText
+import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import kotlin.math.roundToInt
 
 /**
@@ -63,6 +65,7 @@ fun IntakeScreen(
     viewModel: IntakeViewModel = viewModel(factory = IntakeViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsState()
+    val spanish = rememberIsSpanish()
     var showAddDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -171,11 +174,12 @@ fun IntakeScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(
-                                meal.row.recipe?.name
+                            SlowMarqueeText(
+                                text = meal.row.recipe?.displayName(spanish)
                                     ?: stringResource(R.string.meal_free_placeholder),
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.fillMaxWidth()
                             )
                             if (meal.isAdjusted) {
                                 Text(

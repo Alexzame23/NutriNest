@@ -6,8 +6,7 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Profiles contain health and allergy data; images may also be private. -->
+    <exclude domain="database" path="."/>
+    <exclude domain="file" path="images/"/>
 </full-backup-content>

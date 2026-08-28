@@ -24,7 +24,8 @@ internal object PlannerFixtures {
         id: Long,
         name: String = "Recipe $id",
         category: String = RecipeCategories.MAIN_DISH,
-        kcal: Double = 500.0
+        kcal: Double = 500.0,
+        folder: String? = null
     ): PlannableRecipe {
         val ingredient = IngredientEntity(
             id = id,
@@ -35,13 +36,13 @@ internal object PlannerFixtures {
             isCustom = false
         )
         return PlannableRecipe(
-            recipe = RecipeEntity(id = id, name = name, category = category),
+            recipe = RecipeEntity(id = id, name = name, category = category, folder = folder),
             ingredients = listOf(IngredientWithQuantity(ingredient, grams = kcal))
         )
     }
 
     /** Enough variety that the repeat cap never forces a fallback. */
-    fun recipePool(count: Int = 20): List<PlannableRecipe> =
+    fun recipePool(count: Int = 24): List<PlannableRecipe> =
         (1L..count).map { id ->
             recipe(
                 id = id,

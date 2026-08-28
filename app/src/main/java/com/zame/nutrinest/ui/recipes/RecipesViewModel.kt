@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeCategories
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.repository.RecipeRepository
 import com.zame.nutrinest.util.TextNormalizer
@@ -172,14 +173,20 @@ class RecipesViewModel(
     /** Matches the name and the folder, so "desserts" finds a folder of them. */
     private fun RecipeEntity.matches(needle: String): Boolean =
         TextNormalizer.normalize(name).contains(needle) ||
-            folder?.let { TextNormalizer.normalize(it).contains(needle) } == true
+            nameEs?.let { TextNormalizer.normalize(it).contains(needle) } == true ||
+            folder?.let { value ->
+                RecipeBooks.searchableNames(value).any {
+                    TextNormalizer.normalize(it).contains(needle)
+                }
+            } == true
 
     private fun sort(
         recipes: List<RecipeEntity>,
         sort: RecipeSort,
         nutrition: Map<Long, NutritionValues>
     ): List<RecipeEntity> {
-        val byName = compareBy(collator()) { recipe: RecipeEntity -> recipe.name }
+        val spanish = locale().language.equals("es", ignoreCase = true)
+        val byName = compareBy(collator()) { recipe: RecipeEntity -> recipe.displayName(spanish) }
         return when (sort) {
             RecipeSort.NAME_ASC -> recipes.sortedWith(byName)
             RecipeSort.NAME_DESC -> recipes.sortedWith(byName.reversed())

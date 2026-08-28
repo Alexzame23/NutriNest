@@ -65,6 +65,7 @@ fun ProfilesScreen(
     viewModel: ProfilesViewModel = viewModel(factory = ProfilesViewModel.Factory)
 ) {
     val profiles by viewModel.profiles.collectAsState()
+    val operationFailed by viewModel.operationFailed.collectAsState()
     var pendingDelete by remember { mutableStateOf<ProfileEntity?>(null) }
 
     Scaffold(
@@ -147,6 +148,19 @@ fun ProfilesScreen(
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) {
                     Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (operationFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissOperationError,
+            title = { Text(stringResource(R.string.error_operation_title)) },
+            text = { Text(stringResource(R.string.error_operation_failed)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissOperationError) {
+                    Text(stringResource(R.string.action_done))
                 }
             }
         )

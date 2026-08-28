@@ -16,6 +16,10 @@
     <string name="action_more">Más opciones</string>
     <string name="action_save_anyway">Guardar igualmente</string>
     <string name="action_ok">Aceptar</string>
+    <string name="error_save_title">No se pudo guardar</string>
+    <string name="error_save_failed">Se produjo un error al guardar. Los cambios siguen aquí; inténtalo de nuevo.</string>
+    <string name="error_operation_title">Algo ha salido mal</string>
+    <string name="error_operation_failed">No se pudo completar el cambio. Inténtalo de nuevo.</string>
     <string name="action_add_photo">Añadir foto</string>
     <string name="unit_grams">g</string>
     <string name="unit_kcal">kcal</string>
@@ -65,6 +69,7 @@
     <string name="recipes_favorite_remove">Quitar de favoritas</string>
     <plurals name="recipes_count">
         <item quantity="one">%1$d receta</item>
+        <item quantity="many">%1$d recetas</item>
         <item quantity="other">%1$d recetas</item>
     </plurals>
 
@@ -91,6 +96,7 @@
     <string name="recipe_delete_blocked_body">%1$s está planificada en un menú semanal. Quítala del menú primero.</string>
     <plurals name="recipe_ingredients_count">
         <item quantity="one">%1$d ingrediente</item>
+        <item quantity="many">%1$d ingredientes</item>
         <item quantity="other">%1$d ingredientes</item>
     </plurals>
 
@@ -126,6 +132,7 @@
     <string name="ingredients_attribution_title">Sobre estos datos</string>
     <plurals name="ingredients_count">
         <item quantity="one">%1$d ingrediente</item>
+        <item quantity="many">%1$d ingredientes</item>
         <item quantity="other">%1$d ingredientes</item>
     </plurals>
 
@@ -257,6 +264,7 @@
     <string name="validation_starch_exceeds_carbs">El almidón (%1$s g) no puede superar los carbohidratos (%2$s g).</string>
     <string name="validation_kcal_implausible">Las calorías no pueden superar %1$s por 100 g: la grasa pura son 884.</string>
     <string name="validation_serving_size_invalid">La ración debe estar entre 0 y 5000 g.</string>
+    <string name="validation_portion_size_invalid">Cada porción necesita una etiqueta y un peso entre 0 y 5000 g.</string>
     <string name="validation_density_invalid">La densidad debería estar entre 0,1 y 2,5 g por ml.</string>
     <string name="validation_duplicate_name">Ya existe un ingrediente llamado «%1$s».</string>
     <string name="validation_similar_name">Se parece a %1$s. ¿Es un duplicado?</string>
@@ -282,11 +290,15 @@
     <string name="create_recipe_name">Nombre de la receta *</string>
     <string name="create_recipe_category">Categoría *</string>
     <string name="create_recipe_folder">Carpeta</string>
+    <string name="create_recipe_no_folder">Sin carpeta</string>
+    <string name="create_recipe_new_folder">Añadir carpeta nueva</string>
+    <string name="create_recipe_new_folder_name">Nombre de la carpeta</string>
     <string name="create_recipe_nutrition">Nutrición</string>
     <string name="create_recipe_add_ingredient">Añadir ingrediente</string>
     <string name="create_recipe_add_step">Añadir paso</string>
     <string name="create_recipe_new_ingredient">Crear un ingrediente</string>
-    <string name="create_recipe_quantity">Cantidad (gramos)</string>
+    <string name="create_recipe_quantity">Cantidad (%1$s)</string>
+    <string name="create_recipe_image_framing">Encuadre de la foto</string>
     <string name="create_recipe_step_hint">Describe este paso…</string>
     <string name="create_recipe_step_photo">Añadir foto al paso %1$d</string>
     <string name="create_recipe_remove_step">Quitar el paso %1$d</string>
@@ -294,6 +306,7 @@
     <string name="recipe_error_no_ingredients">Añade al menos un ingrediente antes de guardar.</string>
     <string name="recipe_error_no_steps">Añade al menos un paso de preparación antes de guardar.</string>
     <string name="recipe_error_duplicate_name">Ya existe una receta con ese nombre. Elige otro.</string>
+    <string name="recipe_error_invalid_quantity">Todas las cantidades deben ser números positivos válidos.</string>
 
     <!-- ── Menú semanal ───────────────────────────────────────────── -->
     <string name="weekly_menu_title">Menú semanal</string>
@@ -380,8 +393,28 @@
     <string name="menu_config_avoid_recent_note">Se omite automáticamente si dejara muy pocas recetas</string>
     <string name="menu_config_exclude_categories">Excluir categorías</string>
     <string name="menu_config_exclude_ingredients">Excluir categorías de ingredientes</string>
-    <string name="menu_config_only_folders">Usar solo estas carpetas</string>
-    <string name="menu_config_exclude_recipes">Excluir recetas concretas</string>
+    <string name="menu_config_only_folders">Recetarios</string>
+    <string name="menu_config_recipe_books_note">Elige uno, varios o todos los recetarios y ajusta las recetas de cada uno.</string>
+    <string name="menu_config_personal_recipes">Recetas sin recetario</string>
+    <string name="menu_config_select_all_books">Seleccionar todos</string>
+    <string name="menu_config_deselect_all_books">Deseleccionar todos</string>
+    <string name="menu_config_enable_all">Activar todas</string>
+    <string name="menu_config_disable_all">Desactivar todas</string>
+    <string name="menu_config_recipe_search">Buscar recetas</string>
+    <string name="menu_config_favorites_only">Favoritas</string>
+    <plurals name="menu_config_enabled_count">
+        <item quantity="one">%1$d de %2$d receta activada para generar menús</item>
+        <item quantity="other">%1$d de %2$d recetas activadas para generar menús</item>
+    </plurals>
+    <plurals name="menu_config_book_enabled_count">
+        <item quantity="one">%1$d de %2$d activada</item>
+        <item quantity="other">%1$d de %2$d activadas</item>
+    </plurals>
+    <plurals name="menu_config_variety_warning">
+        <item quantity="one">Solo hay %1$d receta activada. Activa al menos %2$d o aumenta las repeticiones para generar una semana variada.</item>
+        <item quantity="other">Solo hay %1$d recetas activadas. Activa al menos %2$d o aumenta las repeticiones para generar una semana variada.</item>
+    </plurals>
+    <string name="menu_config_no_recipe_matches">Ninguna receta coincide con la búsqueda y los filtros de tipo de comida.</string>
     <string name="menu_config_locked_meals">Comidas fijadas</string>
     <string name="menu_config_locked_meals_note">Fija una receta a días y comidas concretos: el generador planificará alrededor.</string>
     <string name="menu_config_add_lock">Fijar una comida</string>
@@ -390,9 +423,18 @@
     <string name="menu_config_days">Días</string>
     <string name="menu_config_meal">Comida</string>
     <string name="menu_config_recipe">Receta</string>
+    <string name="menu_config_lock_choose_recipe">Elegir una receta</string>
+    <string name="menu_config_lock_recipe_picker_title">Elegir una receta</string>
+    <string name="menu_config_lock_all_books">Todos los recetarios</string>
+    <string name="menu_config_lock_meal_type">Tipo de comida</string>
+    <plurals name="menu_config_lock_recipe_results">
+        <item quantity="one">%1$d receta encontrada</item>
+        <item quantity="other">%1$d recetas encontradas</item>
+    </plurals>
     <string name="menu_error_no_profiles">Crea antes al menos un perfil: el menú se personaliza según las calorías objetivo de cada persona.</string>
     <string name="menu_error_no_matching_recipes">Ninguna receta coincide con los filtros. Relaja las exclusiones o añade más recetas.</string>
     <string name="menu_error_not_enough_recipes">No hay recetas suficientes para llenar la semana con el límite de repeticiones actual. Súbelo o añade más recetas.</string>
+    <string name="menu_error_save_failed">No se pudo guardar el menú. Comprueba el almacenamiento disponible e inténtalo de nuevo.</string>
 
     <!-- ── Lista de la compra ─────────────────────────────────────── -->
     <!-- ── Ingesta puntual ────────────────────────────────────────── -->
@@ -497,7 +539,7 @@
 
     <!-- ── Notificaciones ─────────────────────────────────────────── -->
     <string name="notification_channel_name">Recordatorios de planificación</string>
-    <string name="notification_channel_detail">Recordatorio de fin de semana para planificar la semana siguiente</string>
+    <string name="notification_channel_detail">Recordatorio de los viernes para planificar la semana siguiente</string>
     <string name="notification_title">Planifica el menú de la semana que viene</string>
     <string name="notification_body">Dedica un minuto a generar el plan de comidas y la lista de la compra.</string>
 </resources>

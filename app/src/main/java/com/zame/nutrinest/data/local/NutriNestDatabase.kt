@@ -60,7 +60,7 @@ import com.zame.nutrinest.util.TextNormalizer
         ShoppingItemEntity::class,
         IntakeEntryEntity::class
     ],
-    version = 6,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(ProfileConverters::class, MenuConverters::class)
@@ -130,6 +130,73 @@ abstract class NutriNestDatabase : RoomDatabase() {
         /** v3 → v4: weekly menu planner tables. */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // v2 -> v3 had to add weightLossRate with a temporary SQL
+                // default. Room's entity has no database default, so normalize
+                // the table while preserving both profiles and weight history.
+                db.execSQL(
+                    """
+                    CREATE TABLE `_new_profiles` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `dateOfBirth` INTEGER NOT NULL,
+                        `sex` TEXT NOT NULL,
+                        `heightCm` REAL NOT NULL,
+                        `weightKg` REAL NOT NULL,
+                        `bodyFatPercent` REAL,
+                        `activityLevel` TEXT NOT NULL,
+                        `goal` TEXT NOT NULL,
+                        `weightLossRate` TEXT NOT NULL,
+                        `formula` TEXT NOT NULL,
+                        `unitSystem` TEXT NOT NULL,
+                        `dietaryPreferences` TEXT,
+                        `allergies` TEXT,
+                        `colorIndex` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `remoteId` TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `_new_profiles` (
+                        `id`, `name`, `dateOfBirth`, `sex`, `heightCm`, `weightKg`,
+                        `bodyFatPercent`, `activityLevel`, `goal`, `weightLossRate`,
+                        `formula`, `unitSystem`, `dietaryPreferences`, `allergies`,
+                        `colorIndex`, `createdAt`, `remoteId`
+                    ) SELECT
+                        `id`, `name`, `dateOfBirth`, `sex`, `heightCm`, `weightKg`,
+                        `bodyFatPercent`, `activityLevel`, `goal`, `weightLossRate`,
+                        `formula`, `unitSystem`, `dietaryPreferences`, `allergies`,
+                        `colorIndex`, `createdAt`, `remoteId`
+                    FROM `profiles`
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE TABLE `_weight_entries_backup` AS SELECT * FROM `weight_entries`"
+                )
+                db.execSQL("DROP TABLE `weight_entries`")
+                db.execSQL("DROP TABLE `profiles`")
+                db.execSQL("ALTER TABLE `_new_profiles` RENAME TO `profiles`")
+                db.execSQL(
+                    """
+                    CREATE TABLE `weight_entries` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `profileId` INTEGER NOT NULL,
+                        `weightKg` REAL NOT NULL,
+                        `recordedAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "INSERT INTO `weight_entries` SELECT * FROM `_weight_entries_backup`"
+                )
+                db.execSQL("DROP TABLE `_weight_entries_backup`")
+                db.execSQL(
+                    "CREATE INDEX `index_weight_entries_profileId` " +
+                        "ON `weight_entries` (`profileId`)"
+                )
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `weekly_menus` (
@@ -240,17 +307,8 @@ abstract class NutriNestDatabase : RoomDatabase() {
         /**
          * v5 → v6: per-person menus.
          *
-         * A planned meal stops being one row for the whole household. It gains
-         * a `profileId` (null = shared, as every existing row is), a `course`
-         * so one slot can hold a first course, a main and a dessert, and a
-         * nullable `recipeId` for free slots — which is the one change SQLite
-         * cannot make in place, so `planned_meals` is rebuilt and copied
-         * across. Everything the user already had comes with it: menus keep
-         * their meals, meals keep their locks, and the shopping lists hanging
-         * off them are never touched.
-         *
-         * Two tables arrive alongside: how each profile splits their day, and
-         * the ad-hoc intake log that re-portions the rest of it.
+         * Existing meals remain shared, while the new schema also supports
+         * profile-specific meals, courses, free slots, and intake tracking.
          */
         internal val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -262,22 +320,19 @@ abstract class NutriNestDatabase : RoomDatabase() {
         }
 
         private fun addMenuScopeColumns(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "ALTER TABLE `weekly_menus` ADD COLUMN `scope` TEXT NOT NULL DEFAULT 'SHARED'"
-            )
-            db.execSQL(
-                "ALTER TABLE `weekly_menus` ADD COLUMN `coursesSpec` TEXT NOT NULL DEFAULT ''"
-            )
+            if (!columnExists(db, "weekly_menus", "scope")) {
+                db.execSQL(
+                    "ALTER TABLE `weekly_menus` ADD COLUMN `scope` TEXT NOT NULL DEFAULT 'SHARED'"
+                )
+            }
+            if (!columnExists(db, "weekly_menus", "coursesSpec")) {
+                db.execSQL(
+                    "ALTER TABLE `weekly_menus` ADD COLUMN `coursesSpec` TEXT NOT NULL DEFAULT ''"
+                )
+            }
         }
 
-        /**
-         * Rebuilds `planned_meals` so `recipeId` can be null.
-         *
-         * Migrations run before Room turns foreign keys on for the connection,
-         * so dropping the old table does not cascade into `meal_portions`;
-         * the portions are left exactly where they are and re-attach to the
-         * rebuilt table, which keeps the same row ids.
-         */
+        /** Rebuilds `planned_meals` so a free slot may have no recipe. */
         private fun rebuildPlannedMeals(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -301,7 +356,6 @@ abstract class NutriNestDatabase : RoomDatabase() {
                 )
                 """.trimIndent()
             )
-            // Everything planned so far was one dish shared by everyone.
             db.execSQL(
                 """
                 INSERT INTO `planned_meals_new`
@@ -317,17 +371,19 @@ abstract class NutriNestDatabase : RoomDatabase() {
             listOf("menuId", "recipeId", "profileId").forEach {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_planned_meals_$it` " +
-                            "ON `planned_meals` (`$it`)"
+                        "ON `planned_meals` (`$it`)"
                 )
             }
         }
 
         /** Existing portions are, by definition, exactly what was planned. */
         private fun addPortionBaseFactor(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                "ALTER TABLE `meal_portions` ADD COLUMN `baseFactor` REAL NOT NULL DEFAULT 0"
-            )
-            db.execSQL("UPDATE `meal_portions` SET `baseFactor` = `factor`")
+            if (!columnExists(db, "meal_portions", "baseFactor")) {
+                db.execSQL(
+                    "ALTER TABLE `meal_portions` ADD COLUMN `baseFactor` REAL NOT NULL DEFAULT 0"
+                )
+                db.execSQL("UPDATE `meal_portions` SET `baseFactor` = `factor`")
+            }
         }
 
         private fun createPerPersonTables(db: SupportSQLiteDatabase) {
@@ -364,8 +420,74 @@ abstract class NutriNestDatabase : RoomDatabase() {
             )
             db.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_intake_entries_profileId_dayStart` " +
-                        "ON `intake_entries` (`profileId`, `dayStart`)"
+                    "ON `intake_entries` (`profileId`, `dayStart`)"
             )
+        }
+
+        /**
+         * Keeps recipe presentation choices with the recipe while retaining
+         * grams as the canonical calculation unit. Also removes the unsuitable
+         * human-milk reference row when it has never been used by the person.
+         */
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Some pre-release v6 databases ran an incomplete per-person
+                // migration. Finish it here so those installs can recover.
+                if (!tableExists(db, "profile_meal_plans")) {
+                    addMenuScopeColumns(db)
+                    rebuildPlannedMeals(db)
+                    addPortionBaseFactor(db)
+                    createPerPersonTables(db)
+                }
+                if (!columnExists(db, "recipes", "coverImageCrop")) {
+                    db.execSQL(
+                        "ALTER TABLE `recipes` ADD COLUMN `coverImageCrop` " +
+                            "TEXT NOT NULL DEFAULT 'CENTER'"
+                    )
+                }
+                if (!columnExists(db, "recipe_ingredients", "quantityUnit")) {
+                    db.execSQL(
+                        "ALTER TABLE `recipe_ingredients` ADD COLUMN `quantityUnit` " +
+                            "TEXT NOT NULL DEFAULT 'GRAM'"
+                    )
+                }
+                // Do not discard a user's historic recipe or shopping entry.
+                // Referenced legacy rows are hidden from ingredient browsing.
+                db.execSQL(
+                    "DELETE FROM `ingredients` WHERE `sourceKey` = 'BEDCA:2494' " +
+                        "AND NOT EXISTS (SELECT 1 FROM `recipe_ingredients` " +
+                        "WHERE `ingredientId` = `ingredients`.`id`) " +
+                        "AND NOT EXISTS (SELECT 1 FROM `shopping_items` " +
+                        "WHERE `ingredientId` = `ingredients`.`id`)"
+                )
+            }
+        }
+
+        /** v7 → v8: bilingual built-in recipe titles and instructions. */
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                if (!columnExists(db, "recipes", "nameEs")) {
+                    db.execSQL("ALTER TABLE `recipes` ADD COLUMN `nameEs` TEXT")
+                }
+                if (!columnExists(db, "recipe_steps", "textEs")) {
+                    db.execSQL("ALTER TABLE `recipe_steps` ADD COLUMN `textEs` TEXT")
+                }
+            }
+        }
+
+        private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
+            db.query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$table'"
+            ).use { it.moveToFirst() }
+
+        private fun columnExists(
+            db: SupportSQLiteDatabase,
+            table: String,
+            column: String
+        ): Boolean = db.query("PRAGMA table_info(`$table`)").use { cursor ->
+            val nameIndex = cursor.getColumnIndexOrThrow("name")
+            generateSequence { if (cursor.moveToNext()) cursor.getString(nameIndex) else null }
+                .any { it == column }
         }
 
         private fun addIngredientColumns(db: SupportSQLiteDatabase) {
@@ -589,7 +711,8 @@ abstract class NutriNestDatabase : RoomDatabase() {
         internal fun build(appContext: Context): NutriNestDatabase =
             Room.databaseBuilder(appContext, NutriNestDatabase::class.java, "nutrinest.db")
                 .addMigrations(
-                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
                 )
                 .addCallback(FoodImportCallback(appContext))
                 .build()
@@ -607,6 +730,7 @@ abstract class NutriNestDatabase : RoomDatabase() {
         override fun onOpen(db: SupportSQLiteDatabase) {
             super.onOpen(db)
             FoodDatabaseImporter.importIfNeeded(context, db)
+            BuiltInRecipeSeeder.seedIfNeeded(db)
         }
     }
 }

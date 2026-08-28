@@ -4,6 +4,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zame.nutrinest.data.local.entity.FoodDatasetMetaEntity
 import com.zame.nutrinest.data.local.entity.IngredientCategories
+import com.zame.nutrinest.data.local.entity.RecipeBooks
+import com.zame.nutrinest.data.local.entity.RecipeCategories
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -116,8 +118,51 @@ class FoodImportTest {
         assertNotNull(reference.meta(FoodDatasetMetaEntity.DATASET_VERSION))
         assertTrue(
             "BEDCA must be credited wherever its figures are shown",
-            reference.attribution()?.contains("BEDCA") == true
+            reference.meta(FoodDatasetMetaEntity.ATTRIBUTION)?.contains("BEDCA") == true
         )
+    }
+
+    @Test
+    fun installsTheBedcaBackedStarterRecipeBooks() = runBlocking {
+        val recipes = database.recipeDao().observeAll().first()
+        val builtIns = recipes.filter { it.isBuiltIn }
+
+        assertEquals(250, builtIns.size)
+        assertEquals(RecipeBooks.BUILT_IN.toSet(), builtIns.mapNotNull { it.folder }.toSet())
+        assertTrue(
+            "each book should meet the expanded meal-type targets",
+            RecipeBooks.BUILT_IN.all { book ->
+                builtIns.count {
+                    it.folder == book && it.category == RecipeCategories.BREAKFAST
+                } >= 10 && builtIns.count {
+                    it.folder == book && it.category == RecipeCategories.MAIN_DISH
+                } >= 50 && builtIns.count {
+                    it.folder == book && it.category == RecipeCategories.DESSERT
+                } >= 10
+            }
+        )
+        builtIns.forEach { recipe ->
+            assertTrue("${recipe.name} has no Spanish name", !recipe.nameEs.isNullOrBlank())
+            val ingredients = database.recipeDao().observeIngredientsOf(recipe.id).first()
+            assertTrue("${recipe.name} has no ingredients", ingredients.isNotEmpty())
+            assertTrue(
+                "${recipe.name} contains a non-BEDCA ingredient",
+                ingredients.all { it.ingredient.sourceKey?.startsWith("BEDCA:") == true }
+            )
+            if (recipe.folder == RecipeBooks.LOW_CALORIE) {
+                val kcal = ingredients.sumOf { it.nutrition.kcal }
+                assertTrue("${recipe.name} is not lower calorie: $kcal kcal", kcal < 600.0)
+            }
+            val withSteps = database.recipeDao().observeRecipeWithSteps(recipe.id).first()
+            assertTrue(
+                "${recipe.name} needs complete bilingual instructions",
+                withSteps?.steps?.let { steps ->
+                    steps.size >= 2 && steps.all {
+                        it.text.isNotBlank() && !it.textEs.isNullOrBlank()
+                    }
+                } == true
+            )
+        }
     }
 
     @Test
@@ -130,12 +175,56 @@ class FoodImportTest {
     }
 
     @Test
+    fun excludesHumanMilkFromTheCatalogue() = runBlocking {
+        val ingredients = database.ingredientDao().observeAll().first()
+        assertTrue(ingredients.none { it.sourceKey == "BEDCA:2494" })
+    }
+
+    @Test
     fun reopeningDoesNotImportTwice() = runBlocking {
         val before = database.ingredientDao().count()
+        val recipesBefore = database.recipeDao().observeAll().first().size
         database.close()
 
         database = NutriNestDatabase.build(context)
         assertEquals(before, database.ingredientDao().count())
+        assertEquals(recipesBefore, database.recipeDao().observeAll().first().size)
+    }
+
+    @Test
+    fun libraryUpgradeAddsTranslationsAndDetailedStepsInPlace() = runBlocking {
+        val original = database.recipeDao().observeAll().first().first { it.isBuiltIn }
+        val sqlite = database.openHelper.writableDatabase
+        sqlite.execSQL(
+            "UPDATE recipes SET nameEs = NULL WHERE id = ?",
+            arrayOf<Any>(original.id)
+        )
+        sqlite.execSQL(
+            "DELETE FROM recipe_steps WHERE recipeId = ?",
+            arrayOf<Any>(original.id)
+        )
+        sqlite.execSQL(
+            "INSERT INTO recipe_steps (recipeId, position, text) VALUES (?, 0, 'Old step')",
+            arrayOf<Any>(original.id)
+        )
+        sqlite.execSQL(
+            "UPDATE food_dataset_meta SET value = '2' " +
+                "WHERE `key` = 'built_in_recipe_library_version'"
+        )
+        database.close()
+
+        database = NutriNestDatabase.build(context)
+        val upgraded = database.recipeDao().observeRecipeWithSteps(original.id).first()
+        assertNotNull(upgraded)
+        assertTrue(!upgraded?.recipe?.nameEs.isNullOrBlank())
+        assertTrue(
+            upgraded?.steps?.let { steps ->
+                steps.size >= 2 && steps.all {
+                    it.text.isNotBlank() && !it.textEs.isNullOrBlank()
+                }
+            } == true
+        )
+        assertEquals(250, database.recipeDao().observeAll().first().count { it.isBuiltIn })
     }
 
     private companion object {

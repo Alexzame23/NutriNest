@@ -1,5 +1,6 @@
 package com.zame.nutrinest.data.local
 
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -117,12 +118,12 @@ class MigrationTest {
     }
 
     /**
-     * v5 → v6 rebuilds `planned_meals` so a free slot can have no recipe. The
+     * v5 → v7 rebuilds `planned_meals` so a free slot can have no recipe. The
      * rebuild is the risky part: portions hang off those rows by id, so the
      * ids have to survive it along with everything the user planned.
      */
     @Test
-    fun migrate5To6_keepsMenusLocksPortionsAndTheShoppingList() {
+    fun migrate5To7_keepsMenusLocksPortionsAndTheShoppingList() {
         helper.createDatabase(TEST_DB, 5).use { db ->
             db.execSQL(
                 "INSERT INTO ingredients (id, name, foodType, kcal, carbs, fats, protein, " +
@@ -157,7 +158,9 @@ class MigrationTest {
         }
 
         val db = helper.runMigrationsAndValidate(
-            TEST_DB, 6, true, NutriNestDatabase.MIGRATION_5_6
+            TEST_DB, 7, false,
+            NutriNestDatabase.MIGRATION_5_6,
+            NutriNestDatabase.MIGRATION_6_7
         )
 
         db.query(
@@ -207,6 +210,45 @@ class MigrationTest {
         db.query("SELECT COUNT(*) FROM planned_meals WHERE recipeId IS NULL").use {
             it.moveToFirst()
             assertEquals(1, it.getInt(0))
+        }
+    }
+
+    @Test
+    fun migrate7To8_keepsRecipesAndAddsOptionalSpanishText() {
+        helper.createDatabase(TEST_DB, 7).use { db ->
+            db.execSQL(
+                "INSERT INTO recipes (id, name, category, folder, coverImageCrop, " +
+                    "createdAt, isFavorite) VALUES " +
+                    "(1, 'Family soup', 'Main Dish', 'My recipes', 'CENTER', 10, 1)"
+            )
+            db.execSQL(
+                "INSERT INTO recipe_steps (id, recipeId, position, text) " +
+                    "VALUES (1, 1, 0, 'Simmer gently')"
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(
+            TEST_DB, 8, true, NutriNestDatabase.MIGRATION_7_8
+        )
+
+        db.query("SELECT name, nameEs, isFavorite FROM recipes WHERE id = 1").use {
+            it.moveToFirst()
+            assertEquals("Family soup", it.getString(0))
+            assertTrue("a user recipe needs no fabricated translation", it.isNull(1))
+            assertEquals(1, it.getInt(2))
+        }
+        db.query("SELECT text, textEs FROM recipe_steps WHERE id = 1").use {
+            it.moveToFirst()
+            assertEquals("Simmer gently", it.getString(0))
+            assertTrue("a user step needs no fabricated translation", it.isNull(1))
+        }
+
+        // The new nullable columns can hold the bundled bilingual library.
+        db.execSQL("UPDATE recipes SET nameEs = 'Sopa familiar' WHERE id = 1")
+        db.execSQL("UPDATE recipe_steps SET textEs = 'Cuece suavemente' WHERE id = 1")
+        db.query("SELECT nameEs FROM recipes WHERE id = 1").use {
+            it.moveToFirst()
+            assertEquals("Sopa familiar", it.getString(0))
         }
     }
 }

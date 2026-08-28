@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">NutriNest</string>
+    <string name="app_name" translatable="false">NutriNest</string>
 
     <!-- ── Common ─────────────────────────────────────────────────── -->
     <string name="action_back">Back</string>
@@ -17,6 +17,10 @@
     <string name="action_more">More options</string>
     <string name="action_save_anyway">Save anyway</string>
     <string name="action_ok">OK</string>
+    <string name="error_save_title">Couldn\'t save</string>
+    <string name="error_save_failed">Something went wrong while saving. Your changes are still here; please try again.</string>
+    <string name="error_operation_title">Something went wrong</string>
+    <string name="error_operation_failed">The change could not be completed. Please try again.</string>
     <string name="action_add_photo">Add photo</string>
     <string name="unit_grams">g</string>
     <string name="unit_kcal">kcal</string>
@@ -258,6 +262,7 @@
     <string name="validation_starch_exceeds_carbs">Starch (%1$s g) can\'t exceed carbs (%2$s g).</string>
     <string name="validation_kcal_implausible">Calories can\'t exceed %1$s per 100 g — pure fat is 884.</string>
     <string name="validation_serving_size_invalid">Serving size must be between 0 and 5000 g.</string>
+    <string name="validation_portion_size_invalid">Each portion needs a label and a weight between 0 and 5000 g.</string>
     <string name="validation_density_invalid">Density should be between 0.1 and 2.5 g per ml.</string>
     <string name="validation_duplicate_name">An ingredient called \"%1$s\" already exists.</string>
     <string name="validation_similar_name">Similar to %1$s — is this a duplicate?</string>
@@ -283,11 +288,15 @@
     <string name="create_recipe_name">Recipe name *</string>
     <string name="create_recipe_category">Category *</string>
     <string name="create_recipe_folder">Folder</string>
+    <string name="create_recipe_no_folder">No folder</string>
+    <string name="create_recipe_new_folder">Add new folder</string>
+    <string name="create_recipe_new_folder_name">New folder name</string>
     <string name="create_recipe_nutrition">Nutrition</string>
     <string name="create_recipe_add_ingredient">Add ingredient</string>
     <string name="create_recipe_add_step">Add step</string>
     <string name="create_recipe_new_ingredient">Create new ingredient</string>
-    <string name="create_recipe_quantity">Quantity (grams)</string>
+    <string name="create_recipe_quantity">Quantity (%1$s)</string>
+    <string name="create_recipe_image_framing">Photo framing</string>
     <string name="create_recipe_step_hint">Describe this step…</string>
     <string name="create_recipe_step_photo">Add photo to step %1$d</string>
     <string name="create_recipe_remove_step">Remove step %1$d</string>
@@ -295,6 +304,7 @@
     <string name="recipe_error_no_ingredients">Add at least one ingredient before saving.</string>
     <string name="recipe_error_no_steps">Add at least one preparation step before saving.</string>
     <string name="recipe_error_duplicate_name">A recipe with that name already exists. Choose a different one.</string>
+    <string name="recipe_error_invalid_quantity">Every ingredient quantity must be a valid positive amount.</string>
 
     <!-- ── Weekly menu ────────────────────────────────────────────── -->
     <string name="weekly_menu_title">Weekly Menu</string>
@@ -381,8 +391,28 @@
     <string name="menu_config_avoid_recent_note">Skipped automatically if it would leave too few recipes</string>
     <string name="menu_config_exclude_categories">Exclude categories</string>
     <string name="menu_config_exclude_ingredients">Exclude ingredient categories</string>
-    <string name="menu_config_only_folders">Use only these folders</string>
-    <string name="menu_config_exclude_recipes">Exclude specific recipes</string>
+    <string name="menu_config_only_folders">Recipe books</string>
+    <string name="menu_config_recipe_books_note">Choose one, several or all books, then fine-tune the recipes inside each one.</string>
+    <string name="menu_config_personal_recipes">Recipes without a book</string>
+    <string name="menu_config_select_all_books">Select all books</string>
+    <string name="menu_config_deselect_all_books">Deselect all</string>
+    <string name="menu_config_enable_all">Enable all</string>
+    <string name="menu_config_disable_all">Disable all</string>
+    <string name="menu_config_recipe_search">Search recipes</string>
+    <string name="menu_config_favorites_only">Favorites</string>
+    <plurals name="menu_config_enabled_count">
+        <item quantity="one">%1$d of %2$d recipe enabled for menu generation</item>
+        <item quantity="other">%1$d of %2$d recipes enabled for menu generation</item>
+    </plurals>
+    <plurals name="menu_config_book_enabled_count">
+        <item quantity="one">%1$d of %2$d enabled</item>
+        <item quantity="other">%1$d of %2$d enabled</item>
+    </plurals>
+    <plurals name="menu_config_variety_warning">
+        <item quantity="one">Only %1$d recipe is enabled. Enable at least %2$d or increase the repeat limit to generate a varied week.</item>
+        <item quantity="other">Only %1$d recipes are enabled. Enable at least %2$d or increase the repeat limit to generate a varied week.</item>
+    </plurals>
+    <string name="menu_config_no_recipe_matches">No recipes match these search and meal-type filters.</string>
     <string name="menu_config_locked_meals">Locked meals</string>
     <string name="menu_config_locked_meals_note">Fix a recipe to specific days and meals — the generator plans around them.</string>
     <string name="menu_config_add_lock">Add locked meal</string>
@@ -391,9 +421,18 @@
     <string name="menu_config_days">Days</string>
     <string name="menu_config_meal">Meal</string>
     <string name="menu_config_recipe">Recipe</string>
+    <string name="menu_config_lock_choose_recipe">Choose a recipe</string>
+    <string name="menu_config_lock_recipe_picker_title">Choose a recipe</string>
+    <string name="menu_config_lock_all_books">All books</string>
+    <string name="menu_config_lock_meal_type">Meal type</string>
+    <plurals name="menu_config_lock_recipe_results">
+        <item quantity="one">%1$d recipe found</item>
+        <item quantity="other">%1$d recipes found</item>
+    </plurals>
     <string name="menu_error_no_profiles">Create at least one profile first — the menu is personalized to each person\'s calorie targets.</string>
     <string name="menu_error_no_matching_recipes">No recipes match the selected filters. Relax the exclusions or add more recipes.</string>
     <string name="menu_error_not_enough_recipes">Not enough recipes to fill the week with the current repeat limit. Increase the limit or add more recipes.</string>
+    <string name="menu_error_save_failed">The menu could not be saved. Check the available storage and try again.</string>
 
     <!-- ── Ad-hoc intake ──────────────────────────────────────────── -->
     <string name="intake_title">Eaten today</string>
@@ -498,7 +537,7 @@
 
     <!-- ── Notifications ──────────────────────────────────────────── -->
     <string name="notification_channel_name">Menu planning reminders</string>
-    <string name="notification_channel_detail">Weekend reminder to plan next week\'s meals</string>
+    <string name="notification_channel_detail">Friday reminder to plan next week\'s meals</string>
     <string name="notification_title">Plan next week\'s menu</string>
     <string name="notification_body">Take a minute to generate next week\'s meal plan and shopping list.</string>
 </resources>

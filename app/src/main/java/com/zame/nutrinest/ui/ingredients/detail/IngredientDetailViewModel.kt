@@ -1,5 +1,6 @@
 package com.zame.nutrinest.ui.ingredients.detail
 
+import android.app.Application
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -20,6 +21,7 @@ import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeUsage
 import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
+import com.zame.nutrinest.util.ImageStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -52,7 +54,8 @@ data class IngredientDetailUiState(
     val attribution: String? = null,
     val isLoading: Boolean = true,
     val deleted: Boolean = false,
-    val deleteBlocked: Boolean = false
+    val deleteBlocked: Boolean = false,
+    val operationFailed: Boolean = false
 ) {
     /** Macros scaled to whatever basis the user picked. */
     val scaledNutrition: NutritionValues
@@ -64,6 +67,7 @@ data class IngredientDetailUiState(
 }
 
 class IngredientDetailViewModel(
+    private val app: Application,
     private val repository: IngredientRepository,
     referenceRepository: FoodReferenceRepository,
     savedStateHandle: SavedStateHandle
@@ -74,7 +78,11 @@ class IngredientDetailViewModel(
     private val selectedPortionId = MutableStateFlow<Long?>(null)
     private val deletion = MutableStateFlow(DeletionState())
 
-    private data class DeletionState(val deleted: Boolean = false, val blocked: Boolean = false)
+    private data class DeletionState(
+        val deleted: Boolean = false,
+        val blocked: Boolean = false,
+        val failed: Boolean = false
+    )
 
     private val attribution = referenceRepository.observeDatasetMeta()
         .map { meta -> meta.firstOrNull { it.key == FoodDatasetMetaEntity.ATTRIBUTION }?.value }
@@ -102,7 +110,8 @@ class IngredientDetailViewModel(
             attribution = credit,
             isLoading = false,
             deleted = deletionState.deleted,
-            deleteBlocked = deletionState.blocked
+            deleteBlocked = deletionState.blocked,
+            operationFailed = deletionState.failed
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IngredientDetailUiState())
 
@@ -112,7 +121,10 @@ class IngredientDetailViewModel(
 
     fun onFavoriteToggled() {
         val current = uiState.value.ingredient ?: return
-        viewModelScope.launch { repository.setFavorite(current.id, !current.isFavorite) }
+        viewModelScope.launch {
+            runCatching { repository.setFavorite(current.id, !current.isFavorite) }
+                .onFailure { deletion.value = deletion.value.copy(failed = true) }
+        }
     }
 
     /**
@@ -121,17 +133,28 @@ class IngredientDetailViewModel(
      * user cannot act on.
      */
     fun onDeleteConfirmed() {
+        val imagePath = uiState.value.ingredient?.imagePath
         viewModelScope.launch {
-            if (repository.delete(ingredientId)) {
-                deletion.value = DeletionState(deleted = true)
-            } else {
-                deletion.value = DeletionState(blocked = true)
-            }
+            runCatching { repository.delete(ingredientId) }.fold(
+                onSuccess = { deleted ->
+                    if (deleted) {
+                        ImageStorage.deleteManaged(app, imagePath)
+                        deletion.value = DeletionState(deleted = true)
+                    } else {
+                        deletion.value = DeletionState(blocked = true)
+                    }
+                },
+                onFailure = { deletion.value = DeletionState(failed = true) }
+            )
         }
     }
 
     fun dismissDeleteBlocked() {
         deletion.value = deletion.value.copy(blocked = false)
+    }
+
+    fun dismissOperationError() {
+        deletion.value = deletion.value.copy(failed = false)
     }
 
     /**
@@ -161,6 +184,7 @@ class IngredientDetailViewModel(
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as NutriNestApp
                 IngredientDetailViewModel(
+                    app,
                     app.container.ingredientRepository,
                     app.container.foodReferenceRepository,
                     createSavedStateHandle()

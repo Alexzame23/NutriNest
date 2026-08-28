@@ -25,7 +25,7 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
@@ -35,6 +35,13 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    // The app has an in-app language switcher, so both bundled locales must
+    // always be present instead of being split into on-demand resources.
+    bundle {
+        language {
+            enableSplit = false
+        }
     }
 }
 
@@ -81,3 +88,5 @@ dependencies {
     //Notifications
     implementation(libs.androidx.work.runtime)
 }
+
+android.sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")

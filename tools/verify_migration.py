@@ -175,61 +175,76 @@ def run_migration_4_5(conn: sqlite3.Connection) -> None:
 
 
 def run_migration_5_6(conn: sqlite3.Connection) -> None:
-    """v5 -> v6, replaying the Kotlin's own statements in source order.
-
-    Foreign keys are switched off around it on purpose: `planned_meals` is
-    rebuilt to make `recipeId` nullable, and Room runs migrations before it
-    turns constraints on for the connection, so on a real device the DROP does
-    not cascade into `meal_portions` either.
-    """
+    """Apply the actual v5 -> v6 statements, including duplicate cleanup."""
     source = open(DB_KT).read()
-    start = source.index("private fun addMenuScopeColumns")
-    block = source[start:source.index("private fun addIngredientColumns")]
-
-    conn.execute("PRAGMA foreign_keys = OFF")
-    for statement in extract_exec_sql(block):
-        # The planned_meals indexes are built from a list in Kotlin.
-        if "$" in statement:
-            continue
+    marker = source.index("internal val MIGRATION_5_6")
+    end = source.index("internal val MIGRATION_6_7", marker)
+    for statement in extract_exec_sql(source[marker:end]):
         conn.execute(statement)
-    for column in extract_string_list(block, 'listOf("menuId"'):
-        conn.execute(
-            f"CREATE INDEX IF NOT EXISTS `index_planned_meals_{column}`"
-            f" ON `planned_meals` (`{column}`)"
-        )
     conn.commit()
+
+
+def run_migration_6_7(conn: sqlite3.Connection) -> None:
+    """Apply the recipe presentation and quantity migration."""
+    source = open(DB_KT).read()
+    marker = source.index("internal val MIGRATION_6_7")
+    end = source.index("private fun addIngredientColumns", marker)
+    for statement in extract_exec_sql(source[marker:end]):
+        conn.execute(statement)
+    conn.commit()
+
+
+def verify_profile_rebuild() -> None:
+    """Exercise the v3 profile rebuild with actual profile and weight rows."""
+    conn = sqlite3.connect(":memory:")
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(
+        """CREATE TABLE profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL,
+        dateOfBirth INTEGER NOT NULL, sex TEXT NOT NULL, heightCm REAL NOT NULL,
+        weightKg REAL NOT NULL, bodyFatPercent REAL, activityLevel TEXT NOT NULL,
+        goal TEXT NOT NULL, formula TEXT NOT NULL, unitSystem TEXT NOT NULL,
+        dietaryPreferences TEXT, allergies TEXT, colorIndex INTEGER NOT NULL,
+        createdAt INTEGER NOT NULL, remoteId TEXT,
+        weightLossRate TEXT NOT NULL DEFAULT 'MODERATE')"""
+    )
+    conn.execute(
+        """CREATE TABLE weight_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, profileId INTEGER NOT NULL,
+        weightKg REAL NOT NULL, recordedAt INTEGER NOT NULL,
+        FOREIGN KEY(profileId) REFERENCES profiles(id) ON DELETE CASCADE)"""
+    )
+    conn.execute(
+        """INSERT INTO profiles VALUES
+        (7, 'Ana', 1, 'FEMALE', 165, 62, 24, 'MODERATE', 'MAINTAIN',
+         'AUTO', 'METRIC', 'vegetarian', 'nuts', 2, 99, 'remote-7', 'SLOW')"""
+    )
+    conn.execute("INSERT INTO weight_entries VALUES (9, 7, 61.5, 1234)")
 
+    source = open(DB_KT).read()
+    start = source.index("private val MIGRATION_3_4")
+    end = source.index("internal val MIGRATION_4_5", start)
+    for statement in extract_exec_sql(source[start:end]):
+        conn.execute(statement)
 
-def seed_v5_menu(conn: sqlite3.Connection) -> None:
-    """A week as v5 stored it: one dish per slot, shared, one of them locked."""
-    ingredient_id = conn.execute(
-        "SELECT ingredientId FROM recipe_ingredients WHERE recipeId = 1 LIMIT 1"
-    ).fetchone()[0]
-    conn.execute(
-        """
-        INSERT INTO profiles (id, name, dateOfBirth, sex, heightCm, weightKg,
-                              activityLevel, goal, formula, unitSystem, colorIndex,
-                              createdAt, weightLossRate)
-        VALUES (1, 'Ana', 0, 'FEMALE', 165.0, 60.0, 'MODERATE', 'MAINTAIN',
-                'AUTO', 'METRIC', 0, 0, 'MODERATE')
-        """
+    profile = conn.execute(
+        "SELECT id, name, dietaryPreferences, allergies, colorIndex, remoteId, weightLossRate "
+        "FROM profiles"
+    ).fetchone()
+    check("v3->v4 preserves profile metadata",
+          profile == (7, "Ana", "vegetarian", "nuts", 2, "remote-7", "SLOW"), str(profile))
+    weight = conn.execute(
+        "SELECT id, profileId, weightKg, recordedAt FROM weight_entries"
+    ).fetchone()
+    check("v3->v4 preserves weight history", weight == (9, 7, 61.5, 1234), str(weight))
+    default = next(
+        row[4] for row in conn.execute("PRAGMA table_info(profiles)")
+        if row[1] == "weightLossRate"
     )
-    conn.execute(
-        "INSERT INTO weekly_menus (id, weekStart, slotsSpec, createdAt)"
-        " VALUES (1, 1000, 'BREAKFAST:0.3,LUNCH:0.4,DINNER:0.3', 0)"
-    )
-    conn.execute(
-        "INSERT INTO planned_meals (id, menuId, dayOfWeek, slot, recipeId, isLocked, isCheatMeal)"
-        " VALUES (1, 1, 0, 'LUNCH', 1, 1, 0), (2, 1, 1, 'DINNER', 1, 0, 1)"
-    )
-    conn.execute("INSERT INTO meal_portions VALUES (1, 1, 1.5), (2, 1, 0.8)")
-    conn.execute(
-        "INSERT INTO shopping_items (id, menuId, ingredientId, grams, purchased)"
-        " VALUES (1, 1, ?, 500.0, 1)",
-        (ingredient_id,),
-    )
-    conn.commit()
+    check("v3->v4 removes the legacy SQL default", default is None, str(default))
+    check("profile rebuild leaves no foreign-key violations",
+          not conn.execute("PRAGMA foreign_key_check").fetchall())
+    conn.close()
 
 
 def _legacy_block(_: str) -> str:
@@ -249,7 +264,10 @@ def run_import(conn: sqlite3.Connection, expect_version: str) -> dict[str, tuple
     No ATTACH — that is what broke Room's per-connection invalidation tracker.
     """
     source = open(IMPORTER_KT).read()
-    substitutions = {"$IMPORTED_ID_OFFSET": str(IMPORTED_ID_OFFSET)}
+    substitutions = {
+        "$IMPORTED_ID_OFFSET": str(IMPORTED_ID_OFFSET),
+        "$HUMAN_MILK_FOOD_ID": "2494",
+    }
     statements = extract_exec_sql(source, substitutions)
     # restoreUserState issues its UPDATE through a prepared statement.
     statements += extract_sql_calls(source, "compileStatement", substitutions)
@@ -340,10 +358,11 @@ def main() -> None:
         "SELECT value FROM db_metadata WHERE key = 'dataset_version'"
     ).fetchone()[0]
     expected_foods = asset.execute(
-        "SELECT COUNT(*) FROM foods WHERE is_deprecated = 0"
+        "SELECT COUNT(*) FROM foods WHERE is_deprecated = 0 AND id != 2494"
     ).fetchone()[0]
 
     print("1. v1 fixture -> v4 -> v5")
+    verify_profile_rebuild()
     conn = build_v1(db_path)
     run_migrations_1_to_4(conn)
     check("menu planner tables exist after v3->v4",
@@ -378,6 +397,33 @@ def main() -> None:
     check("createdAt backfilled",
           conn.execute("SELECT COUNT(*) FROM ingredients WHERE createdAt = 0").fetchone()[0] == 0)
 
+    # Simulate a v5 database that acquired duplicate slots before the unique
+    # constraint existed. The migration must retain one row and still upgrade.
+    conn.execute(
+        "INSERT INTO weekly_menus (id, weekStart, slotsSpec, createdAt) "
+        "VALUES (1, 0, 'LUNCH:1.0', 0)"
+    )
+    conn.execute(
+        "INSERT INTO planned_meals "
+        "(id, menuId, dayOfWeek, slot, recipeId, isLocked, isCheatMeal) "
+        "VALUES (1, 1, 0, 'LUNCH', 1, 0, 0), (2, 1, 0, 'LUNCH', 1, 1, 0)"
+    )
+    run_migration_5_6(conn)
+    kept = conn.execute(
+        "SELECT id FROM planned_meals WHERE menuId = 1 AND dayOfWeek = 0 AND slot = 'LUNCH'"
+    ).fetchall()
+    check("v5->v6 removes duplicate meal slots before indexing", kept == [(2,)], str(kept))
+    unique_indices = {
+        row[1] for row in conn.execute("PRAGMA index_list('planned_meals')") if row[2]
+    }
+    check("v5->v6 adds the unique meal-slot index",
+          "index_planned_meals_menuId_dayOfWeek_slot" in unique_indices)
+    run_migration_6_7(conn)
+    recipe_columns = {row[1] for row in conn.execute("PRAGMA table_info(recipes)")}
+    link_columns = {row[1] for row in conn.execute("PRAGMA table_info(recipe_ingredients)")}
+    check("v6->v7 adds cover image framing", "coverImageCrop" in recipe_columns)
+    check("v6->v7 retains the selected quantity unit", "quantityUnit" in link_columns)
+
     print("\n2. import")
     tally = run_import(conn, version)
     for label, (read, written) in tally.items():
@@ -403,7 +449,8 @@ def main() -> None:
     ):
         expected = asset.execute(
             f"SELECT COUNT(*) FROM {source_table} s"
-            f" JOIN foods f ON f.id = s.food_id WHERE f.is_deprecated = 0"
+            f" JOIN foods f ON f.id = s.food_id "
+            f"WHERE f.is_deprecated = 0 AND f.id != 2494"
         ).fetchone()[0]
         actual = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
         check(f"{table} = {expected} (active foods only)", actual == expected, f"got {actual}")
@@ -411,6 +458,9 @@ def main() -> None:
           conn.execute(
               "SELECT COUNT(*) FROM ingredient_nutrients WHERE ingredientId NOT IN"
               " (SELECT id FROM ingredients)").fetchone()[0] == 0)
+    check("human milk is excluded from the catalogue",
+          conn.execute("SELECT COUNT(*) FROM ingredients WHERE sourceKey = 'BEDCA:2494'")
+          .fetchone()[0] == 0)
 
     check("dataset version recorded",
           conn.execute("SELECT value FROM food_dataset_meta WHERE key='dataset_version'")

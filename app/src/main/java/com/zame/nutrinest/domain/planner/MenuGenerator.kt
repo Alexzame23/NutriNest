@@ -7,6 +7,7 @@ import com.zame.nutrinest.data.local.entity.MealCourse
 import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.MenuScope
 import com.zame.nutrinest.data.local.entity.NutritionValues
+import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import kotlin.random.Random
@@ -51,8 +52,8 @@ data class GenerationConfig(
     /** Ingredient category keys to avoid, e.g. `IngredientCategories.FISH`. */
     val excludedIngredientCategories: Set<String> = emptySet(),
     val excludedRecipeIds: Set<Long> = emptySet(),
-    /** Empty = all folders allowed; otherwise only recipes in these folders (or no folder). */
-    val includedFolders: Set<String> = emptySet(),
+    /** null = every book; an empty set intentionally enables no recipe book. */
+    val includedFolders: Set<String?>? = null,
     val excludeRecentlyUsed: Boolean = true,
     val locks: List<MealLock> = emptyList()
 ) {
@@ -105,7 +106,8 @@ sealed class GenerationResult {
 enum class FailureReason(@StringRes val messageRes: Int) {
     NO_PROFILES(R.string.menu_error_no_profiles),
     NO_MATCHING_RECIPES(R.string.menu_error_no_matching_recipes),
-    NOT_ENOUGH_RECIPES(R.string.menu_error_not_enough_recipes)
+    NOT_ENOUGH_RECIPES(R.string.menu_error_not_enough_recipes),
+    SAVE_FAILED(R.string.menu_error_save_failed)
 }
 
 // ── Generator ────────────────────────────────────────────────────────────
@@ -145,6 +147,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
         plans: List<DailyPlan>,
         recipes: List<PlannableRecipe>,
         config: GenerationConfig,
+        profiles: List<ProfileEntity> = emptyList(),
         recentRecipeIds: Set<Long> = emptySet(),
         leftoverIngredientIds: Set<Long> = emptySet()
     ): GenerationResult {
@@ -153,11 +156,16 @@ class MenuGenerator(private val random: Random = Random.Default) {
         }
 
         // ── Filter the candidate pool ──────────────────────────────────
-        val pool = recipes.filter { candidate ->
+        val eligibleRecipes = recipes.filter { candidate ->
+            candidate.totalNutrition.kcal.isFinite() && candidate.totalNutrition.kcal > 0 &&
+                candidate.ingredients.all { it.grams.isFinite() && it.grams > 0 } &&
+                DietarySafety.recipeAllowed(candidate, profiles)
+        }
+        val pool = eligibleRecipes.filter { candidate ->
             candidate.recipe.id !in config.excludedRecipeIds &&
                 candidate.recipe.category !in config.excludedCategories &&
                 candidate.ingredientCategories.none { it in config.excludedIngredientCategories } &&
-                (config.includedFolders.isEmpty() ||
+                (config.includedFolders == null ||
                     candidate.recipe.folder in config.includedFolders) &&
                 candidate.totalNutrition.kcal > 0
         }
@@ -171,7 +179,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
             return GenerationResult.Failure(FailureReason.NO_MATCHING_RECIPES)
         }
 
-        val byId = recipes.associateBy { it.recipe.id }
+        val byId = eligibleRecipes.associateBy { it.recipe.id }
         val slots = config.slotWeights.keys.sortedBy { it.ordinal }
 
         // ── Resolve locks into a (day, slot, course, who) → recipeId map ─
@@ -190,7 +198,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
         val cheatSlots = allDaySlots
             .filterNot { it in lockedDaySlots }
             .shuffled(random)
-            .take(config.cheatMeals.coerceIn(0, allDaySlots.size))
+            .take(config.cheatMeals.coerceAtLeast(0))
             .toSet()
 
         // ── Fill the week ──────────────────────────────────────────────
@@ -214,7 +222,6 @@ class MenuGenerator(private val random: Random = Random.Default) {
 
                 if (free.isNotEmpty()) {
                     if (eating.isEmpty()) {
-                        // Nobody is planning this slot: one household placeholder.
                         meals += freeMeal(day, slot, profileId = null, cheat = householdCheat)
                     } else {
                         free.forEach {
@@ -224,10 +231,6 @@ class MenuGenerator(private val random: Random = Random.Default) {
                 }
                 if (eating.isEmpty()) continue
 
-                // Anyone with a reason to eat apart gets their own row; the
-                // rest share one. A profile-scoped lock is an override too —
-                // it says this person eats something specific, so it can't be
-                // served from the household dish.
                 val apart = eating.filter { plan ->
                     config.scope == MenuScope.INDIVIDUAL ||
                         (config.scope == MenuScope.PER_MEAL &&
@@ -256,7 +259,7 @@ class MenuGenerator(private val random: Random = Random.Default) {
                                 slot = slot,
                                 course = course,
                                 useCount = useCount,
-                                maxRepeats = config.maxRecipeRepeats,
+                                maxRepeats = config.maxRecipeRepeats.coerceAtLeast(1),
                                 leftoverIngredientIds = leftoverIngredientIds,
                                 yesterdayRecipeIds = yesterdayRecipeIds,
                                 alreadyInSlot = usedHere
@@ -315,13 +318,13 @@ class MenuGenerator(private val random: Random = Random.Default) {
         yesterdayRecipeIds: Set<Long>,
         alreadyInSlot: Set<Long>
     ): PlannableRecipe? {
-        // Hard caps first, each falling back to the wider pool rather than
-        // failing: a small recipe collection should still yield a full week.
+        // The configured repeat count is a real upper bound. If it cannot fill
+        // the week, the caller gets NOT_ENOUGH_RECIPES and can ask the user to
+        // add recipes or raise the limit.
         val candidates = pool
             .filterNot { it.recipe.id in alreadyInSlot }
             .ifEmpty { pool }
             .filter { (useCount[it.recipe.id] ?: 0) < maxRepeats }
-            .ifEmpty { pool }
             .ifEmpty { return null }
 
         return candidates.maxByOrNull { candidate ->

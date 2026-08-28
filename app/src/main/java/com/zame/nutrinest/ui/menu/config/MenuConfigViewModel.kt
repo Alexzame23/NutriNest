@@ -41,7 +41,8 @@ data class MenuConfigUiState(
     val excludedCategories: Set<String> = emptySet(),
     val excludedIngredientCategories: Set<String> = emptySet(),
     val excludedRecipeIds: Set<Long> = emptySet(),
-    val includedFolders: Set<String> = emptySet(),
+    /** null means all books; empty means the user deliberately selected none. */
+    val includedFolders: Set<String?>? = null,
     val excludeRecentlyUsed: Boolean = true,
     val locks: List<MealLock> = emptyList(),
     val isGenerating: Boolean = false,
@@ -84,6 +85,10 @@ class MenuConfigViewModel(
 
     val allFolders = recipeRepository.observeFolders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Lightweight totals for the locked-meal recipe picker. */
+    val recipeNutrition = recipeRepository.observeNutritionTotals()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /** The household. With one profile the scope options don't apply. */
     val profiles = menuRepository.observeProfiles()
@@ -147,8 +152,29 @@ class MenuConfigViewModel(
         )
     }
 
-    fun toggleFolder(folder: String) = update {
-        copy(includedFolders = includedFolders.toggle(folder))
+    fun toggleFolder(folder: String?, availableFolders: Set<String?>) = update {
+        val selected = includedFolders ?: availableFolders
+        copy(includedFolders = selected.toggle(folder))
+    }
+
+    fun selectAllFolders() = update { copy(includedFolders = null) }
+
+    fun deselectAllFolders() = update { copy(includedFolders = emptySet()) }
+
+    /** Enables or disables a recipe without changing the selected books. */
+    fun setRecipeEnabled(recipeId: Long, enabled: Boolean) = update {
+        copy(
+            excludedRecipeIds = if (enabled) excludedRecipeIds - recipeId
+            else excludedRecipeIds + recipeId
+        )
+    }
+
+    fun enableRecipes(recipeIds: Set<Long>) = update {
+        copy(excludedRecipeIds = excludedRecipeIds - recipeIds)
+    }
+
+    fun disableRecipes(recipeIds: Set<Long>) = update {
+        copy(excludedRecipeIds = excludedRecipeIds + recipeIds)
     }
 
     /** [profileId] null pins the meal for everyone; otherwise for that person. */
@@ -163,26 +189,29 @@ class MenuConfigViewModel(
     fun dismissError() = update { copy(error = null) }
 
     fun generate() {
+        if (_state.value.isGenerating) return
         val s = _state.value
         update { copy(isGenerating = true) }
         viewModelScope.launch {
-            val result = menuRepository.generate(
-                weekStart = weekStart,
-                config = GenerationConfig(
-                    slotWeights = s.slotWeights,
-                    scope = s.scope,
-                    slotCourses = s.slotCourses,
-                    overrides = s.overrides,
-                    cheatMeals = s.cheatMeals,
-                    maxRecipeRepeats = s.maxRepeats,
-                    excludedCategories = s.excludedCategories,
-                    excludedIngredientCategories = s.excludedIngredientCategories,
-                    excludedRecipeIds = s.excludedRecipeIds,
-                    includedFolders = s.includedFolders,
-                    excludeRecentlyUsed = s.excludeRecentlyUsed,
-                    locks = s.locks
+            val result = runCatching {
+                menuRepository.generate(
+                    weekStart = weekStart,
+                    config = GenerationConfig(
+                        slotWeights = s.slotWeights,
+                        scope = s.scope,
+                        slotCourses = s.slotCourses,
+                        overrides = s.overrides,
+                        cheatMeals = s.cheatMeals,
+                        maxRecipeRepeats = s.maxRepeats,
+                        excludedCategories = s.excludedCategories,
+                        excludedIngredientCategories = s.excludedIngredientCategories,
+                        excludedRecipeIds = s.excludedRecipeIds,
+                        includedFolders = s.includedFolders,
+                        excludeRecentlyUsed = s.excludeRecentlyUsed,
+                        locks = s.locks
+                    )
                 )
-            )
+            }.getOrElse { GenerationResult.Failure(FailureReason.SAVE_FAILED) }
             when (result) {
                 is GenerationResult.Success -> update { copy(isGenerating = false, done = true) }
                 is GenerationResult.Failure -> update {

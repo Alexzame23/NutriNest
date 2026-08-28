@@ -25,7 +25,11 @@ import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.domain.nutrition.IngredientValidator
 import com.zame.nutrinest.util.ImageStorage
+import com.zame.nutrinest.util.LocalizedNumbers
 import com.zame.nutrinest.util.TextNormalizer
+import com.zame.nutrinest.util.toLocalizedDoubleOrNull
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -34,7 +38,10 @@ import kotlinx.coroutines.launch
 /** A household measure being edited, held as text until it is saved. */
 data class PortionDraft(
     val label: String = "",
-    val grams: String = ""
+    val grams: String = "",
+    val labelEs: String = "",
+    val portionType: String = "PORTION",
+    val isDefault: Boolean = false
 )
 
 data class IngredientEditorUiState(
@@ -64,18 +71,20 @@ data class IngredientEditorUiState(
     /** Set when the user pressed save and only warnings stand in the way. */
     val confirmWarnings: Boolean = false,
     val saved: Boolean = false,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isSaving: Boolean = false,
+    val saveFailed: Boolean = false
 ) {
     val fieldsInError: Set<IngredientValidator.Field> get() = validation.fieldsInError()
 
     /** Energy the macros imply, offered as a one-tap fix for a mismatch. */
     val suggestedKcal: Int?
         get() {
-            val c = carbs.toDoubleOrNull() ?: return null
-            val f = fats.toDoubleOrNull() ?: return null
-            val p = protein.toDoubleOrNull() ?: return null
-            val fibre = micronutrients[NutrientTags.FIBRE]?.toDoubleOrNull() ?: 0.0
-            val alcohol = micronutrients[NutrientTags.ALCOHOL]?.toDoubleOrNull() ?: 0.0
+            val c = carbs.toLocalizedDoubleOrNull() ?: return null
+            val f = fats.toLocalizedDoubleOrNull() ?: return null
+            val p = protein.toLocalizedDoubleOrNull() ?: return null
+            val fibre = micronutrients[NutrientTags.FIBRE]?.toLocalizedDoubleOrNull() ?: 0.0
+            val alcohol = micronutrients[NutrientTags.ALCOHOL]?.toLocalizedDoubleOrNull() ?: 0.0
             return IngredientValidator.atwaterKcal(p, c, f, fibre, alcohol).toInt()
         }
 }
@@ -101,6 +110,8 @@ class IngredientEditorViewModel(
 
     /** Kept so saving can preserve the fields the form does not expose. */
     private var original: IngredientEntity? = null
+    private var originalAliases: Map<String, IngredientAliasEntity> = emptyMap()
+    private var duplicateCheckJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -127,6 +138,7 @@ class IngredientEditorViewModel(
         // A single snapshot of the relations — the form owns the values from
         // here, so observing would fight whatever the user is typing.
         val details = repository.observeDetails(ingredientId).first()
+        originalAliases = details?.aliases.orEmpty().associateBy { it.alias }
 
         update {
             copy(
@@ -148,7 +160,13 @@ class IngredientEditorViewModel(
                 densityGml = existing.densityGml?.toEditableText().orEmpty(),
                 imagePath = existing.imagePath,
                 portions = details?.portions.orEmpty().map {
-                    PortionDraft(it.labelEn, it.grams.toEditableText())
+                    PortionDraft(
+                        label = it.labelEn,
+                        grams = it.grams.toEditableText(),
+                        labelEs = it.labelEs,
+                        portionType = it.portionType,
+                        isDefault = it.isDefault
+                    )
                 },
                 synonyms = details?.aliases.orEmpty().map { it.alias }.distinct()
             )
@@ -197,19 +215,25 @@ class IngredientEditorViewModel(
     fun onImagePicked(uri: Uri) {
         viewModelScope.launch {
             val path = ImageStorage.copyToAppStorage(getApplication(), uri)
-            if (path != null) update { copy(imagePath = path) }
+            if (path != null) {
+                val previousDraft = _uiState.value.imagePath
+                if (previousDraft != original?.imagePath) {
+                    ImageStorage.deleteManaged(getApplication(), previousDraft)
+                }
+                update { copy(imagePath = path) }
+            }
         }
     }
 
     // ── Portions and synonyms ───────────────────────────────────────────
 
-    fun onAddPortion() = update { copy(portions = portions + PortionDraft()) }
+    fun onAddPortion() = updateAndValidate { copy(portions = portions + PortionDraft()) }
 
-    fun onPortionChange(index: Int, draft: PortionDraft) = update {
+    fun onPortionChange(index: Int, draft: PortionDraft) = updateAndValidate {
         copy(portions = portions.mapIndexed { i, existing -> if (i == index) draft else existing })
     }
 
-    fun onRemovePortion(index: Int) = update {
+    fun onRemovePortion(index: Int) = updateAndValidate {
         copy(portions = portions.filterIndexed { i, _ -> i != index })
     }
 
@@ -226,6 +250,7 @@ class IngredientEditorViewModel(
     // ── Saving ──────────────────────────────────────────────────────────
 
     fun onSave() {
+        if (_uiState.value.isSaving || _uiState.value.isLoading) return
         val state = _uiState.value
         val result = validate(state)
         update { copy(validation = result) }
@@ -244,13 +269,20 @@ class IngredientEditorViewModel(
     }
 
     fun onDismissWarnings() = update { copy(confirmWarnings = false) }
+    fun dismissSaveError() = update { copy(saveFailed = false) }
 
     private fun persist(state: IngredientEditorUiState) {
         viewModelScope.launch {
+            if (_uiState.value.isSaving) return@launch
+            update { copy(isSaving = true, saveFailed = false) }
             val now = System.currentTimeMillis()
             val name = state.name.trim()
             val nameEs = state.nameEs.trim().takeIf { it.isNotEmpty() }
             val previous = original
+            if (repository.isDuplicateName(name, previous?.id ?: 0L)) {
+                update { copy(isSaving = false, duplicateName = true) }
+                return@launch
+            }
 
             val ingredient = IngredientEntity(
                 id = previous?.id ?: 0L,
@@ -262,17 +294,17 @@ class IngredientEditorViewModel(
                 categoryKey = state.categoryKey!!,
                 aisleKey = previous?.aisleKey,
                 nutrition = NutritionValues(
-                    kcal = state.kcal.toDoubleOrNull() ?: 0.0,
-                    carbs = state.carbs.toDoubleOrNull() ?: 0.0,
-                    fats = state.fats.toDoubleOrNull() ?: 0.0,
-                    protein = state.protein.toDoubleOrNull() ?: 0.0
+                    kcal = state.kcal.toLocalizedDoubleOrNull() ?: 0.0,
+                    carbs = state.carbs.toLocalizedDoubleOrNull() ?: 0.0,
+                    fats = state.fats.toLocalizedDoubleOrNull() ?: 0.0,
+                    protein = state.protein.toLocalizedDoubleOrNull() ?: 0.0
                 ),
                 prepState = previous?.prepState ?: PrepState.UNSPECIFIED,
                 rawSafety = state.rawSafety,
                 notes = state.notes.trim().takeIf { it.isNotEmpty() },
-                servingSizeG = state.servingSizeG.toDoubleOrNull(),
+                servingSizeG = state.servingSizeG.toLocalizedDoubleOrNull(),
                 isLiquid = state.isLiquid,
-                densityGml = state.densityGml.toDoubleOrNull(),
+                densityGml = state.densityGml.toLocalizedDoubleOrNull(),
                 completenessPct = completeness(state),
                 quality = previous?.quality ?: DataQuality.OK,
                 sourceKey = previous?.sourceKey,
@@ -288,20 +320,23 @@ class IngredientEditorViewModel(
                 remoteId = previous?.remoteId
             )
 
-            repository.save(
+            runCatching { repository.save(
                 ingredient = ingredient,
                 nutrients = state.micronutrients.mapNotNull { (tag, text) ->
-                    text.toDoubleOrNull()?.let { IngredientNutrientEntity(ingredient.id, tag, it) }
+                    text.toLocalizedDoubleOrNull()?.let {
+                        IngredientNutrientEntity(ingredient.id, tag, it)
+                    }
                 },
                 portions = state.portions.mapNotNull { draft ->
-                    val grams = draft.grams.toDoubleOrNull() ?: return@mapNotNull null
+                    val grams = draft.grams.toLocalizedDoubleOrNull() ?: return@mapNotNull null
                     val label = draft.label.trim().ifEmpty { return@mapNotNull null }
                     IngredientPortionEntity(
                         ingredientId = ingredient.id,
                         labelEn = label,
-                        labelEs = label,
+                        labelEs = draft.labelEs.ifBlank { label },
                         grams = grams,
-                        portionType = "PORTION"
+                        portionType = draft.portionType,
+                        isDefault = draft.isDefault
                     )
                 },
                 aliases = state.synonyms.mapNotNull { synonym ->
@@ -310,11 +345,18 @@ class IngredientEditorViewModel(
                         ingredientId = ingredient.id,
                         alias = trimmed,
                         aliasNorm = TextNormalizer.normalize(trimmed),
-                        lang = if (nameEs == trimmed) "es" else "en"
+                        lang = originalAliases[trimmed]?.lang
+                            ?: if (nameEs == trimmed) "es" else "en"
                     )
                 }
-            )
-            update { copy(saved = true) }
+            ) }.onSuccess {
+                if (previous?.imagePath != ingredient.imagePath) {
+                    ImageStorage.deleteManaged(getApplication(), previous?.imagePath)
+                }
+                update { copy(isSaving = false, saved = true) }
+            }.onFailure {
+                update { copy(isSaving = false, saveFailed = true) }
+            }
         }
     }
 
@@ -325,15 +367,21 @@ class IngredientEditorViewModel(
             IngredientValidator.Draft(
                 name = state.name,
                 categoryKey = state.categoryKey,
-                kcal = state.kcal.toDoubleOrNull(),
-                carbs = state.carbs.toDoubleOrNull(),
-                fats = state.fats.toDoubleOrNull(),
-                protein = state.protein.toDoubleOrNull(),
-                extraNutrients = state.micronutrients.mapNotNull { (tag, text) ->
-                    text.toDoubleOrNull()?.let { tag to it }
-                }.toMap(),
-                servingSizeG = state.servingSizeG.toDoubleOrNull(),
-                densityGml = state.densityGml.toDoubleOrNull()
+                kcal = state.kcal.toLocalizedDoubleOrNull(),
+                carbs = state.carbs.toLocalizedDoubleOrNull(),
+                fats = state.fats.toLocalizedDoubleOrNull(),
+                protein = state.protein.toLocalizedDoubleOrNull(),
+                extraNutrients = state.micronutrients.mapValues { (_, text) ->
+                    text.toLocalizedDoubleOrNull() ?: Double.NaN
+                },
+                servingSizeG = state.servingSizeG.parseOptionalNumber(),
+                portionGrams = state.portions
+                    .filter { it.label.isNotBlank() || it.grams.isNotBlank() }
+                    .map { draft ->
+                        draft.grams.toLocalizedDoubleOrNull()
+                            ?.takeIf { draft.label.isNotBlank() }
+                    },
+                densityGml = state.densityGml.parseOptionalNumber()
             )
         )
 
@@ -345,11 +393,15 @@ class IngredientEditorViewModel(
      * add twice without noticing.
      */
     private fun checkForDuplicates(name: String) {
-        viewModelScope.launch {
+        duplicateCheckJob?.cancel()
+        duplicateCheckJob = viewModelScope.launch {
+            delay(250)
             val excluding = original?.id ?: 0L
             val exact = name.isNotBlank() && repository.isDuplicateName(name, excluding)
             val similar = if (exact) emptyList() else repository.findSimilar(name, excluding)
-            update { copy(duplicateName = exact, similar = similar) }
+            if (_uiState.value.name == name) {
+                update { copy(duplicateName = exact, similar = similar) }
+            }
         }
     }
 
@@ -357,7 +409,7 @@ class IngredientEditorViewModel(
     private fun completeness(state: IngredientEditorUiState): Int {
         val possible = state.nutrientDefs.count { it.isPrimary }.coerceAtLeast(1)
         val filled = state.nutrientDefs.count {
-            it.isPrimary && state.micronutrients[it.tag]?.toDoubleOrNull() != null
+            it.isPrimary && state.micronutrients[it.tag]?.toLocalizedDoubleOrNull() != null
         }
         // The four required macros always count as present.
         return (((filled + 4).toDouble() / (possible + 4)) * 100).toInt().coerceIn(0, 100)
@@ -386,8 +438,19 @@ class IngredientEditorViewModel(
             }
         }
     }
+
+    override fun onCleared() {
+        val draft = _uiState.value.imagePath
+        if (!_uiState.value.saved && draft != original?.imagePath) {
+            ImageStorage.deleteManagedNow(getApplication(), draft)
+        }
+        super.onCleared()
+    }
 }
 
 /** Renders a stored value for a text field without a trailing ".0". */
 private fun Double.toEditableText(): String =
-    if (this == toLong().toDouble()) toLong().toString() else toString()
+    LocalizedNumbers.format(this)
+
+private fun String.parseOptionalNumber(): Double? =
+    if (isBlank()) null else toLocalizedDoubleOrNull() ?: Double.NaN

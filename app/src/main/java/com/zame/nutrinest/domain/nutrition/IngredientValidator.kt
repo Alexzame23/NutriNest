@@ -47,6 +47,7 @@ object IngredientValidator {
         STARCH_EXCEEDS_CARBS,
         KCAL_IMPLAUSIBLE,
         SERVING_SIZE_INVALID,
+        PORTION_SIZE_INVALID,
         DENSITY_INVALID,
         SPARSE_NUTRIENT_COVERAGE,
 
@@ -56,7 +57,9 @@ object IngredientValidator {
     }
 
     /** Which form field an issue points at, so the editor can highlight it. */
-    enum class Field { NAME, CATEGORY, KCAL, CARBS, FATS, PROTEIN, SERVING_SIZE, DENSITY, MICRONUTRIENT }
+    enum class Field {
+        NAME, CATEGORY, KCAL, CARBS, FATS, PROTEIN, SERVING_SIZE, PORTION, DENSITY, MICRONUTRIENT
+    }
 
     data class Issue(
         val code: ValidationCode,
@@ -89,6 +92,8 @@ object IngredientValidator {
         val protein: Double?,
         val extraNutrients: Map<String, Double> = emptyMap(),
         val servingSizeG: Double? = null,
+        /** Only non-empty portion rows; null means its number did not parse. */
+        val portionGrams: List<Double?> = emptyList(),
         val densityGml: Double? = null
     )
 
@@ -121,7 +126,7 @@ object IngredientValidator {
 
         if (kcal == null) {
             issues += Issue(ValidationCode.KCAL_REQUIRED, Severity.ERROR, Field.KCAL)
-        } else if (kcal < 0) {
+        } else if (!kcal.isFinite() || kcal < 0) {
             issues += Issue(ValidationCode.KCAL_INVALID, Severity.ERROR, Field.KCAL)
         } else if (kcal > MAX_KCAL_PER_100G) {
             issues += Issue(
@@ -135,7 +140,7 @@ object IngredientValidator {
         issues += checkGramField(protein, ValidationCode.PROTEIN_INVALID, Field.PROTEIN)
 
         draft.extraNutrients.forEach { (tag, value) ->
-            if (value < 0) {
+            if (!value.isFinite() || value < 0) {
                 issues += Issue(
                     ValidationCode.NUTRIENT_NEGATIVE, Severity.ERROR,
                     Field.MICRONUTRIENT, tag
@@ -144,13 +149,16 @@ object IngredientValidator {
         }
 
         draft.servingSizeG?.let {
-            if (it <= 0 || it > 5_000) {
+            if (!it.isFinite() || it <= 0 || it > 5_000) {
                 issues += Issue(ValidationCode.SERVING_SIZE_INVALID, Severity.ERROR, Field.SERVING_SIZE)
             }
         }
+        if (draft.portionGrams.any { it == null || !it.isFinite() || it <= 0 || it > 5_000 }) {
+            issues += Issue(ValidationCode.PORTION_SIZE_INVALID, Severity.ERROR, Field.PORTION)
+        }
         draft.densityGml?.let {
             // Honey is ~1.42, oils ~0.91. Outside 0.1–2.5 is not food.
-            if (it <= 0.1 || it > 2.5) {
+            if (!it.isFinite() || it <= 0.1 || it > 2.5) {
                 issues += Issue(ValidationCode.DENSITY_INVALID, Severity.ERROR, Field.DENSITY)
             }
         }
@@ -236,7 +244,8 @@ object IngredientValidator {
         invalidCode: ValidationCode,
         field: Field
     ): List<Issue> = when {
-        value == null || value < 0 -> listOf(Issue(invalidCode, Severity.ERROR, field))
+        value == null || !value.isFinite() || value < 0 ->
+            listOf(Issue(invalidCode, Severity.ERROR, field))
         value > 100.0 -> listOf(Issue(ValidationCode.GRAMS_EXCEED_100, Severity.ERROR, field))
         else -> emptyList()
     }

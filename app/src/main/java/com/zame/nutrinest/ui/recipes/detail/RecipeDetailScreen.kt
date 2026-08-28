@@ -46,19 +46,22 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
+import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.components.StatusChip
 import com.zame.nutrinest.ui.components.formatGrams
+import com.zame.nutrinest.ui.components.formatRecipeQuantity
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.recipeCategoryColor
 import com.zame.nutrinest.ui.recipes.recipeCategoryIcon
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
+import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -93,7 +96,9 @@ fun RecipeDetailScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text(stringResource(R.string.recipe_delete_title)) },
-            text = { Text(stringResource(R.string.recipe_delete_body, recipe.name)) },
+            text = {
+                Text(stringResource(R.string.recipe_delete_body, recipe.displayName(spanish)))
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
@@ -112,9 +117,29 @@ fun RecipeDetailScreen(
         AlertDialog(
             onDismissRequest = viewModel::dismissDeleteBlocked,
             title = { Text(stringResource(R.string.recipe_delete_blocked_title)) },
-            text = { Text(stringResource(R.string.recipe_delete_blocked_body, recipe.name)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.recipe_delete_blocked_body,
+                        recipe.displayName(spanish)
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(onClick = viewModel::dismissDeleteBlocked) {
+                    Text(stringResource(R.string.action_done))
+                }
+            }
+        )
+    }
+
+    if (state.operationFailed) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissOperationError,
+            title = { Text(stringResource(R.string.error_operation_title)) },
+            text = { Text(stringResource(R.string.error_operation_failed)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissOperationError) {
                     Text(stringResource(R.string.action_done))
                 }
             }
@@ -126,11 +151,10 @@ fun RecipeDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        recipe.name,
+                    SlowMarqueeText(
+                        text = recipe.displayName(spanish),
                         style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
                 navigationIcon = {
@@ -230,7 +254,11 @@ fun RecipeDetailScreen(
                                     )
                                 }
                                 Text(
-                                    formatGrams(item.grams),
+                                    formatRecipeQuantity(
+                                        item.ingredient,
+                                        item.grams,
+                                        item.quantityUnit
+                                    ),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -279,7 +307,7 @@ fun RecipeDetailScreen(
                                 }
                                 Spacer(Modifier.height(6.dp))
                                 Text(
-                                    step.text,
+                                    step.displayText(spanish),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -295,6 +323,7 @@ fun RecipeDetailScreen(
 @Composable
 private fun Header(state: RecipeDetailUiState) {
     val recipe = state.recipe ?: return
+    val spanish = rememberIsSpanish()
     val tint = recipeCategoryColor(recipe.category)
 
     Column {
@@ -310,6 +339,7 @@ private fun Header(state: RecipeDetailUiState) {
                     model = File(recipe.coverImagePath),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    alignment = recipe.coverImageCrop.toRecipeImageAlignment(),
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
@@ -332,7 +362,7 @@ private fun Header(state: RecipeDetailUiState) {
             )
             recipe.folder?.let { folder ->
                 StatusChip(
-                    label = folder,
+                    label = RecipeBooks.displayName(folder, spanish),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     icon = Icons.Rounded.Folder
                 )

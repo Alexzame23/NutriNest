@@ -29,13 +29,14 @@ data class TagValue(val tag: String, val value: Double)
 @Dao
 interface IngredientDao {
 
-    @Query("SELECT * FROM ingredients ORDER BY name COLLATE NOCASE")
+    @Query("SELECT * FROM ingredients WHERE sourceKey IS NOT 'BEDCA:2494' ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<IngredientEntity>>
 
     @Query(
         """
         SELECT * FROM ingredients
         WHERE name LIKE '%' || :query || '%'
+          AND sourceKey IS NOT 'BEDCA:2494'
         ORDER BY isCustom DESC, name COLLATE NOCASE
         """
     )
@@ -56,6 +57,7 @@ interface IngredientDao {
         """
         SELECT * FROM ingredients
         WHERE foodType IN (:categoryKeys)
+          AND sourceKey IS NOT 'BEDCA:2494'
           AND (:favoritesOnly = 0 OR isFavorite = 1)
           AND (:customOnly = 0 OR isCustom = 1)
           AND (
@@ -76,14 +78,14 @@ interface IngredientDao {
         customOnly: Int
     ): Flow<List<IngredientEntity>>
 
-    @Query("SELECT * FROM ingredients WHERE isFavorite = 1")
+    @Query("SELECT * FROM ingredients WHERE isFavorite = 1 AND sourceKey IS NOT 'BEDCA:2494'")
     fun observeFavorites(): Flow<List<IngredientEntity>>
 
     /** Most recently used, for the "Recent" view and the recipe picker. */
     @Query(
         """
         SELECT * FROM ingredients
-        WHERE lastUsedAt IS NOT NULL
+        WHERE lastUsedAt IS NOT NULL AND sourceKey IS NOT 'BEDCA:2494'
         ORDER BY lastUsedAt DESC
         LIMIT :limit
         """
@@ -149,7 +151,8 @@ interface IngredientDao {
 
     @Query(
         """
-        SELECT r.id AS recipeId, r.name AS recipeName, ri.grams AS grams
+        SELECT r.id AS recipeId, r.name AS recipeName, r.nameEs AS recipeNameEs,
+               ri.grams AS grams
         FROM recipe_ingredients ri
         JOIN recipes r ON r.id = ri.recipeId
         WHERE ri.ingredientId = :ingredientId

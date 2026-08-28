@@ -178,6 +178,25 @@ class IngredientValidatorTest {
     }
 
     @Test
+    fun `non finite values are rejected`() {
+        assertFalse(IngredientValidator.validate(oliveOil().copy(kcal = Double.NaN)).canSave)
+        assertFalse(IngredientValidator.validate(oliveOil().copy(fats = Double.POSITIVE_INFINITY)).canSave)
+        assertFalse(
+            IngredientValidator.validate(
+                oliveOil().copy(extraNutrients = mapOf("VITC" to Double.NaN))
+            ).canSave
+        )
+    }
+
+    @Test
+    fun `invalid household portion is rejected`() {
+        val result = IngredientValidator.validate(oliveOil().copy(portionGrams = listOf(null, 30.0)))
+
+        assertTrue(ValidationCode.PORTION_SIZE_INVALID in result.codes())
+        assertFalse(result.canSave)
+    }
+
+    @Test
     fun `atwater follows the EU energy factors`() {
         // 10 g protein + 20 g carbs + 5 g fat + 2 g fibre = 40 + 80 + 45 + 4.
         assertEquals(

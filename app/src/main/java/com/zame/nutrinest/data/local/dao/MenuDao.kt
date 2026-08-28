@@ -179,7 +179,7 @@ interface MenuDao {
 
     @Query(
         """
-        SELECT i.*, ri.grams FROM ingredients i
+        SELECT i.*, ri.grams, ri.quantityUnit FROM ingredients i
         INNER JOIN recipe_ingredients ri ON ri.ingredientId = i.id
         WHERE ri.recipeId = :recipeId
         """
@@ -217,6 +217,16 @@ interface MenuDao {
         portionsPerMeal: List<List<MealPortionEntity>>,
         shoppingItems: List<ShoppingItemEntity>
     ): Long {
+        require(meals.size == portionsPerMeal.size) {
+            "Each planned meal must have a matching portion list"
+        }
+        require(meals.all { it.dayOfWeek in 0..6 }) { "Invalid menu day" }
+        require(portionsPerMeal.flatten().all { it.factor.isFinite() && it.factor > 0.0 }) {
+            "Portion factors must be finite and positive"
+        }
+        require(shoppingItems.all { it.grams.isFinite() && it.grams > 0.0 }) {
+            "Shopping quantities must be finite and positive"
+        }
         deleteMenu(weekStart)
         val menuId = insertMenu(
             WeeklyMenuEntity(

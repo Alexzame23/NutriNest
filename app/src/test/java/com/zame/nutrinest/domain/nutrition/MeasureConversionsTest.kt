@@ -129,4 +129,18 @@ class MeasureConversionsTest {
         assertEquals("120.4 g", MeasureConversions.formatGrams(120.42, Locale.UK))
         assertEquals("1500 g", MeasureConversions.formatGrams(1500.0, Locale.UK))
     }
+
+    @Test
+    fun `recipe quantities retain the selected liquid unit`() {
+        assertEquals(
+            "1.5 L",
+            MeasureConversions.formatRecipeQuantity(
+                grams = 1500.0,
+                unit = MeasureUnit.LITRE,
+                isLiquid = true,
+                densityGml = 1.0,
+                locale = Locale.UK
+            )
+        )
+    }
 }

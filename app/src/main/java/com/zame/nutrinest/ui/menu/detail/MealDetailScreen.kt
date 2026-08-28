@@ -49,7 +49,10 @@ import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.OptionDropdown
-import com.zame.nutrinest.ui.components.formatGrams
+import com.zame.nutrinest.ui.components.SlowMarqueeText
+import com.zame.nutrinest.ui.components.formatRecipeQuantity
+import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -60,6 +63,7 @@ fun MealDetailScreen(
     viewModel: MealDetailViewModel = viewModel(factory = MealDetailViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsState()
+    val spanish = rememberIsSpanish()
     val recipes by viewModel.allRecipes.collectAsState()
     val meal = state.meal
     var showSwapDialog by remember { mutableStateOf(false) }
@@ -69,13 +73,14 @@ fun MealDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        meal?.recipe?.name
+                    SlowMarqueeText(
+                        text = meal?.recipe?.displayName(spanish)
                             ?: stringResource(
                                 if (state.isFree) R.string.meal_free_placeholder
                                 else R.string.meal_detail_title
                             ),
-                        style = MaterialTheme.typography.headlineSmall
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 },
                 navigationIcon = {
@@ -158,6 +163,7 @@ fun MealDetailScreen(
                         model = File(path),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        alignment = meal.recipe.coverImageCrop.toRecipeImageAlignment(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
@@ -224,12 +230,16 @@ fun MealDetailScreen(
                         state.baseIngredients.forEach { ingredient ->
                             Row(Modifier.fillMaxWidth()) {
                                 Text(
-                                    ingredient.ingredient.name,
+                                    ingredient.ingredient.displayName(spanish),
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatGrams(ingredient.grams * portion.portion.factor),
+                                    formatRecipeQuantity(
+                                        ingredient.ingredient,
+                                        ingredient.grams * portion.portion.factor,
+                                        ingredient.quantityUnit
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -252,12 +262,16 @@ fun MealDetailScreen(
                         state.baseIngredients.forEach { ingredient ->
                             Row(Modifier.fillMaxWidth()) {
                                 Text(
-                                    ingredient.ingredient.name,
+                                    ingredient.ingredient.displayName(spanish),
                                     style = MaterialTheme.typography.bodyLarge,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatGrams(ingredient.grams * state.householdFactor),
+                                    formatRecipeQuantity(
+                                        ingredient.ingredient,
+                                        ingredient.grams * state.householdFactor,
+                                        ingredient.quantityUnit
+                                    ),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -295,7 +309,10 @@ fun MealDetailScreen(
                             )
                         }
                         Spacer(Modifier.height(6.dp))
-                        Text(step.text, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            step.displayText(spanish),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
                     }
                 }
             }
@@ -381,6 +398,7 @@ private fun SwapMealDialog(
     onDismiss: () -> Unit,
     onConfirm: (Long, Long?) -> Unit
 ) {
+    val spanish = rememberIsSpanish()
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
     // Pre-selected to the row's own scope, which is the expected default.
     var swapFor by remember { mutableStateOf(state.ownerProfileId) }
@@ -393,9 +411,11 @@ private fun SwapMealDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OptionDropdown(
                     label = stringResource(R.string.menu_config_recipe),
-                    options = recipes.map { it.name },
-                    selected = selectedRecipe?.name,
-                    onSelected = { name -> selectedRecipe = recipes.find { it.name == name } }
+                    options = recipes.map { it.displayName(spanish) },
+                    selected = selectedRecipe?.displayName(spanish),
+                    onSelected = { name ->
+                        selectedRecipe = recipes.find { it.displayName(spanish) == name }
+                    }
                 )
                 if (canChooseScope) {
                     KeyedDropdown(
