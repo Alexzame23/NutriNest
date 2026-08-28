@@ -423,6 +423,14 @@
     <string name="menu_config_days">Días</string>
     <string name="menu_config_meal">Comida</string>
     <string name="menu_config_recipe">Receta</string>
+    <string name="menu_config_lock_choose_recipe">Elegir una receta</string>
+    <string name="menu_config_lock_recipe_picker_title">Elegir una receta</string>
+    <string name="menu_config_lock_all_books">Todos los recetarios</string>
+    <string name="menu_config_lock_meal_type">Tipo de comida</string>
+    <plurals name="menu_config_lock_recipe_results">
+        <item quantity="one">%1$d receta encontrada</item>
+        <item quantity="other">%1$d recetas encontradas</item>
+    </plurals>
     <string name="menu_error_no_profiles">Crea antes al menos un perfil: el menú se personaliza según las calorías objetivo de cada persona.</string>
     <string name="menu_error_no_matching_recipes">Ninguna receta coincide con los filtros. Relaja las exclusiones o añade más recetas.</string>
     <string name="menu_error_not_enough_recipes">No hay recetas suficientes para llenar la semana con el límite de repeticiones actual. Súbelo o añade más recetas.</string>
@@ -531,7 +539,7 @@
 
     <!-- ── Notificaciones ─────────────────────────────────────────── -->
     <string name="notification_channel_name">Recordatorios de planificación</string>
-    <string name="notification_channel_detail">Recordatorio de fin de semana para planificar la semana siguiente</string>
+    <string name="notification_channel_detail">Recordatorio de los viernes para planificar la semana siguiente</string>
     <string name="notification_title">Planifica el menú de la semana que viene</string>
     <string name="notification_body">Dedica un minuto a generar el plan de comidas y la lista de la compra.</string>
 </resources>

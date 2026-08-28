@@ -86,6 +86,10 @@ class MenuConfigViewModel(
     val allFolders = recipeRepository.observeFolders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Lightweight totals for the locked-meal recipe picker. */
+    val recipeNutrition = recipeRepository.observeNutritionTotals()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     /** The household. With one profile the scope options don't apply. */
     val profiles = menuRepository.observeProfiles()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

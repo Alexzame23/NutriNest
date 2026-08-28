@@ -23,8 +23,8 @@ import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 /**
- * Weekend reminder: checks whether next week's menu exists and, if not,
- * posts a friendly notification. Runs weekly, anchored to Saturday morning.
+ * Friday reminder: checks whether next week's menu exists and, if not,
+ * posts a friendly notification. Runs weekly, anchored to Friday morning.
  */
 class MenuReminderWorker(
     context: Context,
@@ -80,27 +80,28 @@ class MenuReminderWorker(
         private const val NOTIFICATION_ID = 4001
         private const val WORK_NAME = "weekly_menu_reminder"
 
-        /** Schedules the weekly reminder, anchored near Saturday 10:00. */
+        /** Schedules the weekly reminder, anchored near Friday 10:00. */
         fun schedule(context: Context) {
-            val delayMs = millisUntilNextSaturdayMorning()
+            val delayMs = millisUntilNextFridayMorning()
             val request = PeriodicWorkRequestBuilder<MenuReminderWorker>(7, TimeUnit.DAYS)
                 .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                // Re-anchor installations that were previously scheduled for
+                // Saturday so they receive the next reminder on Friday.
+                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
                 request
             )
         }
 
-        private fun millisUntilNextSaturdayMorning(): Long {
-            val now = Calendar.getInstance()
+        internal fun millisUntilNextFridayMorning(now: Calendar = Calendar.getInstance()): Long {
             val next = (now.clone() as Calendar).apply {
                 set(Calendar.HOUR_OF_DAY, 10)
                 set(Calendar.MINUTE, 0)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
-                while (get(Calendar.DAY_OF_WEEK) != Calendar.SATURDAY || timeInMillis <= now.timeInMillis) {
+                while (get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY || timeInMillis <= now.timeInMillis) {
                     add(Calendar.DAY_OF_MONTH, 1)
                 }
             }

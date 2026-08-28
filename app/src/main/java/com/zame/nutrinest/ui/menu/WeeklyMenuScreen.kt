@@ -87,7 +87,7 @@ fun WeeklyMenuScreen(
     var showEraseDialog by remember { mutableStateOf(false) }
 
     // Politely ask for notification permission once (Android 13+) so the
-    // weekend planning reminder can be delivered.
+    // Friday planning reminder can be delivered.
     if (Build.VERSION.SDK_INT >= 33) {
         val launcher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()

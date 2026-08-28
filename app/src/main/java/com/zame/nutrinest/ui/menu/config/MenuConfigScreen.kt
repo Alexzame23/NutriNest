@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -56,12 +58,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.MealSlot
@@ -70,13 +76,17 @@ import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeEntity
+import com.zame.nutrinest.data.local.entity.NutritionValues
+import com.zame.nutrinest.ui.components.CategoryDot
 import com.zame.nutrinest.ui.components.KeyedDropdown
-import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
+import com.zame.nutrinest.ui.recipes.recipeCategoryColor
+import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import com.zame.nutrinest.util.TextNormalizer
 import com.zame.nutrinest.util.WeekUtils
+import java.io.File
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -92,6 +102,7 @@ fun MenuConfigScreen(
     val shortDays = remember(configuration) { WeekUtils.shortDayNames(configuration.locales[0]) }
     val recipes by viewModel.allRecipes.collectAsState()
     val folders by viewModel.allFolders.collectAsState()
+    val recipeNutrition by viewModel.recipeNutrition.collectAsState()
     val profiles by viewModel.profiles.collectAsState()
     val spanish = rememberIsSpanish()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -501,6 +512,7 @@ fun MenuConfigScreen(
         AddLockDialog(
             slots = state.slots,
             recipes = recipes,
+            nutritionByRecipe = recipeNutrition,
             profiles = profiles,
             onDismiss = { showLockDialog = false },
             onConfirm = { days, slot, recipe, profileId ->
@@ -906,6 +918,7 @@ private fun AddOverrideDialog(
 private fun AddLockDialog(
     slots: List<MealSlot>,
     recipes: List<RecipeEntity>,
+    nutritionByRecipe: Map<Long, NutritionValues>,
     profiles: List<ProfileEntity>,
     onDismiss: () -> Unit,
     onConfirm: (Set<Int>, MealSlot, RecipeEntity, Long?) -> Unit
@@ -914,6 +927,7 @@ private fun AddLockDialog(
     var selectedDays by remember { mutableStateOf(setOf<Int>()) }
     var selectedSlot by remember { mutableStateOf(slots.first()) }
     var selectedRecipe by remember { mutableStateOf<RecipeEntity?>(null) }
+    var showRecipePicker by remember { mutableStateOf(false) }
     // null = the whole household, which is what a lock has always meant.
     var lockedFor by remember { mutableStateOf<Long?>(null) }
 
@@ -932,14 +946,41 @@ private fun AddLockDialog(
                     selectedKey = selectedSlot,
                     onSelected = { selectedSlot = it }
                 )
-                OptionDropdown(
-                    label = stringResource(R.string.menu_config_recipe),
-                    options = recipes.map { it.displayName(spanish) },
-                    selected = selectedRecipe?.displayName(spanish),
-                    onSelected = { name ->
-                        selectedRecipe = recipes.find { it.displayName(spanish) == name }
-                    }
+                Text(
+                    stringResource(R.string.menu_config_recipe),
+                    style = MaterialTheme.typography.bodyLarge
                 )
+                OutlinedButton(
+                    onClick = { showRecipePicker = true },
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val recipe = selectedRecipe
+                        if (recipe == null) {
+                            Text(stringResource(R.string.menu_config_lock_choose_recipe))
+                        } else {
+                            SlowMarqueeText(
+                                text = recipe.displayName(spanish),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                listOf(
+                                    recipe.folder?.let { RecipeBooks.displayName(it, spanish) }
+                                        ?: stringResource(R.string.menu_config_personal_recipes),
+                                    stringResource(recipeCategoryLabel(recipe.category))
+                                ).joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
                 if (profiles.size > 1) {
                     KeyedDropdown(
                         label = stringResource(R.string.menu_config_who),
@@ -964,6 +1005,264 @@ private fun AddLockDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         }
     )
+
+    if (showRecipePicker) {
+        LockedMealRecipePickerDialog(
+            recipes = recipes,
+            nutritionByRecipe = nutritionByRecipe,
+            onDismiss = { showRecipePicker = false },
+            onRecipeSelected = {
+                selectedRecipe = it
+                showRecipePicker = false
+            }
+        )
+    }
+}
+
+/** Full-screen, live-filtered picker used only for selecting a locked recipe. */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun LockedMealRecipePickerDialog(
+    recipes: List<RecipeEntity>,
+    nutritionByRecipe: Map<Long, NutritionValues>,
+    onDismiss: () -> Unit,
+    onRecipeSelected: (RecipeEntity) -> Unit
+) {
+    val spanish = rememberIsSpanish()
+    val bookFolders = remember(recipes) {
+        buildList<String?> {
+            val available = recipes.mapNotNull { it.folder }.toSet()
+            RecipeBooks.BUILT_IN.filterTo(this) { it in available }
+            available.filter { it !in RecipeBooks.BUILT_IN }.sorted().forEach(::add)
+            if (recipes.any { it.folder == null }) add(null)
+        }
+    }
+    var query by remember { mutableStateOf("") }
+    // null means every book; an empty set is a deliberate no-book selection.
+    var selectedFolders by remember { mutableStateOf<Set<String?>?>(null) }
+    var selectedCategories by remember { mutableStateOf(emptySet<String>()) }
+    var favoritesOnly by remember { mutableStateOf(false) }
+
+    val results = filterLockedMealRecipes(
+        recipes = recipes,
+        filters = LockedMealRecipeSearchFilters(
+            query = query,
+            folders = selectedFolders,
+            categories = selectedCategories,
+            favoritesOnly = favoritesOnly
+        ),
+        spanish = spanish
+    )
+
+    fun toggleFolder(folder: String?) {
+        val current = selectedFolders ?: bookFolders.toSet()
+        val updated = if (folder in current) current - folder else current + folder
+        selectedFolders = if (updated.size == bookFolders.size) null else updated
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            stringResource(R.string.menu_config_lock_recipe_picker_title),
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.action_cancel)
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
+                )
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(start = 20.dp, top = 8.dp, end = 20.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text(stringResource(R.string.menu_config_recipe_search)) },
+                        leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                        trailingIcon = {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { query = "" }) {
+                                    Icon(
+                                        Icons.Rounded.Close,
+                                        contentDescription = stringResource(R.string.action_clear)
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            stringResource(R.string.menu_config_only_folders),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = selectedFolders == null,
+                                onClick = { selectedFolders = null },
+                                label = { Text(stringResource(R.string.menu_config_lock_all_books)) }
+                            )
+                            bookFolders.forEach { folder ->
+                                val label = folder?.let { RecipeBooks.displayName(it, spanish) }
+                                    ?: stringResource(R.string.menu_config_personal_recipes)
+                                FilterChip(
+                                    selected = selectedFolders?.contains(folder) == true,
+                                    onClick = { toggleFolder(folder) },
+                                    label = { Text(label) }
+                                )
+                            }
+                        }
+                    }
+                }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            stringResource(R.string.menu_config_lock_meal_type),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            RecipeCategories.ALL.forEach { category ->
+                                FilterChip(
+                                    selected = category in selectedCategories,
+                                    onClick = {
+                                        selectedCategories = if (category in selectedCategories) {
+                                            selectedCategories - category
+                                        } else {
+                                            selectedCategories + category
+                                        }
+                                    },
+                                    label = { Text(stringResource(recipeCategoryLabel(category))) }
+                                )
+                            }
+                            FilterChip(
+                                selected = favoritesOnly,
+                                onClick = { favoritesOnly = !favoritesOnly },
+                                label = { Text(stringResource(R.string.menu_config_favorites_only)) }
+                            )
+                        }
+                    }
+                }
+                item {
+                    Text(
+                        pluralStringResource(
+                            R.plurals.menu_config_lock_recipe_results,
+                            results.size,
+                            results.size
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (results.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.menu_config_no_recipe_matches),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    items(results, key = { it.id }) { recipe ->
+                        LockedMealRecipeResult(
+                            recipe = recipe,
+                            nutrition = nutritionByRecipe[recipe.id],
+                            spanish = spanish,
+                            onClick = { onRecipeSelected(recipe) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LockedMealRecipeResult(
+    recipe: RecipeEntity,
+    nutrition: NutritionValues?,
+    spanish: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (recipe.coverImagePath != null) {
+                AsyncImage(
+                    model = File(recipe.coverImagePath),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = recipe.coverImageCrop.toRecipeImageAlignment(),
+                    modifier = Modifier.size(56.dp)
+                )
+            } else {
+                CategoryDot(recipeCategoryColor(recipe.category), size = 20.dp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                SlowMarqueeText(
+                    text = recipe.displayName(spanish),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    listOf(
+                        recipe.folder?.let { RecipeBooks.displayName(it, spanish) }
+                            ?: stringResource(R.string.menu_config_personal_recipes),
+                        stringResource(recipeCategoryLabel(recipe.category))
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                nutrition?.let {
+                    Text(
+                        stringResource(R.string.kcal_value, it.kcal.roundToInt()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

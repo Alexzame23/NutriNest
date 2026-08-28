@@ -421,6 +421,14 @@
     <string name="menu_config_days">Days</string>
     <string name="menu_config_meal">Meal</string>
     <string name="menu_config_recipe">Recipe</string>
+    <string name="menu_config_lock_choose_recipe">Choose a recipe</string>
+    <string name="menu_config_lock_recipe_picker_title">Choose a recipe</string>
+    <string name="menu_config_lock_all_books">All books</string>
+    <string name="menu_config_lock_meal_type">Meal type</string>
+    <plurals name="menu_config_lock_recipe_results">
+        <item quantity="one">%1$d recipe found</item>
+        <item quantity="other">%1$d recipes found</item>
+    </plurals>
     <string name="menu_error_no_profiles">Create at least one profile first — the menu is personalized to each person\'s calorie targets.</string>
     <string name="menu_error_no_matching_recipes">No recipes match the selected filters. Relax the exclusions or add more recipes.</string>
     <string name="menu_error_not_enough_recipes">Not enough recipes to fill the week with the current repeat limit. Increase the limit or add more recipes.</string>
@@ -529,7 +537,7 @@
 
     <!-- ── Notifications ──────────────────────────────────────────── -->
     <string name="notification_channel_name">Menu planning reminders</string>
-    <string name="notification_channel_detail">Weekend reminder to plan next week\'s meals</string>
+    <string name="notification_channel_detail">Friday reminder to plan next week\'s meals</string>
     <string name="notification_title">Plan next week\'s menu</string>
     <string name="notification_body">Take a minute to generate next week\'s meal plan and shopping list.</string>
 </resources>
