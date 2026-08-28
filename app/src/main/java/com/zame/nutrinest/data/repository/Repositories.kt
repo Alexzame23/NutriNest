@@ -161,11 +161,7 @@ class LocalIngredientRepository(private val dao: IngredientDao) : IngredientRepo
         aliases: List<IngredientAliasEntity>
     ) = dao.upsertFull(ingredient, nutrients, portions, aliases)
 
-    override suspend fun delete(id: Long): Boolean {
-        if (dao.countReferences(id) > 0) return false
-        dao.deleteById(id)
-        return true
-    }
+    override suspend fun delete(id: Long) = dao.deleteIfUnused(id)
 
     override suspend fun setFavorite(id: Long, favorite: Boolean) = dao.setFavorite(id, favorite)
 
@@ -204,9 +200,5 @@ class LocalRecipeRepository(private val dao: RecipeDao) : RecipeRepository {
 
     override suspend fun setFavorite(id: Long, favorite: Boolean) = dao.setFavorite(id, favorite)
 
-    override suspend fun delete(id: Long): Boolean {
-        if (dao.countReferences(id) > 0) return false
-        dao.deleteById(id)
-        return true
-    }
+    override suspend fun delete(id: Long) = dao.deleteIfUnused(id)
 }

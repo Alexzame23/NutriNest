@@ -72,6 +72,14 @@ interface RecipeDao {
     @Query("DELETE FROM recipes WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    /** Checks menu references and deletes atomically. */
+    @Transaction
+    suspend fun deleteIfUnused(id: Long): Boolean {
+        if (countReferences(id) > 0) return false
+        deleteById(id)
+        return true
+    }
+
     @Insert
     suspend fun insertRecipe(recipe: RecipeEntity): Long
 

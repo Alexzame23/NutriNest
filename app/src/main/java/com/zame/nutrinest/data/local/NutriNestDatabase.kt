@@ -334,6 +334,14 @@ abstract class NutriNestDatabase : RoomDatabase() {
 
         /** Rebuilds `planned_meals` so a free slot may have no recipe. */
         private fun rebuildPlannedMeals(db: SupportSQLiteDatabase) {
+            // Dropping the parent table can cascade into meal_portions while
+            // foreign keys are enabled. Keep an explicit copy so upgrades do
+            // not silently lose everybody's serving factors.
+            db.execSQL("DROP TABLE IF EXISTS `_meal_portions_backup`")
+            db.execSQL(
+                "CREATE TABLE `_meal_portions_backup` AS " +
+                    "SELECT `plannedMealId`, `profileId`, `factor` FROM `meal_portions`"
+            )
             db.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS `planned_meals_new` (
@@ -368,6 +376,13 @@ abstract class NutriNestDatabase : RoomDatabase() {
             )
             db.execSQL("DROP TABLE `planned_meals`")
             db.execSQL("ALTER TABLE `planned_meals_new` RENAME TO `planned_meals`")
+            db.execSQL(
+                "INSERT OR REPLACE INTO `meal_portions` " +
+                    "(`plannedMealId`, `profileId`, `factor`) " +
+                    "SELECT `plannedMealId`, `profileId`, `factor` " +
+                    "FROM `_meal_portions_backup`"
+            )
+            db.execSQL("DROP TABLE `_meal_portions_backup`")
             listOf("menuId", "recipeId", "profileId").forEach {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_planned_meals_$it` " +

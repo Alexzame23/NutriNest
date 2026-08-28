@@ -30,7 +30,7 @@ data class NutritionTargets(
  * Something worth telling the user about how their targets were worked out.
  * A code rather than a sentence, so the UI layer supplies the translation.
  */
-enum class NutritionNote(@StringRes val messageRes: Int) {
+enum class NutritionNote(@param:StringRes val messageRes: Int) {
     KATCH_MCARDLE_NEEDS_BODY_FAT(R.string.nutrition_note_katch_needs_body_fat)
 }
 

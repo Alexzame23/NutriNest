@@ -34,7 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,8 +47,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zame.nutrinest.R
+import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.util.toLocalizedDoubleOrNull
 import kotlin.math.roundToInt
 
 /**
@@ -64,7 +66,7 @@ fun IntakeScreen(
     onBack: () -> Unit,
     viewModel: IntakeViewModel = viewModel(factory = IntakeViewModel.Factory)
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -339,6 +341,27 @@ private fun LogIntakeDialog(
     var carbs by remember { mutableStateOf("") }
     var fats by remember { mutableStateOf("") }
     var protein by remember { mutableStateOf("") }
+    val kcalValue = kcal.toLocalizedDoubleOrNull()
+    val carbsValue = if (carbs.isBlank()) 0.0 else carbs.toLocalizedDoubleOrNull()
+    val fatsValue = if (fats.isBlank()) 0.0 else fats.toLocalizedDoubleOrNull()
+    val proteinValue = if (protein.isBlank()) 0.0 else protein.toLocalizedDoubleOrNull()
+    val nutrition = if (
+        kcalValue != null && carbsValue != null && fatsValue != null && proteinValue != null
+    ) {
+        NutritionValues(kcalValue, carbsValue, fatsValue, proteinValue)
+    } else {
+        null
+    }
+    val valuesAreValid = nutrition?.let { isValidIntake(label, it) } == true
+    val hasInvalidOptionalValue = listOf(
+        carbs to carbsValue,
+        fats to fatsValue,
+        protein to proteinValue
+    ).any { (text, value) ->
+        text.isNotBlank() && (value == null || value !in 0.0..10_000.0)
+    }
+    val hasInvalidKcal = kcal.isNotBlank() &&
+        (kcalValue == null || kcalValue <= 0.0 || kcalValue > 100_000.0)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -373,18 +396,26 @@ private fun LogIntakeDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (hasInvalidKcal || hasInvalidOptionalValue) {
+                    Text(
+                        stringResource(R.string.intake_invalid_values),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = label.isNotBlank() && (kcal.toDoubleOrNull() ?: 0.0) > 0.0,
+                enabled = valuesAreValid,
                 onClick = {
+                    val values = nutrition ?: return@TextButton
                     onConfirm(
                         label,
-                        kcal.toDoubleOrNull() ?: 0.0,
-                        carbs.toDoubleOrNull() ?: 0.0,
-                        fats.toDoubleOrNull() ?: 0.0,
-                        protein.toDoubleOrNull() ?: 0.0
+                        values.kcal,
+                        values.carbs,
+                        values.fats,
+                        values.protein
                     )
                 }
             ) { Text(stringResource(R.string.action_add)) }

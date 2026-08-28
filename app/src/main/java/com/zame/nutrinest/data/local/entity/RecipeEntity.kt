@@ -163,6 +163,16 @@ data class IngredientWithQuantity(
     val nutrition: NutritionValues get() = ingredient.nutrition.forGrams(grams)
 }
 
+/** Bulk-query row used to load many recipes without one query per recipe. */
+data class RecipeIngredientRow(
+    @ColumnInfo(name = "parentRecipeId") val recipeId: Long,
+    @Embedded val ingredient: IngredientEntity,
+    val grams: Double,
+    val quantityUnit: String = "GRAM"
+) {
+    fun ingredientWithQuantity() = IngredientWithQuantity(ingredient, grams, quantityUnit)
+}
+
 /**
  * What a whole recipe adds up to, summed in SQL.
  *

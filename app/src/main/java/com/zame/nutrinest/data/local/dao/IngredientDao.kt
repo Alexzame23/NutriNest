@@ -230,6 +230,14 @@ interface IngredientDao {
     @Query("DELETE FROM ingredients WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    /** Checks references and deletes without a race between the two operations. */
+    @Transaction
+    suspend fun deleteIfUnused(id: Long): Boolean {
+        if (countReferences(id) > 0) return false
+        deleteById(id)
+        return true
+    }
+
     @Query("SELECT COUNT(*) FROM ingredients")
     suspend fun count(): Int
 

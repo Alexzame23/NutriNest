@@ -12,10 +12,12 @@ import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.repository.RecipeRepository
 import com.zame.nutrinest.util.TextNormalizer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.Collator
@@ -120,7 +122,9 @@ class RecipesViewModel(
             hasAnyRecipes = recipes.isNotEmpty(),
             isLoading = false
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecipesUiState())
 
     // ── Intents ─────────────────────────────────────────────────────────
 

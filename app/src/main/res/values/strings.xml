@@ -451,6 +451,7 @@
     <string name="intake_what">What was it</string>
     <string name="intake_kcal">Calories</string>
     <string name="intake_dialog_note">The rest of your day is re-portioned straight away. Free meals are left out of it, and nobody else\'s menu changes.</string>
+    <string name="intake_invalid_values">Use positive calories and non-negative numeric macro values.</string>
 
     <!-- ── Shopping list ──────────────────────────────────────────── -->
     <string name="shopping_list_title">Shopping List</string>
@@ -505,6 +506,7 @@
     <string name="profile_error_height">Please enter a valid height.</string>
     <string name="profile_error_weight">Please enter a valid weight.</string>
     <string name="profile_error_body_fat">Body fat must be between 3 and 70 percent, or left empty.</string>
+    <string name="profile_error_meal_split">Meal shares must cover roughly a full day before saving.</string>
 
     <!-- ── Profile enums ──────────────────────────────────────────── -->
     <string name="sex_male">Male</string>

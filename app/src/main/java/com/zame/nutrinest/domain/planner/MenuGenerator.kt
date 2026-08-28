@@ -103,7 +103,7 @@ sealed class GenerationResult {
     data class Failure(val reason: FailureReason) : GenerationResult()
 }
 
-enum class FailureReason(@StringRes val messageRes: Int) {
+enum class FailureReason(@param:StringRes val messageRes: Int) {
     NO_PROFILES(R.string.menu_error_no_profiles),
     NO_MATCHING_RECIPES(R.string.menu_error_no_matching_recipes),
     NOT_ENOUGH_RECIPES(R.string.menu_error_not_enough_recipes),

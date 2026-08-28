@@ -29,7 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,9 +62,9 @@ fun MealDetailScreen(
     onBack: () -> Unit,
     viewModel: MealDetailViewModel = viewModel(factory = MealDetailViewModel.Factory)
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
-    val recipes by viewModel.allRecipes.collectAsState()
+    val recipes by viewModel.allRecipes.collectAsStateWithLifecycle()
     val meal = state.meal
     var showSwapDialog by remember { mutableStateOf(false) }
 

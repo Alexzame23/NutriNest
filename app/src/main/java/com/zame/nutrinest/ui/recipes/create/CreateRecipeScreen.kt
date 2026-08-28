@@ -48,7 +48,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,9 +90,9 @@ fun CreateRecipeScreen(
     onCreateIngredient: () -> Unit,
     viewModel: CreateRecipeViewModel = viewModel(factory = CreateRecipeViewModel.Factory)
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val allIngredients by viewModel.allIngredients.collectAsState()
-    val folders by viewModel.folders.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val allIngredients by viewModel.allIngredients.collectAsStateWithLifecycle()
+    val folders by viewModel.folders.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
     val snackbarHostState = remember { SnackbarHostState() }
     var showIngredientPicker by remember { mutableStateOf(false) }

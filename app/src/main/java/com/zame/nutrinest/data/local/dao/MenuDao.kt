@@ -18,6 +18,7 @@ import com.zame.nutrinest.data.local.entity.PortionWithProfile
 import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.ProfileMealPlanEntity
 import com.zame.nutrinest.data.local.entity.RecipeEntity
+import com.zame.nutrinest.data.local.entity.RecipeIngredientRow
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
 import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.local.entity.ShoppingItemWithIngredient
@@ -185,6 +186,27 @@ interface MenuDao {
         """
     )
     suspend fun getIngredientsOf(recipeId: Long): List<IngredientWithQuantity>
+
+    /** One join for planner generation instead of a query for every recipe. */
+    @Query(
+        """
+        SELECT ri.recipeId AS parentRecipeId, i.*, ri.grams, ri.quantityUnit
+        FROM recipe_ingredients ri
+        INNER JOIN ingredients i ON i.id = ri.ingredientId
+        """
+    )
+    suspend fun getAllRecipeIngredients(): List<RecipeIngredientRow>
+
+    /** Bulk load for shopping-list recalculation after a meal swap. */
+    @Query(
+        """
+        SELECT ri.recipeId AS parentRecipeId, i.*, ri.grams, ri.quantityUnit
+        FROM recipe_ingredients ri
+        INNER JOIN ingredients i ON i.id = ri.ingredientId
+        WHERE ri.recipeId IN (:recipeIds)
+        """
+    )
+    suspend fun getIngredientsOfRecipes(recipeIds: List<Long>): List<RecipeIngredientRow>
 
     @Query("SELECT * FROM recipe_steps WHERE recipeId = :recipeId ORDER BY position")
     fun observeSteps(recipeId: Long): Flow<List<RecipeStepEntity>>

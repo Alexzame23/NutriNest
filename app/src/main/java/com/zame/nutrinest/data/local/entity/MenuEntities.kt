@@ -12,7 +12,7 @@ import androidx.room.TypeConverter
 import com.zame.nutrinest.R
 
 /** Meal slots within a day. Order in the enum = display order. */
-enum class MealSlot(@StringRes val labelRes: Int, val nominalHour: Int) {
+enum class MealSlot(@param:StringRes val labelRes: Int, val nominalHour: Int) {
     BREAKFAST(R.string.meal_slot_breakfast, 8),
     MORNING_SNACK(R.string.meal_slot_morning_snack, 11),
     LUNCH(R.string.meal_slot_lunch, 14),
@@ -56,7 +56,10 @@ enum class MealSlot(@StringRes val labelRes: Int, val nominalHour: Int) {
  * eat — everyone has the same dinner, but the child's Tuesday lunch is at
  * school.
  */
-enum class MenuScope(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
+enum class MenuScope(
+    @param:StringRes val labelRes: Int,
+    @param:StringRes val descriptionRes: Int
+) {
     SHARED(R.string.menu_scope_shared, R.string.menu_scope_shared_note),
     INDIVIDUAL(R.string.menu_scope_individual, R.string.menu_scope_individual_note),
     PER_MEAL(R.string.menu_scope_per_meal, R.string.menu_scope_per_meal_note)
@@ -67,7 +70,7 @@ enum class MenuScope(@StringRes val labelRes: Int, @StringRes val descriptionRes
  * first-course-plus-main pattern. [SINGLE] is one dish filling the slot on its
  * own; every planned meal carries exactly one course.
  */
-enum class MealCourse(@StringRes val labelRes: Int) {
+enum class MealCourse(@param:StringRes val labelRes: Int) {
     SINGLE(R.string.course_single),
     FIRST(R.string.course_first),
     MAIN(R.string.course_main),
@@ -127,15 +130,24 @@ data class WeeklyMenuEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val remoteId: String? = null
 ) {
-    fun slotWeights(): Map<MealSlot, Float> =
-        slotsSpec.split(",").mapNotNull { part ->
+    fun slotWeights(): Map<MealSlot, Float> {
+        val parsed = slotsSpec.split(",").mapNotNull { part ->
             val pieces = part.split(":")
             if (pieces.size == 2) {
                 val slot = runCatching { MealSlot.valueOf(pieces[0]) }.getOrNull()
                 val weight = pieces[1].toFloatOrNull()
-                if (slot != null && weight != null) slot to weight else null
+                if (slot != null && weight != null && weight.isFinite() && weight in 0.05f..1f) {
+                    slot to weight
+                } else {
+                    null
+                }
             } else null
         }.toMap()
+        return parsed.takeIf {
+            it.size in 3..5 && it.values.sum() in 0.95f..1.05f
+        }
+            ?: MealSlot.defaultWeights(MealSlot.forMealsPerDay(3))
+    }
 
     fun slotCourses(): Map<MealSlot, List<MealCourse>> =
         coursesSpec.split(",").mapNotNull { part ->

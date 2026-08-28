@@ -30,7 +30,7 @@ class AppContainer(app: Application) {
         LocalProfileRepository(database.profileDao())
 
     val menuRepository: MenuRepository =
-        LocalMenuRepository(database.menuDao())
+        LocalMenuRepository(database)
 }
 
 class NutriNestApp : Application() {

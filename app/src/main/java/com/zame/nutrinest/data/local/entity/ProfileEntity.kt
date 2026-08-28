@@ -9,15 +9,15 @@ import androidx.room.TypeConverter
 import com.zame.nutrinest.R
 import java.util.Calendar
 
-enum class BiologicalSex(@StringRes val labelRes: Int) {
+enum class BiologicalSex(@param:StringRes val labelRes: Int) {
     MALE(R.string.sex_male),
     FEMALE(R.string.sex_female)
 }
 
 /** Weekly exercise level with the standard TDEE multipliers. */
 enum class ActivityLevel(
-    @StringRes val labelRes: Int,
-    @StringRes val descriptionRes: Int,
+    @param:StringRes val labelRes: Int,
+    @param:StringRes val descriptionRes: Int,
     val multiplier: Double
 ) {
     SEDENTARY(R.string.activity_sedentary, R.string.activity_sedentary_detail, 1.2),
@@ -27,7 +27,7 @@ enum class ActivityLevel(
     VERY_ACTIVE(R.string.activity_very_active, R.string.activity_very_active_detail, 1.9)
 }
 
-enum class Goal(@StringRes val labelRes: Int) {
+enum class Goal(@param:StringRes val labelRes: Int) {
     LOSE_WEIGHT(R.string.goal_lose_weight),
     MAINTAIN(R.string.goal_maintain),
     GAIN_WEIGHT(R.string.goal_gain_weight),
@@ -40,21 +40,21 @@ enum class Goal(@StringRes val labelRes: Int) {
  * Expressed as a daily deficit; the labels show the approximate weekly fat
  * loss (~7700 kcal per kg of body fat). Only applies to the losing goal.
  */
-enum class WeightLossRate(@StringRes val labelRes: Int, val kcalPerDayDeficit: Int) {
+enum class WeightLossRate(@param:StringRes val labelRes: Int, val kcalPerDayDeficit: Int) {
     GENTLE(R.string.weight_loss_gentle, 275),
     MODERATE(R.string.weight_loss_moderate, 550),
     AGGRESSIVE(R.string.weight_loss_aggressive, 825)
 }
 
 /** User-selectable BMR formula. AUTO picks the best fit for available data. */
-enum class BmrFormula(@StringRes val labelRes: Int) {
+enum class BmrFormula(@param:StringRes val labelRes: Int) {
     AUTO(R.string.formula_auto),
     MIFFLIN_ST_JEOR(R.string.formula_mifflin),
     HARRIS_BENEDICT(R.string.formula_harris),
     KATCH_MCARDLE(R.string.formula_katch)
 }
 
-enum class UnitSystem(@StringRes val labelRes: Int) {
+enum class UnitSystem(@param:StringRes val labelRes: Int) {
     METRIC(R.string.units_metric),
     IMPERIAL(R.string.units_imperial)
 }

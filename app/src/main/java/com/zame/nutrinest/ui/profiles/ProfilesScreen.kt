@@ -34,7 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,8 +64,8 @@ fun ProfilesScreen(
     onEditProfile: (Long) -> Unit,
     viewModel: ProfilesViewModel = viewModel(factory = ProfilesViewModel.Factory)
 ) {
-    val profiles by viewModel.profiles.collectAsState()
-    val operationFailed by viewModel.operationFailed.collectAsState()
+    val profiles by viewModel.profiles.collectAsStateWithLifecycle()
+    val operationFailed by viewModel.operationFailed.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<ProfileEntity?>(null) }
 
     Scaffold(

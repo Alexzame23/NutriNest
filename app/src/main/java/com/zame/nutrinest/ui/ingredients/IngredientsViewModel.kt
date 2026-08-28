@@ -13,6 +13,7 @@ import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.util.TextNormalizer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -82,7 +84,6 @@ data class IngredientsUiState(
 }
 
 private data class Filters(
-    val query: String = "",
     val view: IngredientView = IngredientView.CATEGORIES,
     val sort: IngredientSort = IngredientSort.NAME_ASC,
     val selectedCategories: Set<String> = emptySet(),
@@ -110,6 +111,7 @@ class IngredientsViewModel(
         Collator.getInstance(locale()).apply { strength = Collator.PRIMARY }
 
     private val filters = MutableStateFlow(Filters())
+    private val query = MutableStateFlow("")
     private val collapsed = MutableStateFlow<Set<String>>(emptySet())
     private val compare = MutableStateFlow(CompareState())
 
@@ -125,19 +127,18 @@ class IngredientsViewModel(
         val selection: List<Long> = emptyList()
     )
 
-    private val ingredients = filters.debounce(200).flatMapLatest { f ->
-        when (f.view) {
+    private val ingredients = combine(query.debounce(200), filters) { q, f -> q to f }
+        .flatMapLatest { (q, f) -> when (f.view) {
             // "Recent" is ordered by the database, then narrowed in memory so
             // the search box still works inside it.
             IngredientView.RECENT -> repository.observeRecentlyUsed(RECENT_LIMIT)
             else -> repository.observeFiltered(
-                query = f.query,
+                query = q,
                 categoryKeys = f.selectedCategories,
                 favoritesOnly = f.view == IngredientView.FAVORITES,
                 customOnly = f.customOnly
             )
-        }
-    }
+        } }
 
     private val recentlyAdded = repository.observeRecentlyAdded(RECENT_LIMIT)
 
@@ -145,19 +146,19 @@ class IngredientsViewModel(
         .map { meta -> meta.firstOrNull { it.key == FoodDatasetMetaEntity.ATTRIBUTION }?.value }
 
     val uiState: StateFlow<IngredientsUiState> = combine(
-        filters,
+        combine(filters, query) { f, q -> f to q },
         ingredients,
         referenceRepository.observeCategoriesWithCounts(),
         collapsed,
         combine(compare, recentlyAdded, attribution, localeTick) { c, added, credit, _ ->
             Triple(c, added, credit)
         }
-    ) { f, all, categories, collapsedKeys, (compareState, added, credit) ->
-        val visible = if (f.view == IngredientView.RECENT) narrowInMemory(all, f) else all
+    ) { (f, q), all, categories, collapsedKeys, (compareState, added, credit) ->
+        val visible = if (f.view == IngredientView.RECENT) narrowInMemory(all, f, q) else all
         val sorted = sort(visible, f.sort)
 
         IngredientsUiState(
-            query = f.query,
+            query = q,
             view = f.view,
             sort = f.sort,
             selectedCategories = f.selectedCategories,
@@ -177,7 +178,7 @@ class IngredientsViewModel(
                     ),
                     LabelledSection(
                         R.string.ingredients_recently_added,
-                        sort(narrowInMemory(added, f), f.sort)
+                        sort(narrowInMemory(added, f, q), f.sort)
                     )
                 ).filter { it.ingredients.isNotEmpty() }
             } else {
@@ -189,7 +190,10 @@ class IngredientsViewModel(
             attribution = credit,
             isLoading = false
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IngredientsUiState())
+    }
+        // Locale-aware sorting and grouping can touch the full food catalogue.
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IngredientsUiState())
 
     // ── Intents ─────────────────────────────────────────────────────────
 
@@ -205,7 +209,7 @@ class IngredientsViewModel(
         localeTick.value = locale()
     }
 
-    fun onQueryChange(value: String) = filters.update { copy(query = value) }
+    fun onQueryChange(value: String) { query.value = value }
 
     fun onViewChange(view: IngredientView) = filters.update { copy(view = view) }
 
@@ -262,8 +266,12 @@ class IngredientsViewModel(
      * already ordered for us (the "Recent" views), so those views behave like
      * the others without giving up their ordering.
      */
-    private fun narrowInMemory(items: List<IngredientEntity>, f: Filters): List<IngredientEntity> {
-        val needle = TextNormalizer.normalize(f.query)
+    private fun narrowInMemory(
+        items: List<IngredientEntity>,
+        f: Filters,
+        query: String
+    ): List<IngredientEntity> {
+        val needle = TextNormalizer.normalize(query)
         return items.filter { item ->
             (f.selectedCategories.isEmpty() || item.categoryKey in f.selectedCategories) &&
                 (!f.customOnly || item.isCustom) &&

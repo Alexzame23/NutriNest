@@ -404,14 +404,17 @@
     <string name="menu_config_favorites_only">Favoritas</string>
     <plurals name="menu_config_enabled_count">
         <item quantity="one">%1$d de %2$d receta activada para generar menús</item>
+        <item quantity="many">%1$d de %2$d recetas activadas para generar menús</item>
         <item quantity="other">%1$d de %2$d recetas activadas para generar menús</item>
     </plurals>
     <plurals name="menu_config_book_enabled_count">
         <item quantity="one">%1$d de %2$d activada</item>
+        <item quantity="many">%1$d de %2$d activadas</item>
         <item quantity="other">%1$d de %2$d activadas</item>
     </plurals>
     <plurals name="menu_config_variety_warning">
         <item quantity="one">Solo hay %1$d receta activada. Activa al menos %2$d o aumenta las repeticiones para generar una semana variada.</item>
+        <item quantity="many">Solo hay %1$d recetas activadas. Activa al menos %2$d o aumenta las repeticiones para generar una semana variada.</item>
         <item quantity="other">Solo hay %1$d recetas activadas. Activa al menos %2$d o aumenta las repeticiones para generar una semana variada.</item>
     </plurals>
     <string name="menu_config_no_recipe_matches">Ninguna receta coincide con la búsqueda y los filtros de tipo de comida.</string>
@@ -429,6 +432,7 @@
     <string name="menu_config_lock_meal_type">Tipo de comida</string>
     <plurals name="menu_config_lock_recipe_results">
         <item quantity="one">%1$d receta encontrada</item>
+        <item quantity="many">%1$d recetas encontradas</item>
         <item quantity="other">%1$d recetas encontradas</item>
     </plurals>
     <string name="menu_error_no_profiles">Crea antes al menos un perfil: el menú se personaliza según las calorías objetivo de cada persona.</string>
@@ -454,6 +458,7 @@
     <string name="intake_what">Qué era</string>
     <string name="intake_kcal">Calorías</string>
     <string name="intake_dialog_note">El resto del día se reajusta al momento. Las comidas libres quedan fuera y el menú de los demás no cambia.</string>
+    <string name="intake_invalid_values">Usa calorías positivas y valores numéricos no negativos para los macros.</string>
 
     <string name="shopping_list_title">Lista de la compra</string>
     <string name="shopping_list_empty_title">Todavía no hay nada que comprar</string>
@@ -507,6 +512,7 @@
     <string name="profile_error_height">Introduce una altura válida.</string>
     <string name="profile_error_weight">Introduce un peso válido.</string>
     <string name="profile_error_body_fat">La grasa corporal debe estar entre el 3 y el 70 por ciento, o dejarse vacía.</string>
+    <string name="profile_error_meal_split">Los porcentajes de las comidas deben cubrir aproximadamente un día completo antes de guardar.</string>
 
     <!-- ── Enumeraciones de perfil ────────────────────────────────── -->
     <string name="sex_male">Hombre</string>

@@ -13,7 +13,7 @@ import com.zame.nutrinest.R
 import java.util.Locale
 
 /** The languages the app ships translations for. */
-enum class AppLanguage(val tag: String, @StringRes val labelRes: Int) {
+enum class AppLanguage(val tag: String, @param:StringRes val labelRes: Int) {
     ENGLISH("en", R.string.language_english),
     SPANISH("es", R.string.language_spanish);
 

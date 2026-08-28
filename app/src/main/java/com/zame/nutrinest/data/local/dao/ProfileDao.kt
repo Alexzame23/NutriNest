@@ -86,4 +86,14 @@ interface ProfileDao {
             )
         }
     }
+
+    /** Updates profile, weight history, and its daily split as one commit. */
+    @Transaction
+    suspend fun updateWithMealPlan(
+        profile: ProfileEntity,
+        mealPlan: List<ProfileMealPlanEntity>
+    ) {
+        updateTrackingWeight(profile)
+        replaceMealPlan(profile.id, mealPlan)
+    }
 }

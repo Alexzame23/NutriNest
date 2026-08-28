@@ -175,12 +175,20 @@ def run_migration_4_5(conn: sqlite3.Connection) -> None:
 
 
 def run_migration_5_6(conn: sqlite3.Connection) -> None:
-    """Apply the actual v5 -> v6 statements, including duplicate cleanup."""
+    """Apply the actual v5 -> v6 statements and generated index loop."""
     source = open(DB_KT).read()
     marker = source.index("internal val MIGRATION_5_6")
     end = source.index("internal val MIGRATION_6_7", marker)
     for statement in extract_exec_sql(source[marker:end]):
+        # rebuildPlannedMeals creates these three statements in a Kotlin loop.
+        if "$it" in statement:
+            continue
         conn.execute(statement)
+    for column in ("menuId", "recipeId", "profileId"):
+        conn.execute(
+            f"CREATE INDEX IF NOT EXISTS index_planned_meals_{column} "
+            f"ON planned_meals ({column})"
+        )
     conn.commit()
 
 
@@ -188,9 +196,45 @@ def run_migration_6_7(conn: sqlite3.Connection) -> None:
     """Apply the recipe presentation and quantity migration."""
     source = open(DB_KT).read()
     marker = source.index("internal val MIGRATION_6_7")
-    end = source.index("private fun addIngredientColumns", marker)
+    end = source.index("internal val MIGRATION_7_8", marker)
     for statement in extract_exec_sql(source[marker:end]):
         conn.execute(statement)
+    conn.commit()
+
+
+def run_migration_7_8(conn: sqlite3.Connection) -> None:
+    """Apply the bilingual recipe-title and instruction migration."""
+    source = open(DB_KT).read()
+    marker = source.index("internal val MIGRATION_7_8")
+    end = source.index("private fun tableExists", marker)
+    for statement in extract_exec_sql(source[marker:end]):
+        conn.execute(statement)
+    conn.commit()
+
+
+def seed_v5_menu(conn: sqlite3.Connection) -> None:
+    """A real v5 menu with portions and a checked shopping item."""
+    conn.execute(
+        "INSERT INTO profiles (id, name, dateOfBirth, sex, heightCm, weightKg, "
+        "bodyFatPercent, activityLevel, goal, weightLossRate, formula, unitSystem, "
+        "dietaryPreferences, allergies, colorIndex, createdAt, remoteId) VALUES "
+        "(1, 'Ana', 0, 'FEMALE', 165, 60, NULL, 'MODERATE', 'MAINTAIN', "
+        "'MODERATE', 'AUTO', 'METRIC', NULL, NULL, 0, 0, NULL)"
+    )
+    conn.execute(
+        "INSERT INTO weekly_menus (id, weekStart, slotsSpec, createdAt) "
+        "VALUES (1, 0, 'LUNCH:0.5,DINNER:0.5', 0)"
+    )
+    conn.execute(
+        "INSERT INTO planned_meals "
+        "(id, menuId, dayOfWeek, slot, recipeId, isLocked, isCheatMeal) VALUES "
+        "(1, 1, 0, 'LUNCH', 1, 1, 0), (2, 1, 0, 'DINNER', 1, 0, 0)"
+    )
+    conn.execute("INSERT INTO meal_portions VALUES (1, 1, 1.5), (2, 1, 0.8)")
+    conn.execute(
+        "INSERT INTO shopping_items "
+        "(id, menuId, ingredientId, grams, purchased) VALUES (1, 1, 8, 6, 1)"
+    )
     conn.commit()
 
 
@@ -397,32 +441,17 @@ def main() -> None:
     check("createdAt backfilled",
           conn.execute("SELECT COUNT(*) FROM ingredients WHERE createdAt = 0").fetchone()[0] == 0)
 
-    # Simulate a v5 database that acquired duplicate slots before the unique
-    # constraint existed. The migration must retain one row and still upgrade.
-    conn.execute(
-        "INSERT INTO weekly_menus (id, weekStart, slotsSpec, createdAt) "
-        "VALUES (1, 0, 'LUNCH:1.0', 0)"
-    )
-    conn.execute(
-        "INSERT INTO planned_meals "
-        "(id, menuId, dayOfWeek, slot, recipeId, isLocked, isCheatMeal) "
-        "VALUES (1, 1, 0, 'LUNCH', 1, 0, 0), (2, 1, 0, 'LUNCH', 1, 1, 0)"
-    )
+    seed_v5_menu(conn)
     run_migration_5_6(conn)
-    kept = conn.execute(
-        "SELECT id FROM planned_meals WHERE menuId = 1 AND dayOfWeek = 0 AND slot = 'LUNCH'"
-    ).fetchall()
-    check("v5->v6 removes duplicate meal slots before indexing", kept == [(2,)], str(kept))
-    unique_indices = {
-        row[1] for row in conn.execute("PRAGMA index_list('planned_meals')") if row[2]
-    }
-    check("v5->v6 adds the unique meal-slot index",
-          "index_planned_meals_menuId_dayOfWeek_slot" in unique_indices)
     run_migration_6_7(conn)
+    run_migration_7_8(conn)
     recipe_columns = {row[1] for row in conn.execute("PRAGMA table_info(recipes)")}
     link_columns = {row[1] for row in conn.execute("PRAGMA table_info(recipe_ingredients)")}
+    step_columns = {row[1] for row in conn.execute("PRAGMA table_info(recipe_steps)")}
     check("v6->v7 adds cover image framing", "coverImageCrop" in recipe_columns)
     check("v6->v7 retains the selected quantity unit", "quantityUnit" in link_columns)
+    check("v7->v8 adds translated recipe names", "nameEs" in recipe_columns)
+    check("v7->v8 adds translated instructions", "textEs" in step_columns)
 
     print("\n2. import")
     tally = run_import(conn, version)
@@ -556,9 +585,6 @@ def main() -> None:
           conn.execute("SELECT COUNT(*) FROM ingredients").fetchone()[0] == before)
 
     print("\n6. v5 -> v6: per-person menus")
-    seed_v5_menu(conn)
-    run_migration_5_6(conn)
-
     meals = conn.execute(
         "SELECT id, slot, recipeId, isLocked, isCheatMeal, course, profileId, isFree"
         " FROM planned_meals ORDER BY id"

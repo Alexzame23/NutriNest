@@ -31,15 +31,17 @@ UNTRANSLATED = {"app_name"}
 failures: list[str] = []
 
 
-def entries(path: str) -> dict[str, str]:
-    """name -> text, for both <string> and <plurals> (items concatenated)."""
-    out: dict[str, str] = {}
+def entries(path: str) -> dict[str, tuple[str, ...]]:
+    """Name to independently formatted variants of a string or plural."""
+    out: dict[str, tuple[str, ...]] = {}
     for child in ET.parse(path).getroot():
         name = child.get("name")
         if name is None:
             continue
-        out[name] = " ".join("".join(part.itertext()) for part in child) or \
-            "".join(child.itertext())
+        if child.tag == "plurals":
+            out[name] = tuple("".join(item.itertext()) for item in child)
+        else:
+            out[name] = ("".join(child.itertext()),)
     return out
 
 
@@ -47,37 +49,46 @@ def placeholders(text: str) -> list[str]:
     return sorted(m.group(0) for m in PLACEHOLDER.finditer(text))
 
 
-def check_positional_arguments(language: str, values: dict[str, str]) -> None:
+def placeholder_signatures(texts: tuple[str, ...]) -> set[tuple[str, ...]]:
+    """Distinct format signatures; plural languages may have extra quantities."""
+    return {tuple(placeholders(text)) for text in texts}
+
+
+def check_positional_arguments(
+    language: str, values: dict[str, tuple[str, ...]]
+) -> None:
     """
     AAPT2 rejects a string with more than one substitution unless every one of
     them is numbered ("%1$s" rather than "%s"), so catch it here rather than at
     build time.
     """
-    for name, text in values.items():
-        found = PLACEHOLDER.findall(text)
-        if len(found) > 1 and any(index == "" for index in found):
-            failures.append(
-                f"{language}/{name}: multiple substitutions must be numbered, e.g. '%1$s'"
-            )
+    for name, texts in values.items():
+        for text in texts:
+            found = PLACEHOLDER.findall(text)
+            if len(found) > 1 and any(index == "" for index in found):
+                failures.append(
+                    f"{language}/{name}: multiple substitutions must be numbered, e.g. '%1$s'"
+                )
 
 
-def check_percent_usage(language: str, values: dict[str, str]) -> None:
+def check_percent_usage(language: str, values: dict[str, tuple[str, ...]]) -> None:
     """
     A literal '%' is only safe in a string that never reaches String.format.
     Anything with format arguments must escape it as '%%'; anything without
     must not use '%%', which would then be shown to the user verbatim.
     """
-    for name, text in values.items():
-        formatted = bool(placeholders(text))
-        if formatted and LITERAL_PERCENT.search(text):
-            failures.append(
-                f"{language}/{name}: has format arguments and a bare '%' — escape it as '%%'"
-            )
-        if not formatted and "%%" in text:
-            failures.append(
-                f"{language}/{name}: '%%' in a string with no format arguments would "
-                f"be shown literally"
-            )
+    for name, texts in values.items():
+        for text in texts:
+            formatted = bool(placeholders(text))
+            if formatted and LITERAL_PERCENT.search(text):
+                failures.append(
+                    f"{language}/{name}: has format arguments and a bare '%' — escape it as '%%'"
+                )
+            if not formatted and "%%" in text:
+                failures.append(
+                    f"{language}/{name}: '%%' in a string with no format arguments would "
+                    f"be shown literally"
+                )
 
 
 def main() -> None:
@@ -107,7 +118,8 @@ def main() -> None:
             failures.append(f"{directory}: '{name}' has no entry in values/strings.xml")
 
         for name in sorted(set(base) & set(values)):
-            want, got = placeholders(base[name]), placeholders(values[name])
+            want = placeholder_signatures(base[name])
+            got = placeholder_signatures(values[name])
             if want != got:
                 failures.append(
                     f"{directory}/{name}: placeholders {got} do not match {want}"

@@ -31,13 +31,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** What is wrong with the form, as a code the UI layer translates. */
-enum class ProfileFormError(@StringRes val messageRes: Int) {
+enum class ProfileFormError(@param:StringRes val messageRes: Int) {
     NAME_REQUIRED(R.string.profile_error_name),
     DOB_REQUIRED(R.string.profile_error_dob),
     DOB_IN_FUTURE(R.string.profile_error_dob_future),
     HEIGHT_INVALID(R.string.profile_error_height),
     WEIGHT_INVALID(R.string.profile_error_weight),
     BODY_FAT_INVALID(R.string.profile_error_body_fat),
+    MEAL_SPLIT_INVALID(R.string.profile_error_meal_split),
     SAVE_FAILED(R.string.error_save_failed)
 }
 
@@ -80,6 +81,10 @@ data class ProfileEditorState(
     /** Everything assigned, free slots included — should come to 100%. */
     val totalShare: Float
         get() = slots.sumOf { (slotShares[it] ?: 0f).toDouble() }.toFloat()
+
+    /** Small rounding differences are harmless, but a day must still add up. */
+    val isMealSplitValid: Boolean
+        get() = totalShare.isFinite() && totalShare in 0.95f..1.05f
 
     /**
      * Absolute budget of a slot in kcal. Free slots keep theirs on paper —
@@ -168,7 +173,8 @@ class ProfileEditorViewModel(
      */
     private fun loadMealPlan(id: Long) {
         viewModelScope.launch {
-            val rows = repository.observeMealPlan(id).first()
+            val rows = runCatching { repository.observeMealPlan(id).first() }
+                .getOrElse { return@launch }
             if (rows.isEmpty()) return@launch
             update {
                 copy(
@@ -183,42 +189,41 @@ class ProfileEditorViewModel(
     private fun loadProfile(id: Long) {
         update { copy(isLoading = true) }
         viewModelScope.launch {
-            repository.observeById(id).collect { profile ->
-                if (profile != null && _state.value.editingId == null) {
-                    original = profile
-                    update {
-                        val (feet, inches) =
-                            UnitConversions.cmToFeetInches(profile.heightCm)
-                        copy(
-                            editingId = profile.id,
-                            name = profile.name,
-                            dateOfBirth = profile.dateOfBirth,
-                            sex = profile.sex,
-                            unitSystem = profile.unitSystem,
-                            heightText = when (profile.unitSystem) {
-                                UnitSystem.METRIC -> trimNumber(profile.heightCm)
-                                UnitSystem.IMPERIAL -> feet.toString()
-                            },
-                            heightInchesText = when (profile.unitSystem) {
-                                UnitSystem.METRIC -> ""
-                                UnitSystem.IMPERIAL -> trimNumber(inches)
-                            },
-                            weightText = when (profile.unitSystem) {
-                                UnitSystem.METRIC -> trimNumber(profile.weightKg)
-                                UnitSystem.IMPERIAL ->
-                                    trimNumber(UnitConversions.kgToLb(profile.weightKg))
-                            },
-                            bodyFatText = profile.bodyFatPercent?.let(::trimNumber) ?: "",
-                            activityLevel = profile.activityLevel,
-                            goal = profile.goal,
-                            weightLossRate = profile.weightLossRate,
-                            formula = profile.formula,
-                            dietaryPreferences = profile.dietaryPreferences ?: "",
-                            allergies = profile.allergies ?: "",
-                            isLoading = false
-                        )
-                    }
-                }
+            val profile = runCatching { repository.observeById(id).first() }.getOrNull()
+            if (profile == null) {
+                update { copy(isLoading = false, error = ProfileFormError.SAVE_FAILED) }
+                return@launch
+            }
+            original = profile
+            update {
+                val (feet, inches) = UnitConversions.cmToFeetInches(profile.heightCm)
+                copy(
+                    editingId = profile.id,
+                    name = profile.name,
+                    dateOfBirth = profile.dateOfBirth,
+                    sex = profile.sex,
+                    unitSystem = profile.unitSystem,
+                    heightText = when (profile.unitSystem) {
+                        UnitSystem.METRIC -> trimNumber(profile.heightCm)
+                        UnitSystem.IMPERIAL -> feet.toString()
+                    },
+                    heightInchesText = when (profile.unitSystem) {
+                        UnitSystem.METRIC -> ""
+                        UnitSystem.IMPERIAL -> trimNumber(inches)
+                    },
+                    weightText = when (profile.unitSystem) {
+                        UnitSystem.METRIC -> trimNumber(profile.weightKg)
+                        UnitSystem.IMPERIAL -> trimNumber(UnitConversions.kgToLb(profile.weightKg))
+                    },
+                    bodyFatText = profile.bodyFatPercent?.let(::trimNumber) ?: "",
+                    activityLevel = profile.activityLevel,
+                    goal = profile.goal,
+                    weightLossRate = profile.weightLossRate,
+                    formula = profile.formula,
+                    dietaryPreferences = profile.dietaryPreferences ?: "",
+                    allergies = profile.allergies ?: "",
+                    isLoading = false
+                )
             }
         }
     }
@@ -302,6 +307,7 @@ class ProfileEditorViewModel(
                 s.weightKg == null -> ProfileFormError.WEIGHT_INVALID
                 s.bodyFatText.isNotBlank() && s.bodyFatPercent == null ->
                     ProfileFormError.BODY_FAT_INVALID
+                !s.isMealSplitValid -> ProfileFormError.MEAL_SPLIT_INVALID
                 else -> null
             }
             if (error != null) {
@@ -330,8 +336,9 @@ class ProfileEditorViewModel(
             )
             update { copy(isSaving = true) }
             runCatching {
-                if (s.editingId == null) repository.create(entity)
-                else repository.update(entity)
+                val mealPlan = s.mealPlanRows(entity.id)
+                if (s.editingId == null) repository.create(entity, mealPlan)
+                else repository.update(entity, mealPlan)
             }.onSuccess {
                 update { copy(isSaving = false, saved = true) }
             }.onFailure {

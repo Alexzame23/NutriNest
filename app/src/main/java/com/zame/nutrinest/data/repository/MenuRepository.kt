@@ -1,5 +1,7 @@
 package com.zame.nutrinest.data.repository
 
+import androidx.room.withTransaction
+import com.zame.nutrinest.data.local.NutriNestDatabase
 import com.zame.nutrinest.data.local.dao.MenuDao
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.IntakeEntryEntity
@@ -26,10 +28,12 @@ import com.zame.nutrinest.domain.planner.MenuResolver
 import com.zame.nutrinest.domain.planner.PlannableRecipe
 import com.zame.nutrinest.domain.planner.ShoppingListCalculator
 import com.zame.nutrinest.util.WeekUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.withContext
 
 /** Which side of the household a menu edit applies to. */
 sealed interface MealScopeTarget {
@@ -90,9 +94,11 @@ interface MenuRepository {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalMenuRepository(
-    private val dao: MenuDao,
+    private val database: NutriNestDatabase,
     private val generator: MenuGenerator = MenuGenerator()
 ) : MenuRepository {
+
+    private val dao: MenuDao = database.menuDao()
 
     override fun observeMenu(weekStart: Long) = dao.observeMenu(weekStart)
     override fun observeMeals(menuId: Long) = dao.observeMeals(menuId)
@@ -123,8 +129,11 @@ class LocalMenuRepository(
         val slots = config.slotWeights.keys.sortedBy { it.ordinal }
         val plans = buildPlans(slots, config.slotWeights)
         val profiles = dao.getProfiles()
+        val ingredientsByRecipe = dao.getAllRecipeIngredients()
+            .groupBy { it.recipeId }
+            .mapValues { (_, rows) -> rows.map { it.ingredientWithQuantity() } }
         val recipes = dao.getAllRecipes().map { recipe ->
-            PlannableRecipe(recipe, dao.getIngredientsOf(recipe.id))
+            PlannableRecipe(recipe, ingredientsByRecipe[recipe.id].orEmpty())
         }
 
         // Context for variety + leftovers: what last week used/bought.
@@ -151,14 +160,16 @@ class LocalMenuRepository(
                 }
             }
 
-        val result = generator.generate(
-            plans = plans,
-            recipes = recipes,
-            config = config.copy(locks = carriedLocks + config.locks),
-            profiles = profiles,
-            recentRecipeIds = recentRecipeIds,
-            leftoverIngredientIds = leftoverIngredientIds
-        )
+        val result = withContext(Dispatchers.Default) {
+            generator.generate(
+                plans = plans,
+                recipes = recipes,
+                config = config.copy(locks = carriedLocks + config.locks),
+                profiles = profiles,
+                recentRecipeIds = recentRecipeIds,
+                leftoverIngredientIds = leftoverIngredientIds
+            )
+        }
 
         if (result is GenerationResult.Success) {
             val menu = result.menu
@@ -199,7 +210,9 @@ class LocalMenuRepository(
     }
 
     override suspend fun eraseWeeks(weekStarts: List<Long>) {
-        weekStarts.distinct().forEach { dao.deleteMenu(it) }
+        database.withTransaction {
+            weekStarts.distinct().forEach { dao.deleteMenu(it) }
+        }
     }
 
     override suspend fun setMealLocked(mealId: Long, locked: Boolean) =
@@ -212,37 +225,39 @@ class LocalMenuRepository(
         newRecipeId: Long,
         target: MealScopeTarget
     ) {
-        val meal = dao.getMeal(mealId) ?: return
-        val menu = dao.getMenuById(meal.menuId) ?: return
-        val plans = plansFor(menu).associateBy { it.profileId }
-        val courses = coursesOf(menu, meal.slot)
+        database.withTransaction {
+            val meal = dao.getMeal(mealId) ?: return@withTransaction
+            val menu = dao.getMenuById(meal.menuId) ?: return@withTransaction
+            val plans = plansFor(menu).associateBy { it.profileId }
+            val courses = coursesOf(menu, meal.slot)
 
-        when (target) {
-            is MealScopeTarget.Household -> {
-                // A free row has no portions yet, so fall back to everyone who
-                // isn't already eating apart in this slot.
-                val eaters = dao.getPortions(mealId).map { it.profileId }.ifEmpty {
-                    val apart = dao.getMealsAt(menu.id, meal.dayOfWeek, meal.slot)
-                        .mapNotNull { it.profileId }.toSet()
-                    (plans.keys - apart).toList()
-                }
-                dao.updateMeal(meal.copy(recipeId = newRecipeId, isFree = false))
-                writePortions(mealId, eaters, plans, meal.slot, meal.course, courses, newRecipeId)
-            }
-
-            is MealScopeTarget.Person -> {
-                if (meal.profileId == target.profileId) {
+            when (target) {
+                is MealScopeTarget.Household -> {
+                    // A free row has no portions yet, so fall back to everyone who
+                    // isn't already eating apart in this slot.
+                    val eaters = dao.getPortions(mealId).map { it.profileId }.ifEmpty {
+                        val apart = dao.getMealsAt(menu.id, meal.dayOfWeek, meal.slot)
+                            .mapNotNull { it.profileId }.toSet()
+                        (plans.keys - apart).toList()
+                    }
                     dao.updateMeal(meal.copy(recipeId = newRecipeId, isFree = false))
-                    writePortions(
-                        mealId, listOf(target.profileId), plans,
-                        meal.slot, meal.course, courses, newRecipeId
-                    )
-                } else {
-                    carveOutSlot(menu.id, meal, target.profileId, newRecipeId, plans, courses)
+                    writePortions(mealId, eaters, plans, meal.slot, meal.course, courses, newRecipeId)
+                }
+
+                is MealScopeTarget.Person -> {
+                    if (meal.profileId == target.profileId) {
+                        dao.updateMeal(meal.copy(recipeId = newRecipeId, isFree = false))
+                        writePortions(
+                            mealId, listOf(target.profileId), plans,
+                            meal.slot, meal.course, courses, newRecipeId
+                        )
+                    } else {
+                        carveOutSlot(menu.id, meal, target.profileId, newRecipeId, plans, courses)
+                    }
                 }
             }
+            recomputeShoppingList(menu.id)
         }
-        recomputeShoppingList(menu.id)
     }
 
     /**
@@ -330,21 +345,25 @@ class LocalMenuRepository(
         nutrition: NutritionValues,
         grams: Double?
     ) {
-        dao.insertIntake(
-            IntakeEntryEntity(
-                profileId = profileId,
-                dayStart = dayStart,
-                label = label,
-                grams = grams,
-                nutrition = nutrition
+        database.withTransaction {
+            dao.insertIntake(
+                IntakeEntryEntity(
+                    profileId = profileId,
+                    dayStart = dayStart,
+                    label = label,
+                    grams = grams,
+                    nutrition = nutrition
+                )
             )
-        )
-        rebalanceDay(profileId, dayStart)
+            rebalanceDay(profileId, dayStart)
+        }
     }
 
     override suspend fun deleteIntake(entryId: Long, profileId: Long, dayStart: Long) {
-        dao.deleteIntake(entryId)
-        rebalanceDay(profileId, dayStart)
+        database.withTransaction {
+            dao.deleteIntake(entryId)
+            rebalanceDay(profileId, dayStart)
+        }
     }
 
     /**
@@ -422,8 +441,14 @@ class LocalMenuRepository(
      */
     private suspend fun recomputeShoppingList(menuId: Long) {
         val meals = dao.getMealsWithPortions(menuId)
-        val ingredients = meals.mapNotNull { it.meal.recipeId }.distinct()
-            .associateWith { dao.getIngredientsOf(it) }
+        val recipeIds = meals.mapNotNull { it.meal.recipeId }.distinct()
+        val ingredients = if (recipeIds.isEmpty()) {
+            emptyMap()
+        } else {
+            dao.getIngredientsOfRecipes(recipeIds)
+                .groupBy { it.recipeId }
+                .mapValues { (_, rows) -> rows.map { it.ingredientWithQuantity() } }
+        }
         dao.rewriteShoppingList(
             menuId = menuId,
             totals = ShoppingListCalculator.totals(

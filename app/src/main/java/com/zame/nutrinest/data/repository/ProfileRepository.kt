@@ -37,8 +37,8 @@ class LocalProfileRepository(private val dao: ProfileDao) : ProfileRepository {
         dao.insertWithInitialWeight(profile, mealPlan)
 
     override suspend fun update(profile: ProfileEntity, mealPlan: List<ProfileMealPlanEntity>?) {
-        dao.updateTrackingWeight(profile)
-        if (mealPlan != null) dao.replaceMealPlan(profile.id, mealPlan)
+        if (mealPlan == null) dao.updateTrackingWeight(profile)
+        else dao.updateWithMealPlan(profile, mealPlan)
     }
 
     override suspend fun delete(profile: ProfileEntity) = dao.delete(profile)

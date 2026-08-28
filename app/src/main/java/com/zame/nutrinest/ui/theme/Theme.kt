@@ -10,7 +10,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -67,12 +66,12 @@ fun NutritionAppTheme(
 ) {
     val colorScheme = if (darkTheme) DarkColors else LightColors
 
-    // Tint the status bar to match the background for an edge-to-edge feel.
+    // The activity owns edge-to-edge rendering; the theme only keeps system-bar
+    // icon contrast in sync. Status-bar colors are ignored on current Android.
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view)
                 .isAppearanceLightStatusBars = !darkTheme
         }

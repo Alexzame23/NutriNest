@@ -51,7 +51,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -97,13 +97,13 @@ fun MenuConfigScreen(
     onGenerated: () -> Unit,
     viewModel: MenuConfigViewModel = viewModel(factory = MenuConfigViewModel.Factory)
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val shortDays = remember(configuration) { WeekUtils.shortDayNames(configuration.locales[0]) }
-    val recipes by viewModel.allRecipes.collectAsState()
-    val folders by viewModel.allFolders.collectAsState()
-    val recipeNutrition by viewModel.recipeNutrition.collectAsState()
-    val profiles by viewModel.profiles.collectAsState()
+    val recipes by viewModel.allRecipes.collectAsStateWithLifecycle()
+    val folders by viewModel.allFolders.collectAsStateWithLifecycle()
+    val recipeNutrition by viewModel.recipeNutrition.collectAsStateWithLifecycle()
+    val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
     val snackbarHostState = remember { SnackbarHostState() }
     var showLockDialog by remember { mutableStateOf(false) }

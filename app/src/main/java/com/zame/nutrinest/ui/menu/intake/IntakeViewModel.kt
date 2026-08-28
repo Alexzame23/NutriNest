@@ -64,6 +64,14 @@ data class IntakeUiState(
     val isOverBudget: Boolean get() = loggedKcal > plannedKcal
 }
 
+/** Guards the database and rebalancer against negative, non-finite, or absurd input. */
+internal fun isValidIntake(label: String, nutrition: NutritionValues): Boolean =
+    label.isNotBlank() &&
+        nutrition.kcal.isFinite() && nutrition.kcal > 0.0 && nutrition.kcal <= 100_000.0 &&
+        listOf(nutrition.carbs, nutrition.fats, nutrition.protein).all {
+            it.isFinite() && it in 0.0..10_000.0
+        }
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class IntakeViewModel(
     private val repository: MenuRepository,
@@ -122,13 +130,14 @@ class IntakeViewModel(
     /** Logging is per profile: nobody else's portions move. */
     fun log(label: String, kcal: Double, carbs: Double, fats: Double, protein: Double) {
         val profileId = uiState.value.selectedProfileId ?: return
-        if (label.isBlank() || kcal <= 0.0) return
+        val nutrition = NutritionValues(kcal, carbs, fats, protein)
+        if (!isValidIntake(label, nutrition)) return
         viewModelScope.launch {
             repository.logIntake(
                 profileId = profileId,
                 dayStart = dayStart,
                 label = label.trim(),
-                nutrition = NutritionValues(kcal, carbs, fats, protein)
+                nutrition = nutrition
             )
         }
     }

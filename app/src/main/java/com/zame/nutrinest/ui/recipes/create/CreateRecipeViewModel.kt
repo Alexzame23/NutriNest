@@ -38,7 +38,7 @@ data class DraftStep(
 )
 
 /** What is wrong with the form, as a code the UI layer translates. */
-enum class RecipeFormError(@StringRes val messageRes: Int) {
+enum class RecipeFormError(@param:StringRes val messageRes: Int) {
     NAME_REQUIRED(R.string.recipe_error_name),
     NO_INGREDIENTS(R.string.recipe_error_no_ingredients),
     NO_STEPS(R.string.recipe_error_no_steps),
