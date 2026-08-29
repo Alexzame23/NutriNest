@@ -65,7 +65,7 @@ class MenuReminderWorker(
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_agenda)
+            .setSmallIcon(R.drawable.nutrinest_launcher_monochrome)
             .setContentTitle(context.getString(R.string.notification_title))
             .setContentText(context.getString(R.string.notification_body))
             .setContentIntent(intent)

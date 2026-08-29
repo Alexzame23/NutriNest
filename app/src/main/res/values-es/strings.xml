@@ -29,13 +29,14 @@
     <string name="kcal_per_100g">%1$d kcal / 100 g</string>
 
     <!-- ── Inicio ─────────────────────────────────────────────────── -->
-    <string name="home_title">Planificador nutricional</string>
-    <string name="home_subtitle">Organiza tus comidas y descubre recetas sanas y deliciosas.</string>
+    <string name="app_logo_description">Logotipo de NutriNest</string>
+    <string name="home_subtitle">Planifica menús semanales personalizados para toda la casa, equilibra los objetivos nutricionales y crea listas de la compra automáticamente.</string>
     <string name="home_recipes_ingredients_title">Recetas e ingredientes</string>
     <string name="home_recipes_ingredients_subtitle">Consulta tus platos y la base de alimentos</string>
     <string name="home_weekly_menu_title">Menú semanal</string>
     <string name="home_weekly_menu_subtitle">Planifica tus comidas de la semana</string>
     <string name="home_profiles">Perfiles</string>
+    <string name="home_help">Abrir la ayuda y el tutorial</string>
     <string name="home_card_description">%1$s. %2$s</string>
 
     <!-- ── Idioma ─────────────────────────────────────────────────── -->
@@ -43,6 +44,61 @@
     <!-- Los nombres de los idiomas se quedan en su propio idioma. -->
     <string name="language_english">English</string>
     <string name="language_spanish">Español</string>
+
+    <!-- ── Ayuda y tutorial ──────────────────────────────────────── -->
+    <string name="help_title">Ayuda y tutorial</string>
+    <string name="help_intro_title">Tu guía de NutriNest</string>
+    <string name="help_intro_body">Abre cualquier sección para consultar una guía concreta. Para empezar: crea los perfiles, revisa los ingredientes y las recetas y, después, genera tu primer menú semanal.</string>
+    <string name="help_expand_section">Desplegar sección</string>
+    <string name="help_collapse_section">Plegar sección</string>
+
+    <string name="help_profiles_title">Perfiles y hogar</string>
+    <string name="help_profiles_summary">Configura a cada persona y sus objetivos nutricionales.</string>
+    <string name="help_profiles_body">1. Toca Perfiles en la pantalla principal y después + para añadir a una persona de la casa.\n\n2. Introduce sus medidas, actividad y objetivo. NutriNest muestra la TMB, el gasto diario y los objetivos de calorías y macros mientras editas. Puedes usar unidades métricas o imperiales y elegir la fórmula de cálculo.\n\n3. Define cómo reparte esa persona el día entre sus comidas. Marca como Libres las franjas que no quieras registrar de forma habitual sin repartir sus calorías entre las demás.\n\n4. Guarda las preferencias alimentarias y alergias como referencia. Los menús usan el objetivo calculado de cada perfil y pueden ser compartidos, individuales o distintos según la comida.</string>
+
+    <string name="help_ingredients_title">Ingredientes</string>
+    <string name="help_ingredients_summary">Busca, consulta, crea, marca, filtra y compara alimentos.</string>
+    <string name="help_ingredients_body">Abre Recetas e ingredientes y entra en la pestaña Ingredientes. Busca en la base de alimentos incluida, explora las categorías, ordena los resultados o cambia entre Todos, Favoritos y tus ingredientes personalizados.\n\nToca un ingrediente para consultar calorías, macros, nutrientes, información sobre los VRN y posibles avisos sobre la calidad de los datos. Usa + para crear un ingrediente personalizado con sus medidas y una foto opcional.\n\nPara ver varios en paralelo, toca Comparar, selecciona dos o tres ingredientes y compara los nutrientes que comparten por cada 100 g.</string>
+
+    <string name="help_recipes_title">Recetas y recetarios</string>
+    <string name="help_recipes_summary">Crea una biblioteca práctica y organízala en recetarios.</string>
+    <string name="help_recipes_body">En la pestaña Recetas, explora por tipo de plato, busca por nombre o recetario, ordena la lista y usa las vistas Todas, Favoritas o Añadidas hace poco. Toca la estrella para tener tus recetas preferidas a mano.\n\nUsa + para crear una receta. Añade raciones, tipo de plato, ingredientes y cantidades, pasos de preparación, una foto de portada opcional y fotos opcionales para cada paso. Al editar puedes elegir o crear un recetario; los recetarios son las carpetas que usa NutriNest.\n\nAbre una receta para ver su nutrición, ingredientes y preparación paso a paso. Las recetas personalizadas se pueden eliminar siempre que no formen parte de un menú guardado.</string>
+
+    <string name="help_configuration_title">Configuración y objetivos del menú</string>
+    <string name="help_configuration_summary">Indica quién come qué y cómo debe funcionar la semana.</string>
+    <string name="help_configuration_body">Desde Menú semanal, toca Crear menú semanal o el icono de configuración. Elige el número de comidas diarias y sus tamaños relativos, las comidas libres y el máximo de repeticiones por receta.\n\nElige Compartido para un menú común, Individual para planes separados o Por comida para añadir excepciones de quien come aparte. También puedes activar primero y segundo, añadir postre y evitar las recetas de la semana anterior.\n\nUsa las exclusiones de categorías de recetas o ingredientes cuando lo necesites. El generador combina estas decisiones con el objetivo diario y el reparto de comidas de cada perfil.</string>
+
+    <string name="help_generation_title">Generación del menú semanal</string>
+    <string name="help_generation_summary">Genera, revisa y regenera esta semana o la siguiente.</string>
+    <string name="help_generation_body">Elige Esta semana o Semana que viene antes de crear el plan. Revisa la configuración y toca Generar; NutriNest prepara la semana con las recetas activadas y respeta objetivos, raciones, repeticiones, exclusiones, estructura de platos y comidas fijadas.\n\nEn la pantalla semanal, cambia entre Todos y cada perfil cuando estén disponibles. El día de hoy aparece destacado y cada fila abre el detalle completo de la comida.\n\nUsa la configuración para regenerar una semana. Las comidas fijadas se conservan y el resto se vuelve a planificar. La opción de borrado elimina el menú y la lista de la compra de las semanas seleccionadas.</string>
+
+    <string name="help_selection_title">Selección y filtros de recetas</string>
+    <string name="help_selection_summary">Controla exactamente qué recetas puede elegir el generador.</string>
+    <string name="help_selection_body">En la configuración del menú, selecciona uno, varios o todos los recetarios, incluidas las Recetas sin recetario. Despliega un recetario para activar o desactivar recetas concretas, o usa Activar todas y Desactivar todas para ir más rápido.\n\nBusca dentro de la selección y filtra por Favoritas o por tipo de comida. NutriNest muestra cuántas recetas están activadas y avisa si no hay variedad suficiente para el límite de repeticiones elegido.\n\nEstos controles solo afectan a la generación del menú; no eliminan ni modifican tus recetas.</string>
+
+    <string name="help_locked_title">Comidas fijadas</string>
+    <string name="help_locked_summary">Reserva recetas concretas antes o después de generar un menú.</string>
+    <string name="help_locked_body">En Configuración del menú, abre Comidas fijadas y añade una. Elige uno o varios días, la franja, la receta y para quién es. El selector de recetas permite filtrar por recetario, tipo de comida y favoritas, además de buscar.\n\nEl generador trata esas comidas como fijas y planifica el resto de la semana a su alrededor. Puedes quitar una fijación desde la configuración.\n\nDespués de generar, abre una comida y usa la acción de fijar para protegerla o soltarla antes de la próxima regeneración.</string>
+
+    <string name="help_free_meals_title">Comidas libres y registro</string>
+    <string name="help_free_meals_summary">Deja comidas sin registrar o reequilibra el día si comes fuera del plan.</string>
+    <string name="help_free_meals_body">Una comida Libre no se registra a propósito: no se cocina, no se cuenta ni se añade a la lista de la compra, y las demás conservan sus presupuestos. Define franjas libres habituales en un perfil o elige el número de comidas libres en la configuración del menú.\n\nSi alguien come algo fuera del plan, abre Menú semanal y toca Comido hoy. Registra qué ha comido y sus calorías, además de los macros opcionales. NutriNest reajusta al momento las raciones que le quedan a esa persona durante el día.\n\nEl registro nunca modifica el menú de los demás miembros de la casa y las franjas Libres quedan fuera del reajuste.</string>
+
+    <string name="help_replacement_title">Detalle y cambio de comida</string>
+    <string name="help_replacement_summary">Consulta raciones y preparación o sustituye una comida planificada.</string>
+    <string name="help_replacement_body">Toca una comida del plan semanal para ver la nutrición de toda la casa, las raciones por persona, los ingredientes totales que debes preparar y cada paso de la receta. Los menús de varios platos muestran cada plato por separado.\n\nElige Cambiar esta comida para sustituirla por otra receta adecuada. El cambio actualiza el plan guardado y las cantidades de ingredientes.\n\nUsa la acción de fijar en la misma pantalla cuando quieras conservar la elección actual en una regeneración posterior.</string>
+
+    <string name="help_shopping_title">Listas de la compra</string>
+    <string name="help_shopping_summary">Convierte el menú semanal en una lista agrupada y marcable.</string>
+    <string name="help_shopping_body">Abre la acción del carrito desde Menú semanal. La lista se genera automáticamente a partir de las raciones planificadas para toda la casa y se agrupa por categorías de ingredientes.\n\nCambia entre Esta semana y Semana que viene y toca un producto o su casilla mientras compras. Los productos comprados aparecen tachados, pero siguen mostrando sus cantidades.\n\nAl regenerar o cambiar comidas se actualizan los totales correspondientes; las comidas Libres no añaden nada a la lista.</string>
+
+    <string name="help_notifications_title">Notificaciones y recordatorios</string>
+    <string name="help_notifications_summary">Recibe un aviso el viernes si la semana siguiente no está planificada.</string>
+    <string name="help_notifications_body">NutriNest comprueba hacia la mañana del viernes si la semana siguiente ya tiene menú. Si no lo tiene, la aplicación envía un recordatorio para planificar. Al tocarlo se abre NutriNest para crear el menú y la lista de la compra.\n\nEn las versiones de Android que necesitan permiso para las notificaciones, autoriza las de NutriNest en los ajustes del sistema. No se muestra ningún aviso si la semana siguiente ya está planificada.</string>
+
+    <string name="help_language_title">Idioma y datos guardados</string>
+    <string name="help_language_summary">Cambia entre español e inglés cuando quieras.</string>
+    <string name="help_language_body">Usa el control de idioma situado arriba a la izquierda en la pantalla principal y elige English o Español. La pantalla actual y este tutorial siguen automáticamente esa elección.\n\nLos perfiles, ingredientes personalizados, recetas, menús y el progreso de las compras se guardan localmente en el dispositivo, por lo que cambiar el idioma de la aplicación no elimina tu trabajo.</string>
 
     <!-- ── Pestañas ───────────────────────────────────────────────── -->
     <string name="tab_recipes">Recetas</string>

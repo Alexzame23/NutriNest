@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zame.nutrinest.ui.home.HomeScreen
+import com.zame.nutrinest.ui.help.HelpScreen
 import com.zame.nutrinest.ui.ingredients.compare.CompareIngredientsScreen
 import com.zame.nutrinest.ui.ingredients.detail.IngredientDetailScreen
 import com.zame.nutrinest.ui.ingredients.editor.IngredientEditorScreen
@@ -25,6 +26,7 @@ import com.zame.nutrinest.util.WeekUtils
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
+    data object Help : Screen("help")
 
     /** Recipes and Ingredients, as two tabs of a single destination. */
     data object RecipesAndIngredients : Screen("food?tab={tab}") {
@@ -87,8 +89,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                     navController.navigate(Screen.RecipesAndIngredients.recipes())
                 },
                 onWeeklyMenuClick = { navController.navigate(Screen.WeeklyMenu.route) },
-                onProfilesClick = { navController.navigate(Screen.Profiles.route) }
+                onProfilesClick = { navController.navigate(Screen.Profiles.route) },
+                onHelpClick = { navController.navigate(Screen.Help.route) }
             )
+        }
+
+        composable(Screen.Help.route) {
+            HelpScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

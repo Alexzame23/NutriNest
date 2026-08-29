@@ -30,13 +30,14 @@
     <string name="kcal_per_100g">%1$d kcal / 100 g</string>
 
     <!-- ── Home ───────────────────────────────────────────────────── -->
-    <string name="home_title">Nutrition Planner</string>
-    <string name="home_subtitle">Organize your meals and discover healthy, delicious recipes.</string>
+    <string name="app_logo_description">NutriNest logo</string>
+    <string name="home_subtitle">Plan personalized weekly menus for your household, balance nutrition targets, and build shopping lists automatically.</string>
     <string name="home_recipes_ingredients_title">Recipes &amp; Ingredients</string>
     <string name="home_recipes_ingredients_subtitle">Browse your dishes and the food database</string>
     <string name="home_weekly_menu_title">Weekly Menu</string>
     <string name="home_weekly_menu_subtitle">Plan your meals for the week</string>
     <string name="home_profiles">Profiles</string>
+    <string name="home_help">Open help and tutorial</string>
     <string name="home_card_description">%1$s. %2$s</string>
 
     <!-- ── Language ───────────────────────────────────────────────── -->
@@ -44,6 +45,61 @@
     <!-- Language names stay in their own language in every locale. -->
     <string name="language_english">English</string>
     <string name="language_spanish">Español</string>
+
+    <!-- ── Help &amp; tutorial ──────────────────────────────────────── -->
+    <string name="help_title">Help &amp; Tutorial</string>
+    <string name="help_intro_title">Your NutriNest guide</string>
+    <string name="help_intro_body">Open any section below for a focused walkthrough. A good first run is: create profiles, review ingredients and recipes, then generate your first weekly menu.</string>
+    <string name="help_expand_section">Expand section</string>
+    <string name="help_collapse_section">Collapse section</string>
+
+    <string name="help_profiles_title">Profiles &amp; household</string>
+    <string name="help_profiles_summary">Set up each person and their nutrition targets.</string>
+    <string name="help_profiles_body">1. Tap Profiles on the home screen, then + to add a household member.\n\n2. Enter body measurements, activity and goal. NutriNest previews BMR, daily energy, calorie and macro targets as you edit. You can switch between metric and imperial units and choose a calculation formula.\n\n3. Set how that person\'s day is divided between meals. Mark regularly untracked slots as Free without redistributing their calories to other meals.\n\n4. Save dietary preferences and allergies for reference. Weekly menus use each profile\'s calculated target, and can be shared, individual, or mixed by meal.</string>
+
+    <string name="help_ingredients_title">Ingredients</string>
+    <string name="help_ingredients_summary">Search, inspect, create, favorite, filter and compare foods.</string>
+    <string name="help_ingredients_body">Open Recipes &amp; Ingredients and choose the Ingredients tab. Search the built-in food database, browse categories, sort results, or switch between All, Favorites and your custom ingredients.\n\nTap an ingredient to review calories, macros, nutrients, NRV information and any data-quality notes. Use + to create a custom ingredient, including its serving measures and optional photo.\n\nFor a side-by-side view, tap Compare, select two or three ingredients, and compare their shared nutrients per 100 g.</string>
+
+    <string name="help_recipes_title">Recipes &amp; recipe books</string>
+    <string name="help_recipes_summary">Build a usable recipe library and organize it into books.</string>
+    <string name="help_recipes_body">In the Recipes tab, browse by course, search by name or recipe book, sort the list, and use the All, Favorites or Recently added views. Tap the star to keep useful recipes close.\n\nUse + to create a recipe. Add servings, course, ingredients and quantities, preparation steps, an optional cover photo and optional photos for individual steps. You can create or choose a recipe book while editing; recipe books are the folders used throughout NutriNest.\n\nOpen any recipe for its nutrition, ingredients and step-by-step preparation. Custom recipes can be removed when they are not being used by a saved menu.</string>
+
+    <string name="help_configuration_title">Menu configuration &amp; targets</string>
+    <string name="help_configuration_summary">Tell the planner who eats what and how the week should work.</string>
+    <string name="help_configuration_body">From Weekly Menu, tap Create weekly menu or the configuration icon. Choose the number of meals per day and their relative sizes, plus any free meals and the maximum repeats per recipe.\n\nChoose Shared for one household menu, Individual for separate plans, or Per meal to add exceptions for someone eating apart. You can also enable first course + main, add desserts, and avoid recipes used last week.\n\nUse exclusions for recipe or ingredient categories when needed. The generator combines these choices with each profile\'s daily target and meal split.</string>
+
+    <string name="help_generation_title">Weekly menu generation</string>
+    <string name="help_generation_summary">Generate, review and regenerate this week or next week.</string>
+    <string name="help_generation_body">Choose This week or Next week before creating a plan. Review the configuration and tap Generate; NutriNest builds the week from enabled recipes while respecting targets, portions, repeat limits, exclusions, meal structure and locks.\n\nOn the weekly screen, switch between Everyone and individual profiles when available. Today is highlighted, and every planned row opens its full meal detail.\n\nUse the configuration action to regenerate a week. Locked meals stay fixed while the rest is planned again. The erase action can remove the selected week\'s menu and shopping list.</string>
+
+    <string name="help_selection_title">Recipe selection &amp; filtering</string>
+    <string name="help_selection_summary">Control exactly which recipes the generator may choose.</string>
+    <string name="help_selection_body">In menu configuration, choose one, several or all recipe books, including Recipes without a book. Expand a book to enable or disable individual recipes, or use Enable all and Disable all for faster setup.\n\nSearch within the selection, filter to Favorites, and filter by meal type. NutriNest shows how many recipes are enabled and warns when there is not enough variety for the chosen repeat limit.\n\nThese controls affect menu generation only; they do not delete or edit your recipes.</string>
+
+    <string name="help_locked_title">Locked meals</string>
+    <string name="help_locked_summary">Reserve specific recipes before or after generating a menu.</string>
+    <string name="help_locked_body">In Menu configuration, open Locked meals and add a lock. Pick one or more days, the meal slot, a recipe, and who it is for. The recipe picker supports book, meal-type, favorites and search filters.\n\nThe generator treats these meals as fixed and plans the rest of the week around them. You can remove a planned lock from configuration.\n\nAfter generation, open a meal and use the lock action to protect or release it before the next regeneration.</string>
+
+    <string name="help_free_meals_title">Free meals &amp; food logging</string>
+    <string name="help_free_meals_summary">Leave meals untracked or rebalance after eating off-plan.</string>
+    <string name="help_free_meals_body">A Free meal is intentionally untracked: it is not cooked, counted or added to the shopping list, and the other meals keep their existing budgets. Set recurring free slots in a profile, or choose the number of free meals in menu configuration.\n\nIf somebody eats something outside the plan, open Weekly Menu and tap Eaten today. Log what they ate and its calories (plus optional macros). NutriNest immediately re-portions that person\'s remaining meals for the day.\n\nLogging never changes another household member\'s menu, and Free slots are left out of the rebalance.</string>
+
+    <string name="help_replacement_title">Meal detail &amp; replacement</string>
+    <string name="help_replacement_summary">See portions and preparation, or swap a planned meal.</string>
+    <string name="help_replacement_body">Tap a meal in the weekly plan to see household nutrition, per-person portions, the total ingredients to prepare, and every recipe step. Multi-course meals show each course separately.\n\nChoose Swap this meal to replace it with another suitable recipe. The replacement updates the saved plan and its ingredient totals.\n\nUse the lock action on the same screen when you want the current choice to survive a later regeneration.</string>
+
+    <string name="help_shopping_title">Shopping lists</string>
+    <string name="help_shopping_summary">Turn the selected weekly menu into a grouped checklist.</string>
+    <string name="help_shopping_body">Open the cart action from Weekly Menu. The shopping list is generated automatically from the planned portions for the whole household and grouped by ingredient category.\n\nSwitch between This week and Next week, then tap an item or its checkbox as you shop. Purchased items are crossed out while their quantities remain visible.\n\nRegenerating or swapping meals refreshes the relevant totals; Free meals add nothing to the list.</string>
+
+    <string name="help_notifications_title">Notifications &amp; reminders</string>
+    <string name="help_notifications_summary">Get a Friday prompt when next week is still unplanned.</string>
+    <string name="help_notifications_body">NutriNest checks around Friday morning whether next week already has a menu. If it does not, the app sends a friendly planning reminder. Tapping it opens NutriNest so you can create the menu and shopping list.\n\nOn Android versions that require notification permission, allow NutriNest notifications in system settings. No reminder is shown when the next week is already planned.</string>
+
+    <string name="help_language_title">Language &amp; saved data</string>
+    <string name="help_language_summary">Switch English or Spanish at any time.</string>
+    <string name="help_language_body">Use the language control at the top-left of the home screen and choose English or Español. The current screen and this tutorial automatically follow that choice.\n\nProfiles, custom ingredients, recipes, menus and shopping progress are stored locally on the device, so changing the app language does not remove your work.</string>
 
     <!-- ── Recipes &amp; Ingredients tabs ─────────────────────────── -->
     <string name="tab_recipes">Recipes</string>
