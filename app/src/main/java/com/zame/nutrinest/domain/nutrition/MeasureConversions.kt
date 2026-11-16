@@ -4,17 +4,18 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Converts between the units an ingredient can be measured in.
+ * Legacy conversion/display compatibility. New input uses [FoodQuantityConversions].
  *
  * Everything in the app is stored per 100 g, so every unit ultimately resolves
  * to grams. Mass units convert unconditionally; volume units need a density,
- * which the shipped dataset provides for all 115 of its liquids. Household
+ * which the shipped dataset records for its liquids without individual evidence. Household
  * measures that vary by food ("Glass (200 ml)" of juice is 209 g) come from
  * `ingredient_portions` rather than from here.
  *
  * Pure and Android-free so it unit-tests directly, matching [UnitConversions]
  * in NutritionCalculator.kt which handles body weight and height.
  */
+@Suppress("DEPRECATION") // Intentionally frozen internal legacy/display path.
 object MeasureConversions {
 
     enum class Family { MASS, VOLUME }
@@ -46,20 +47,22 @@ object MeasureConversions {
     /**
      * Density to use for volume conversion, or null when there is none.
      *
-     * Falls back to water for a liquid with no measured density — an
-     * approximation, but a far better one than refusing to convert. Imported
-     * liquids always carry a real density, so this only affects user creations.
+     * Retains the historical water fallback solely for compatibility. This is
+     * not documented food evidence and must never be used for new input.
      */
+    @Deprecated("Historical compatibility only; use FoodQuantityConversions for new quantities")
     fun effectiveDensity(isLiquid: Boolean, densityGml: Double?): Double? =
         densityGml?.takeIf { it > 0 } ?: if (isLiquid) 1.0 else null
 
     /** Units offered for an ingredient; volume ones appear only when convertible. */
+    @Deprecated("Historical compatibility only; validate new units with FoodQuantityConversions")
     fun availableUnits(isLiquid: Boolean, densityGml: Double?): List<MeasureUnit> {
         val convertible = effectiveDensity(isLiquid, densityGml) != null
         return MeasureUnit.entries.filter { convertible || !it.isVolume }
     }
 
     /** Amount in [unit] to grams, or null when the unit cannot be converted. */
+    @Deprecated("Historical compatibility only; use FoodQuantityConversions.toGrams")
     fun toGrams(amount: Double, unit: MeasureUnit, isLiquid: Boolean, densityGml: Double?): Double? =
         when (unit.family) {
             Family.MASS -> amount * unit.gramsPerUnit
@@ -68,6 +71,7 @@ object MeasureConversions {
         }
 
     /** Grams back into [unit], or null when the unit cannot be converted. */
+    @Deprecated("Historical compatibility only; use FoodQuantityConversions.convert for new input")
     fun fromGrams(grams: Double, unit: MeasureUnit, isLiquid: Boolean, densityGml: Double?): Double? =
         when (unit.family) {
             Family.MASS -> grams / unit.gramsPerUnit

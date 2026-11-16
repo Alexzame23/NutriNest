@@ -69,6 +69,9 @@ import com.zame.nutrinest.data.local.entity.RecipeImageCrop
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeBooks
 import com.zame.nutrinest.domain.nutrition.MeasureConversions
+import com.zame.nutrinest.domain.nutrition.ConversionError
+import com.zame.nutrinest.domain.nutrition.ConversionResult
+import com.zame.nutrinest.domain.nutrition.IngredientQuantityConversions
 import com.zame.nutrinest.ui.components.ImagePickerBox
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
@@ -77,7 +80,6 @@ import com.zame.nutrinest.ui.components.formatRecipeQuantity
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
-import com.zame.nutrinest.util.LocalizedNumbers
 import com.zame.nutrinest.util.TextNormalizer
 import com.zame.nutrinest.util.toLocalizedDoubleOrNull
 import java.io.File
@@ -215,6 +217,7 @@ fun CreateRecipeScreen(
                     onQuantityChange = { grams, unit ->
                         viewModel.updateIngredientQuantity(draft.ingredient.id, grams, unit)
                     },
+                    onInvalidQuantity = { viewModel.invalidateIngredientQuantity(draft.ingredient.id) },
                     onRemove = { viewModel.removeIngredient(draft.ingredient.id) }
                 )
             }
@@ -347,17 +350,23 @@ private fun DraftIngredientRow(
     draft: DraftIngredient,
     spanish: Boolean,
     onQuantityChange: (Double, String) -> Unit,
+    onInvalidQuantity: () -> Unit,
     onRemove: () -> Unit
 ) {
     val unit = draft.quantityUnit.toMeasureUnit()
-    val amount = MeasureConversions.fromGrams(
-        draft.grams,
-        unit,
-        draft.ingredient.isLiquid,
-        draft.ingredient.densityGml
-    ) ?: draft.grams
+    val amount = (IngredientQuantityConversions.fromGrams(
+        draft.grams, unit.name, draft.ingredient
+    ) as? ConversionResult.Success)?.quantity?.amount ?: draft.grams
     var amountText by remember(draft.ingredient.id, draft.quantityUnit) {
-        mutableStateOf(LocalizedNumbers.format(amount))
+        mutableStateOf(amount.toString())
+    }
+    val inputResult = recipeQuantityResult(amountText, unit, draft.ingredient)
+    val inputError = quantityError(inputResult)
+    // Adding the same ingredient again changes grams outside this text field.
+    LaunchedEffect(draft.grams, draft.quantityUnit) {
+        val enteredGrams = (recipeQuantityResult(amountText, unit, draft.ingredient)
+            as? ConversionResult.Success)?.quantity?.amount
+        if (draft.isQuantityValid && enteredGrams != draft.grams) amountText = amount.toString()
     }
     Card(
         shape = MaterialTheme.shapes.medium,
@@ -387,6 +396,9 @@ private fun DraftIngredientRow(
                         QuantityUnits.forEach { candidate ->
                             FilterChip(
                                 selected = candidate == unit,
+                                enabled = inputResult is ConversionResult.Success && IngredientQuantityConversions.fromGrams(
+                                    draft.grams, candidate.name, draft.ingredient
+                                ) is ConversionResult.Success,
                                 onClick = {
                                     onQuantityChange(draft.grams, candidate.name)
                                 },
@@ -399,17 +411,16 @@ private fun DraftIngredientRow(
                     value = amountText,
                     onValueChange = { text ->
                         amountText = text
-                        text.toLocalizedDoubleOrNull()?.let {
-                            MeasureConversions.toGrams(
-                                it,
-                                unit,
-                                draft.ingredient.isLiquid,
-                                draft.ingredient.densityGml
-                            )?.takeIf { grams -> grams > 0 && grams <= 100_000 }
-                                ?.let { grams -> onQuantityChange(grams, unit.name) }
+                        val result = recipeQuantityResult(text, unit, draft.ingredient)
+                        if (result is ConversionResult.Success) {
+                            onQuantityChange(result.quantity.amount, unit.name)
+                        } else {
+                            onInvalidQuantity()
                         }
                     },
                     label = { Text(unit.symbol()) },
+                    isError = inputError != null,
+                    supportingText = inputError?.let { message -> { Text(message) } },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     shape = MaterialTheme.shapes.small,
@@ -431,6 +442,29 @@ private val QuantityUnits = listOf(
     MeasureConversions.MeasureUnit.GRAM,
     MeasureConversions.MeasureUnit.LITRE
 )
+
+private fun recipeQuantityResult(
+    text: String,
+    unit: MeasureConversions.MeasureUnit,
+    ingredient: IngredientEntity
+): ConversionResult {
+    val amount = text.toLocalizedDoubleOrNull()
+        ?: return ConversionResult.Failure(ConversionError.INVALID_AMOUNT)
+    val result = IngredientQuantityConversions.toGrams(amount, unit.name, ingredient)
+    return if (result is ConversionResult.Success && result.quantity.amount > 100_000.0) {
+        ConversionResult.Failure(ConversionError.INVALID_AMOUNT)
+    } else result
+}
+
+@Composable
+private fun quantityError(result: ConversionResult): String? = when (result) {
+    is ConversionResult.Success -> null
+    is ConversionResult.Failure -> stringResource(when (result.error) {
+        ConversionError.MISSING_DENSITY -> R.string.quantity_error_missing_density
+        ConversionError.UNVERIFIED_EVIDENCE -> R.string.quantity_error_unverified_factor
+        else -> R.string.recipe_error_invalid_quantity
+    })
+}
 
 private fun String.toMeasureUnit(): MeasureConversions.MeasureUnit =
     MeasureConversions.MeasureUnit.entries.firstOrNull { it.name == this }
@@ -719,6 +753,8 @@ private fun IngredientPickerSheet(
                 }
             } else {
                 // ── Quantity entry ─────────────────────────────────
+                val quantityResult = recipeQuantityResult(quantityText, selectedUnit, selected)
+                val quantityError = quantityError(quantityResult)
                 Text(
                     selected.displayName(spanish),
                     style = MaterialTheme.typography.titleLarge,
@@ -731,24 +767,13 @@ private fun IngredientPickerSheet(
                             FilterChip(
                                 selected = selectedUnit == unit,
                                 onClick = {
-                                    quantityText.toLocalizedDoubleOrNull()
-                                        ?.let {
-                                            MeasureConversions.toGrams(
-                                                it,
-                                                selectedUnit,
-                                                selected.isLiquid,
-                                                selected.densityGml
-                                            )
+                                    (quantityResult as? ConversionResult.Success)?.let { result ->
+                                        (IngredientQuantityConversions.fromGrams(
+                                            result.quantity.amount, unit.name, selected
+                                        ) as? ConversionResult.Success)?.let {
+                                            quantityText = it.quantity.amount.toString()
                                         }
-                                        ?.let {
-                                            MeasureConversions.fromGrams(
-                                                it,
-                                                unit,
-                                                selected.isLiquid,
-                                                selected.densityGml
-                                            )
-                                        }
-                                        ?.let { quantityText = LocalizedNumbers.format(it) }
+                                    }
                                     selectedUnit = unit
                                 },
                                 label = { Text(unit.symbol()) }
@@ -760,6 +785,8 @@ private fun IngredientPickerSheet(
                 OutlinedTextField(
                     value = quantityText,
                     onValueChange = { quantityText = it },
+                    isError = quantityError != null,
+                    supportingText = quantityError?.let { message -> { Text(message) } },
                     label = {
                         Text(stringResource(R.string.create_recipe_quantity, selectedUnit.symbol()))
                     },
@@ -781,28 +808,11 @@ private fun IngredientPickerSheet(
                     ) { Text(stringResource(R.string.action_back)) }
                     androidx.compose.material3.Button(
                         onClick = {
-                            quantityText.toLocalizedDoubleOrNull()
-                                ?.let {
-                                    MeasureConversions.toGrams(
-                                        it,
-                                        selectedUnit,
-                                        selected.isLiquid,
-                                        selected.densityGml
-                                    )
-                                }
-                                ?.takeIf { it > 0 && it <= 100_000 }
-                                ?.let { grams -> onPicked(selected, grams, selectedUnit.name) }
-                        },
-                        enabled = quantityText.toLocalizedDoubleOrNull()
-                            ?.let {
-                                MeasureConversions.toGrams(
-                                    it,
-                                    selectedUnit,
-                                    selected.isLiquid,
-                                    selected.densityGml
-                                )
+                            (quantityResult as? ConversionResult.Success)?.let {
+                                onPicked(selected, it.quantity.amount, selectedUnit.name)
                             }
-                            ?.let { it in 0.000001..100_000.0 } == true,
+                        },
+                        enabled = quantityResult is ConversionResult.Success,
                         modifier = Modifier.weight(1f)
                     ) { Text(stringResource(R.string.action_add)) }
                 }

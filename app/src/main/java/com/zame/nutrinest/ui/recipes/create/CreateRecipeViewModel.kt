@@ -18,6 +18,8 @@ import com.zame.nutrinest.data.local.entity.RecipeImageCrop
 import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.RecipeRepository
+import com.zame.nutrinest.domain.nutrition.ConversionResult
+import com.zame.nutrinest.domain.nutrition.IngredientQuantityConversions
 import com.zame.nutrinest.util.ImageStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,7 +31,8 @@ import kotlinx.coroutines.launch
 data class DraftIngredient(
     val ingredient: IngredientEntity,
     val grams: Double,
-    val quantityUnit: String = "GRAM"
+    val quantityUnit: String = "GRAM",
+    val isQuantityValid: Boolean = true
 )
 
 data class DraftStep(
@@ -118,10 +121,15 @@ class CreateRecipeViewModel(
     ) = update {
         // Same ingredient twice merges into one entry with summed grams.
         val existing = ingredients.find { it.ingredient.id == ingredient.id }
+        val totalGrams = (existing?.grams ?: 0.0) + grams
+        if (!validQuantity(ingredient, grams, quantityUnit) ||
+            !validQuantity(ingredient, totalGrams, quantityUnit)) {
+            return@update copy(error = RecipeFormError.INVALID_QUANTITY)
+        }
         val newList = if (existing != null) {
             ingredients.map {
                 if (it.ingredient.id == ingredient.id) {
-                    it.copy(grams = it.grams + grams, quantityUnit = quantityUnit)
+                    it.copy(grams = totalGrams, quantityUnit = quantityUnit, isQuantityValid = true)
                 } else it
             }
         } else {
@@ -136,9 +144,22 @@ class CreateRecipeViewModel(
 
     fun updateIngredientQuantity(ingredientId: Long, grams: Double, quantityUnit: String) = update {
         copy(ingredients = ingredients.map {
-            if (it.ingredient.id == ingredientId) it.copy(grams = grams, quantityUnit = quantityUnit) else it
+            if (it.ingredient.id != ingredientId) it
+            else if (validQuantity(it.ingredient, grams, quantityUnit)) {
+                it.copy(grams = grams, quantityUnit = quantityUnit, isQuantityValid = true)
+            } else it.copy(isQuantityValid = false)
         })
     }
+
+    fun invalidateIngredientQuantity(ingredientId: Long) = update {
+        copy(ingredients = ingredients.map {
+            if (it.ingredient.id == ingredientId) it.copy(isQuantityValid = false) else it
+        })
+    }
+
+    private fun validQuantity(ingredient: IngredientEntity, grams: Double, unit: String): Boolean =
+        grams.isFinite() && grams > 0 && grams <= MAX_INGREDIENT_GRAMS &&
+            IngredientQuantityConversions.fromGrams(grams, unit, ingredient) is ConversionResult.Success
 
     fun onStepTextChange(index: Int, text: String) = update {
         copy(steps = steps.mapIndexed { i, s -> if (i == index) s.copy(text = text) else s })
@@ -187,7 +208,7 @@ class CreateRecipeViewModel(
                 name.isEmpty() -> RecipeFormError.NAME_REQUIRED
                 state.ingredients.isEmpty() -> RecipeFormError.NO_INGREDIENTS
                 state.ingredients.any {
-                    !it.grams.isFinite() || it.grams <= 0.0 || it.grams > MAX_INGREDIENT_GRAMS
+                    !it.isQuantityValid || !validQuantity(it.ingredient, it.grams, it.quantityUnit)
                 } -> RecipeFormError.INVALID_QUANTITY
                 nonEmptySteps.isEmpty() -> RecipeFormError.NO_STEPS
                 recipeRepository.existsByName(name) -> RecipeFormError.DUPLICATE_NAME

@@ -598,4 +598,6 @@
     <string name="notification_channel_detail">Friday reminder to plan next week\'s meals</string>
     <string name="notification_title">Plan next week\'s menu</string>
     <string name="notification_body">Take a minute to generate next week\'s meal plan and shopping list.</string>
+    <string name="quantity_error_missing_density">No documented density is available. Enter the edible weight in grams.</string>
+    <string name="quantity_error_unverified_factor">This conversion factor has not been validated. Enter the edible weight in grams.</string>
 </resources>
