@@ -77,12 +77,13 @@ import com.zame.nutrinest.util.toLocalizedDoubleOrNull
 @Composable
 fun IngredientEditorScreen(
     onBack: () -> Unit,
+    onSaved: (Long) -> Unit = { onBack() },
     viewModel: IngredientEditorViewModel = viewModel(factory = IngredientEditorViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
 
-    LaunchedEffect(state.saved) { if (state.saved) onBack() }
+    LaunchedEffect(state.savedIngredientId) { state.savedIngredientId?.let(onSaved) }
 
     if (state.confirmWarnings) {
         WarningsDialog(
@@ -150,6 +151,13 @@ fun IngredientEditorScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (state.isEditing) {
+                item("snapshot-note") {
+                    Text(stringResource(R.string.ingredient_snapshot_edit_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             item("photo") {
                 ImagePickerBox(
                     imagePath = state.imagePath,

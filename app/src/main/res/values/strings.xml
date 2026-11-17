@@ -206,11 +206,13 @@
     <string name="ingredient_data_quality">Data quality</string>
     <string name="ingredient_completeness">%1$d%% of the nutrient panel is filled in</string>
     <string name="ingredient_no_micros">No micronutrient data for this ingredient.</string>
-    <string name="ingredient_delete_title">Delete this ingredient?</string>
-    <string name="ingredient_delete_body">%1$s will be removed permanently.</string>
+    <string name="ingredient_delete_title">Archive this ingredient?</string>
+    <string name="ingredient_delete_body">%1$s will be hidden from new selections. Saved recipes and their quantities will be kept.</string>
     <string name="ingredient_delete_blocked_title">Still in use</string>
     <string name="ingredient_delete_blocked_body">%1$s is used by a recipe or shopping list, so it can\'t be deleted. Remove it from those first.</string>
-    <string name="ingredient_deleted">Ingredient deleted</string>
+    <string name="ingredient_deleted">Ingredient archived</string>
+    <string name="ingredient_action_archive">Archive</string>
+    <string name="ingredient_snapshot_edit_hint">Changes apply to new uses. Saved recipes keep the previous ingredient values.</string>
     <string name="ingredient_not_found">This ingredient no longer exists.</string>
     <string name="ingredient_nrv_share">%1$d%% NRV</string>
     <string name="ingredient_nrv_explainer">NRV is the share of the EU daily reference intake.</string>

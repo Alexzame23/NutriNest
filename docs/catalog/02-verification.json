@@ -1,0 +1,94 @@
+{
+  "audit_head": "c3ff612004229d7d9c57a3fbff6bf7ad8ce405c2",
+  "checks": {
+    "122_ids_all_present_and_importable": true,
+    "250_reachable_recipes": true,
+    "936_unique_foods": true,
+    "all_10_outputs_byte_identical": true,
+    "all_export_csv_counts": true,
+    "almond_variants_not_merged": true,
+    "asset_hash_preserved": true,
+    "decaf_not_merged": true,
+    "energy_unit_evidence": true,
+    "final_source_unchanged": true,
+    "finding_ids_unique": true,
+    "findings_identity_and_cause": true,
+    "no_importable_food_missing_portions": true,
+    "output_inside_asset_directory_rejected": true,
+    "parser_rejects_unrecognized_transform": true,
+    "recipe_id_multiset_independent": true,
+    "recipe_links_independent_literal_count": true,
+    "sqlite_integrity_and_foreign_keys": true
+  },
+  "checks_passed": 18,
+  "commands": [
+    {
+      "asset_sha256_after": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+      "command": "python tools/audit_food_catalog.py --output-dir docs/catalog",
+      "exit_code": 0,
+      "pythonhashseed": "1"
+    },
+    {
+      "asset_sha256_after": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+      "command": "python tools/audit_food_catalog.py --output-dir build/food-audit-repeat",
+      "exit_code": 0,
+      "pythonhashseed": "777"
+    }
+  ],
+  "compared_files": [
+    {
+      "file": "02-food-audit.md",
+      "identical": true,
+      "sha256": "5cb2284e67d9481247d49a9c6bcf8779c9109426aa126b7e22b048287879780d"
+    },
+    {
+      "file": "exports/02-food-audit.json",
+      "identical": true,
+      "sha256": "f2b546474745d7039849da230914dca1d2065dd5bc6f9d068d1eac730b00cac4"
+    },
+    {
+      "file": "exports/duplicate_pairs.csv",
+      "identical": true,
+      "sha256": "6a8b6c8bf16fff769e1667d3a29c6f42ac844f38d968d1c502b600b22d7fddb4"
+    },
+    {
+      "file": "exports/findings.csv",
+      "identical": true,
+      "sha256": "77596862dc3dad4f9b615a32190761fa59d8c93af3434d81c7dbf2afaff8797b"
+    },
+    {
+      "file": "exports/foods.csv",
+      "identical": true,
+      "sha256": "5f90605afb3f95da7c8c13d42c2bc51566c9dbf5d960c9643e5771bafa1fef7a"
+    },
+    {
+      "file": "exports/human_review.csv",
+      "identical": true,
+      "sha256": "871e936d6b965948855c59366493b3709c17686af0441f7383a1aeaf86af916f"
+    },
+    {
+      "file": "exports/manifest.json",
+      "identical": true,
+      "sha256": "f800e3f5bf90da089c450065e32c3a6a5dd8e83afe6bc293c786100ebc9ba91e"
+    },
+    {
+      "file": "exports/portions.csv",
+      "identical": true,
+      "sha256": "5c2f2e843c051d69a54e7d05d4aeaf41df3420efc7db0c1d9d86842b7043880a"
+    },
+    {
+      "file": "exports/raw_cooked.csv",
+      "identical": true,
+      "sha256": "c515f0afa52aaf5d56a5cb876422844b9f3433474cba0e3aa95ea8363adbb021"
+    },
+    {
+      "file": "exports/recipe_usage.csv",
+      "identical": true,
+      "sha256": "765e496bd5c0017e41dd197008192e36d367887274e00870e3465e4fd9cb14c6"
+    }
+  ],
+  "note": "Two final-script executions; outputs compared byte for byte. This file is verification evidence, not a generated audit output. No Android tests executed in phase 02.",
+  "script_sha256": "4d80f40b75fc8bccb8d0ab776cb44dd3ffbf1da999164a944b77b185f162bd08",
+  "source_sha256_after": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+  "source_sha256_before": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359"
+}

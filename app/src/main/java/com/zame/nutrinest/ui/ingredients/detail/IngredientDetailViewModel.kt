@@ -21,7 +21,6 @@ import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeUsage
 import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
-import com.zame.nutrinest.util.ImageStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -127,18 +126,12 @@ class IngredientDetailViewModel(
         }
     }
 
-    /**
-     * Deleting is refused while a recipe or shopping list still points here —
-     * both foreign keys are RESTRICT, so the alternative is an exception the
-     * user cannot act on.
-     */
+    /** Archive from new selection; historical references and images remain intact. */
     fun onDeleteConfirmed() {
-        val imagePath = uiState.value.ingredient?.imagePath
         viewModelScope.launch {
             runCatching { repository.delete(ingredientId) }.fold(
                 onSuccess = { deleted ->
                     if (deleted) {
-                        ImageStorage.deleteManaged(app, imagePath)
                         deletion.value = DeletionState(deleted = true)
                     } else {
                         deletion.value = DeletionState(blocked = true)

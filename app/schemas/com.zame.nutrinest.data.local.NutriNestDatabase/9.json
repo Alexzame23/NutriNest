@@ -1,0 +1,2533 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 9,
+    "identityHash": "3fe09d5bbcc4d9f6d3c851b8ca9eed87",
+    "entities": [
+      {
+        "tableName": "ingredients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `nameEs` TEXT, `nameNorm` TEXT NOT NULL DEFAULT '', `nameEsNorm` TEXT, `baseName` TEXT, `foodType` TEXT NOT NULL, `aisleKey` TEXT, `prepState` TEXT NOT NULL DEFAULT 'UNSPECIFIED', `rawSafety` TEXT NOT NULL DEFAULT 'UNKNOWN', `notes` TEXT, `servingSizeG` REAL, `isLiquid` INTEGER NOT NULL DEFAULT 0, `densityGml` REAL, `completenessPct` INTEGER NOT NULL DEFAULT 0, `quality` TEXT NOT NULL DEFAULT 'OK', `sourceKey` TEXT, `imagePath` TEXT, `isCustom` INTEGER NOT NULL, `isFavorite` INTEGER NOT NULL DEFAULT 0, `usageCount` INTEGER NOT NULL DEFAULT 0, `lastUsedAt` INTEGER, `createdAt` INTEGER NOT NULL DEFAULT 0, `updatedAt` INTEGER NOT NULL DEFAULT 0, `remoteId` TEXT, `kcal` REAL NOT NULL, `carbs` REAL NOT NULL, `fats` REAL NOT NULL, `protein` REAL NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEs",
+            "columnName": "nameEs",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nameNorm",
+            "columnName": "nameNorm",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "nameEsNorm",
+            "columnName": "nameEsNorm",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "baseName",
+            "columnName": "baseName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "categoryKey",
+            "columnName": "foodType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aisleKey",
+            "columnName": "aisleKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "prepState",
+            "columnName": "prepState",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'UNSPECIFIED'"
+          },
+          {
+            "fieldPath": "rawSafety",
+            "columnName": "rawSafety",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'UNKNOWN'"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "servingSizeG",
+            "columnName": "servingSizeG",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "isLiquid",
+            "columnName": "isLiquid",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "densityGml",
+            "columnName": "densityGml",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "completenessPct",
+            "columnName": "completenessPct",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "quality",
+            "columnName": "quality",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'OK'"
+          },
+          {
+            "fieldPath": "sourceKey",
+            "columnName": "sourceKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "imagePath",
+            "columnName": "imagePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isCustom",
+            "columnName": "isCustom",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "usageCount",
+            "columnName": "usageCount",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastUsedAt",
+            "columnName": "lastUsedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "remoteId",
+            "columnName": "remoteId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nutrition.kcal",
+            "columnName": "kcal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.carbs",
+            "columnName": "carbs",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.fats",
+            "columnName": "fats",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.protein",
+            "columnName": "protein",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ingredients_nameNorm",
+            "unique": false,
+            "columnNames": [
+              "nameNorm"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_nameNorm` ON `${TABLE_NAME}` (`nameNorm`)"
+          },
+          {
+            "name": "index_ingredients_nameEsNorm",
+            "unique": false,
+            "columnNames": [
+              "nameEsNorm"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_nameEsNorm` ON `${TABLE_NAME}` (`nameEsNorm`)"
+          },
+          {
+            "name": "index_ingredients_foodType",
+            "unique": false,
+            "columnNames": [
+              "foodType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_foodType` ON `${TABLE_NAME}` (`foodType`)"
+          },
+          {
+            "name": "index_ingredients_isFavorite",
+            "unique": false,
+            "columnNames": [
+              "isFavorite"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_isFavorite` ON `${TABLE_NAME}` (`isFavorite`)"
+          },
+          {
+            "name": "index_ingredients_lastUsedAt",
+            "unique": false,
+            "columnNames": [
+              "lastUsedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredients_lastUsedAt` ON `${TABLE_NAME}` (`lastUsedAt`)"
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_categories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `nameEn` TEXT NOT NULL, `nameEs` TEXT NOT NULL, `iconKey` TEXT NOT NULL, `colorHex` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEn",
+            "columnName": "nameEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEs",
+            "columnName": "nameEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconKey",
+            "columnName": "iconKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "colorHex",
+            "columnName": "colorHex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "shopping_aisles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `nameEn` TEXT NOT NULL, `nameEs` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEn",
+            "columnName": "nameEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEs",
+            "columnName": "nameEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "nutrient_defs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tag` TEXT NOT NULL, `nameEn` TEXT NOT NULL, `nameEs` TEXT NOT NULL, `unit` TEXT NOT NULL, `nutrientGroup` TEXT NOT NULL, `isPrimary` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `nrv` REAL, PRIMARY KEY(`tag`))",
+        "fields": [
+          {
+            "fieldPath": "tag",
+            "columnName": "tag",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEn",
+            "columnName": "nameEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEs",
+            "columnName": "nameEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrientGroup",
+            "columnName": "nutrientGroup",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPrimary",
+            "columnName": "isPrimary",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nrv",
+            "columnName": "nrv",
+            "affinity": "REAL"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tag"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_nutrient_defs_nutrientGroup_sortOrder",
+            "unique": false,
+            "columnNames": [
+              "nutrientGroup",
+              "sortOrder"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nutrient_defs_nutrientGroup_sortOrder` ON `${TABLE_NAME}` (`nutrientGroup`, `sortOrder`)"
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_nutrients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ingredientId` INTEGER NOT NULL, `tag` TEXT NOT NULL, `value` REAL NOT NULL, PRIMARY KEY(`ingredientId`, `tag`), FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tag",
+            "columnName": "tag",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "ingredientId",
+            "tag"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_portions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ingredientId` INTEGER NOT NULL, `labelEn` TEXT NOT NULL, `labelEs` TEXT NOT NULL, `grams` REAL NOT NULL, `portionType` TEXT NOT NULL, `isDefault` INTEGER NOT NULL, FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "labelEn",
+            "columnName": "labelEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "labelEs",
+            "columnName": "labelEs",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "portionType",
+            "columnName": "portionType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDefault",
+            "columnName": "isDefault",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ingredient_portions_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredient_portions_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_aliases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ingredientId` INTEGER NOT NULL, `alias` TEXT NOT NULL, `aliasNorm` TEXT NOT NULL, `lang` TEXT NOT NULL, FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aliasNorm",
+            "columnName": "aliasNorm",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lang",
+            "columnName": "lang",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ingredient_aliases_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredient_aliases_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          },
+          {
+            "name": "index_ingredient_aliases_aliasNorm",
+            "unique": false,
+            "columnNames": [
+              "aliasNorm"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredient_aliases_aliasNorm` ON `${TABLE_NAME}` (`aliasNorm`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_quality_issues",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ingredientId` INTEGER NOT NULL, `code` TEXT NOT NULL, `severity` TEXT NOT NULL, `detail` TEXT, FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "code",
+            "columnName": "code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detail",
+            "columnName": "detail",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ingredient_quality_issues_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ingredient_quality_issues_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ingredients",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "food_dataset_meta",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "recipes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `nameEs` TEXT, `category` TEXT NOT NULL, `folder` TEXT, `coverImagePath` TEXT, `coverImageCrop` TEXT NOT NULL DEFAULT 'CENTER', `createdAt` INTEGER NOT NULL, `remoteId` TEXT, `isFavorite` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEs",
+            "columnName": "nameEs",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "folder",
+            "columnName": "folder",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "coverImagePath",
+            "columnName": "coverImagePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "coverImageCrop",
+            "columnName": "coverImageCrop",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'CENTER'"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteId",
+            "columnName": "remoteId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recipes_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_recipes_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ]
+      },
+      {
+        "tableName": "recipe_ingredients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`recipeId` INTEGER NOT NULL, `ingredientId` INTEGER NOT NULL, `grams` REAL NOT NULL, `quantityUnit` TEXT NOT NULL DEFAULT 'GRAM', PRIMARY KEY(`recipeId`, `ingredientId`), FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "recipeId",
+            "columnName": "recipeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "quantityUnit",
+            "columnName": "quantityUnit",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'GRAM'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "recipeId",
+            "ingredientId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recipe_ingredients_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_ingredients_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recipes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "recipeId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "recipe_steps",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `recipeId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `text` TEXT NOT NULL, `textEs` TEXT, `imagePath` TEXT, FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recipeId",
+            "columnName": "recipeId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textEs",
+            "columnName": "textEs",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "imagePath",
+            "columnName": "imagePath",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recipe_steps_recipeId",
+            "unique": false,
+            "columnNames": [
+              "recipeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recipe_steps_recipeId` ON `${TABLE_NAME}` (`recipeId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recipes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "recipeId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `dateOfBirth` INTEGER NOT NULL, `sex` TEXT NOT NULL, `heightCm` REAL NOT NULL, `weightKg` REAL NOT NULL, `bodyFatPercent` REAL, `activityLevel` TEXT NOT NULL, `goal` TEXT NOT NULL, `weightLossRate` TEXT NOT NULL, `formula` TEXT NOT NULL, `unitSystem` TEXT NOT NULL, `dietaryPreferences` TEXT, `allergies` TEXT, `colorIndex` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `remoteId` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateOfBirth",
+            "columnName": "dateOfBirth",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sex",
+            "columnName": "sex",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "heightCm",
+            "columnName": "heightCm",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weightKg",
+            "columnName": "weightKg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bodyFatPercent",
+            "columnName": "bodyFatPercent",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "activityLevel",
+            "columnName": "activityLevel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "goal",
+            "columnName": "goal",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weightLossRate",
+            "columnName": "weightLossRate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "formula",
+            "columnName": "formula",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unitSystem",
+            "columnName": "unitSystem",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dietaryPreferences",
+            "columnName": "dietaryPreferences",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "allergies",
+            "columnName": "allergies",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "colorIndex",
+            "columnName": "colorIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteId",
+            "columnName": "remoteId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "profile_meal_plans",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` INTEGER NOT NULL, `slot` TEXT NOT NULL, `share` REAL NOT NULL, `isFree` INTEGER NOT NULL, PRIMARY KEY(`profileId`, `slot`), FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slot",
+            "columnName": "slot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "share",
+            "columnName": "share",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFree",
+            "columnName": "isFree",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "slot"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "weight_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `weightKg` REAL NOT NULL, `recordedAt` INTEGER NOT NULL, FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weightKg",
+            "columnName": "weightKg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordedAt",
+            "columnName": "recordedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_weight_entries_profileId",
+            "unique": false,
+            "columnNames": [
+              "profileId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_weight_entries_profileId` ON `${TABLE_NAME}` (`profileId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "weekly_menus",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `weekStart` INTEGER NOT NULL, `slotsSpec` TEXT NOT NULL, `scope` TEXT NOT NULL DEFAULT 'SHARED', `coursesSpec` TEXT NOT NULL DEFAULT '', `createdAt` INTEGER NOT NULL, `remoteId` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weekStart",
+            "columnName": "weekStart",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slotsSpec",
+            "columnName": "slotsSpec",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scope",
+            "columnName": "scope",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'SHARED'"
+          },
+          {
+            "fieldPath": "coursesSpec",
+            "columnName": "coursesSpec",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteId",
+            "columnName": "remoteId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_weekly_menus_weekStart",
+            "unique": true,
+            "columnNames": [
+              "weekStart"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_weekly_menus_weekStart` ON `${TABLE_NAME}` (`weekStart`)"
+          }
+        ]
+      },
+      {
+        "tableName": "planned_meals",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `menuId` INTEGER NOT NULL, `dayOfWeek` INTEGER NOT NULL, `slot` TEXT NOT NULL, `recipeId` INTEGER, `isLocked` INTEGER NOT NULL, `isCheatMeal` INTEGER NOT NULL, `course` TEXT NOT NULL, `profileId` INTEGER, `isFree` INTEGER NOT NULL, FOREIGN KEY(`menuId`) REFERENCES `weekly_menus`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "menuId",
+            "columnName": "menuId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dayOfWeek",
+            "columnName": "dayOfWeek",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "slot",
+            "columnName": "slot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recipeId",
+            "columnName": "recipeId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isLocked",
+            "columnName": "isLocked",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isCheatMeal",
+            "columnName": "isCheatMeal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "course",
+            "columnName": "course",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isFree",
+            "columnName": "isFree",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_planned_meals_menuId",
+            "unique": false,
+            "columnNames": [
+              "menuId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_planned_meals_menuId` ON `${TABLE_NAME}` (`menuId`)"
+          },
+          {
+            "name": "index_planned_meals_recipeId",
+            "unique": false,
+            "columnNames": [
+              "recipeId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_planned_meals_recipeId` ON `${TABLE_NAME}` (`recipeId`)"
+          },
+          {
+            "name": "index_planned_meals_profileId",
+            "unique": false,
+            "columnNames": [
+              "profileId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_planned_meals_profileId` ON `${TABLE_NAME}` (`profileId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "weekly_menus",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "menuId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "recipes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "recipeId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "meal_portions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`plannedMealId` INTEGER NOT NULL, `profileId` INTEGER NOT NULL, `factor` REAL NOT NULL, `baseFactor` REAL NOT NULL DEFAULT 0, PRIMARY KEY(`plannedMealId`, `profileId`), FOREIGN KEY(`plannedMealId`) REFERENCES `planned_meals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "plannedMealId",
+            "columnName": "plannedMealId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "factor",
+            "columnName": "factor",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseFactor",
+            "columnName": "baseFactor",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "plannedMealId",
+            "profileId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_meal_portions_profileId",
+            "unique": false,
+            "columnNames": [
+              "profileId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_meal_portions_profileId` ON `${TABLE_NAME}` (`profileId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "planned_meals",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "plannedMealId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "shopping_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `menuId` INTEGER NOT NULL, `ingredientId` INTEGER NOT NULL, `grams` REAL NOT NULL, `purchased` INTEGER NOT NULL, FOREIGN KEY(`menuId`) REFERENCES `weekly_menus`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "menuId",
+            "columnName": "menuId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredientId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "purchased",
+            "columnName": "purchased",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_shopping_items_menuId",
+            "unique": false,
+            "columnNames": [
+              "menuId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_shopping_items_menuId` ON `${TABLE_NAME}` (`menuId`)"
+          },
+          {
+            "name": "index_shopping_items_ingredientId",
+            "unique": false,
+            "columnNames": [
+              "ingredientId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_shopping_items_ingredientId` ON `${TABLE_NAME}` (`ingredientId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "weekly_menus",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "menuId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ingredientId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "intake_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` INTEGER NOT NULL, `dayStart` INTEGER NOT NULL, `label` TEXT NOT NULL, `grams` REAL, `loggedAt` INTEGER NOT NULL, `kcal` REAL NOT NULL, `carbs` REAL NOT NULL, `fats` REAL NOT NULL, `protein` REAL NOT NULL, FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dayStart",
+            "columnName": "dayStart",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "loggedAt",
+            "columnName": "loggedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.kcal",
+            "columnName": "kcal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.carbs",
+            "columnName": "carbs",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.fats",
+            "columnName": "fats",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutrition.protein",
+            "columnName": "protein",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_intake_entries_profileId_dayStart",
+            "unique": false,
+            "columnNames": [
+              "profileId",
+              "dayStart"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_intake_entries_profileId_dayStart` ON `${TABLE_NAME}` (`profileId`, `dayStart`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profileId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "catalog_revision",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`revision_id` TEXT NOT NULL, `revision_key` TEXT NOT NULL, `parent_revision_id` TEXT, `kind` TEXT NOT NULL, `state` TEXT NOT NULL, `source_namespace` TEXT NOT NULL, `dataset_version` TEXT, `source_sha256` TEXT, `manifest_json` TEXT NOT NULL, `manifest_sha256` TEXT NOT NULL, `rules_version` TEXT NOT NULL, `actor` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `applied_at` INTEGER, `applied_seq` INTEGER, PRIMARY KEY(`revision_id`), FOREIGN KEY(`parent_revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionKey",
+            "columnName": "revision_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentRevisionId",
+            "columnName": "parent_revision_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceNamespace",
+            "columnName": "source_namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "datasetVersion",
+            "columnName": "dataset_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSha256",
+            "columnName": "source_sha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "manifestJson",
+            "columnName": "manifest_json",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "manifestSha256",
+            "columnName": "manifest_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rulesVersion",
+            "columnName": "rules_version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actor",
+            "columnName": "actor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "appliedAt",
+            "columnName": "applied_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "appliedSeq",
+            "columnName": "applied_seq",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "revision_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_catalog_revision_source",
+            "unique": false,
+            "columnNames": [
+              "source_namespace",
+              "dataset_version"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_catalog_revision_source` ON `${TABLE_NAME}` (`source_namespace`, `dataset_version`)"
+          },
+          {
+            "name": "index_catalog_revision_parent",
+            "unique": false,
+            "columnNames": [
+              "parent_revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_catalog_revision_parent` ON `${TABLE_NAME}` (`parent_revision_id`)"
+          },
+          {
+            "name": "index_catalog_revision_sequence",
+            "unique": true,
+            "columnNames": [
+              "applied_seq"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_catalog_revision_sequence` ON `${TABLE_NAME}` (`applied_seq`)"
+          },
+          {
+            "name": "index_catalog_revision_key",
+            "unique": true,
+            "columnNames": [
+              "revision_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_catalog_revision_key` ON `${TABLE_NAME}` (`revision_key`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "parent_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "canonical_ingredients",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`canonical_id` TEXT NOT NULL, `scope_key` TEXT NOT NULL, `concept_key` TEXT NOT NULL, `part_key` TEXT NOT NULL, `preparation_key` TEXT NOT NULL, `preservation_key` TEXT NOT NULL, `form_key` TEXT NOT NULL, `formulation_key` TEXT NOT NULL, `variant_key` TEXT NOT NULL, `identity_state` TEXT NOT NULL, `name_es` TEXT, `name_en` TEXT, `name_es_norm` TEXT, `name_en_norm` TEXT, `created_revision_id` TEXT NOT NULL, `updated_revision_id` TEXT NOT NULL, PRIMARY KEY(`canonical_id`), FOREIGN KEY(`updated_revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`created_revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "canonicalId",
+            "columnName": "canonical_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scopeKey",
+            "columnName": "scope_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "conceptKey",
+            "columnName": "concept_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "partKey",
+            "columnName": "part_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "preparationKey",
+            "columnName": "preparation_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "preservationKey",
+            "columnName": "preservation_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "formKey",
+            "columnName": "form_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "formulationKey",
+            "columnName": "formulation_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "variantKey",
+            "columnName": "variant_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "identityState",
+            "columnName": "identity_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nameEs",
+            "columnName": "name_es",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nameEn",
+            "columnName": "name_en",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nameEsNorm",
+            "columnName": "name_es_norm",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nameEnNorm",
+            "columnName": "name_en_norm",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdRevisionId",
+            "columnName": "created_revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedRevisionId",
+            "columnName": "updated_revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "canonical_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_canonical_updated_revision",
+            "unique": false,
+            "columnNames": [
+              "updated_revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_canonical_updated_revision` ON `${TABLE_NAME}` (`updated_revision_id`)"
+          },
+          {
+            "name": "index_canonical_created_revision",
+            "unique": false,
+            "columnNames": [
+              "created_revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_canonical_created_revision` ON `${TABLE_NAME}` (`created_revision_id`)"
+          },
+          {
+            "name": "index_canonical_name_en",
+            "unique": false,
+            "columnNames": [
+              "name_en_norm"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_canonical_name_en` ON `${TABLE_NAME}` (`name_en_norm`)"
+          },
+          {
+            "name": "index_canonical_name_es",
+            "unique": false,
+            "columnNames": [
+              "name_es_norm"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_canonical_name_es` ON `${TABLE_NAME}` (`name_es_norm`)"
+          },
+          {
+            "name": "index_canonical_id_scope",
+            "unique": true,
+            "columnNames": [
+              "canonical_id",
+              "scope_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_canonical_id_scope` ON `${TABLE_NAME}` (`canonical_id`, `scope_key`)"
+          },
+          {
+            "name": "index_canonical_identity",
+            "unique": true,
+            "columnNames": [
+              "scope_key",
+              "concept_key",
+              "part_key",
+              "preparation_key",
+              "preservation_key",
+              "form_key",
+              "formulation_key",
+              "variant_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_canonical_identity` ON `${TABLE_NAME}` (`scope_key`, `concept_key`, `part_key`, `preparation_key`, `preservation_key`, `form_key`, `formulation_key`, `variant_key`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "updated_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "created_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_canonical_map",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ingredient_id` INTEGER NOT NULL, `canonical_id` TEXT NOT NULL, `scope_key` TEXT NOT NULL, `source_namespace` TEXT NOT NULL, `source_record_key` TEXT NOT NULL, `source_head_slot` INTEGER, `record_sha256` TEXT NOT NULL, `mapping_basis` TEXT NOT NULL, `origin_revision_id` TEXT NOT NULL, `assigned_revision_id` TEXT NOT NULL, PRIMARY KEY(`ingredient_id`), FOREIGN KEY(`assigned_revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`origin_revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`canonical_id`, `scope_key`) REFERENCES `canonical_ingredients`(`canonical_id`, `scope_key`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredient_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalId",
+            "columnName": "canonical_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scopeKey",
+            "columnName": "scope_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceNamespace",
+            "columnName": "source_namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRecordKey",
+            "columnName": "source_record_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceHeadSlot",
+            "columnName": "source_head_slot",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "recordSha256",
+            "columnName": "record_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mappingBasis",
+            "columnName": "mapping_basis",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originRevisionId",
+            "columnName": "origin_revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assignedRevisionId",
+            "columnName": "assigned_revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "ingredient_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_map_assigned_revision",
+            "unique": false,
+            "columnNames": [
+              "assigned_revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_map_assigned_revision` ON `${TABLE_NAME}` (`assigned_revision_id`)"
+          },
+          {
+            "name": "index_map_origin_revision",
+            "unique": false,
+            "columnNames": [
+              "origin_revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_map_origin_revision` ON `${TABLE_NAME}` (`origin_revision_id`)"
+          },
+          {
+            "name": "index_map_canonical_scope",
+            "unique": false,
+            "columnNames": [
+              "canonical_id",
+              "scope_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_map_canonical_scope` ON `${TABLE_NAME}` (`canonical_id`, `scope_key`)"
+          },
+          {
+            "name": "index_map_source_head",
+            "unique": true,
+            "columnNames": [
+              "source_namespace",
+              "source_record_key",
+              "source_head_slot"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_map_source_head` ON `${TABLE_NAME}` (`source_namespace`, `source_record_key`, `source_head_slot`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "assigned_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "origin_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "canonical_ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "canonical_id",
+              "scope_key"
+            ],
+            "referencedColumns": [
+              "canonical_id",
+              "scope_key"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "ingredient_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_catalog_status",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ingredient_id` INTEGER NOT NULL, `state` TEXT NOT NULL, `reason_code` TEXT NOT NULL, `detail` TEXT NOT NULL, `replacement_ingredient_id` INTEGER, `revision_id` TEXT NOT NULL, PRIMARY KEY(`ingredient_id`), FOREIGN KEY(`revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`replacement_ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredient_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reasonCode",
+            "columnName": "reason_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detail",
+            "columnName": "detail",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "replacementIngredientId",
+            "columnName": "replacement_ingredient_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "ingredient_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_catalog_status_revision",
+            "unique": false,
+            "columnNames": [
+              "revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_catalog_status_revision` ON `${TABLE_NAME}` (`revision_id`)"
+          },
+          {
+            "name": "index_catalog_status_replacement",
+            "unique": false,
+            "columnNames": [
+              "replacement_ingredient_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_catalog_status_replacement` ON `${TABLE_NAME}` (`replacement_ingredient_id`)"
+          },
+          {
+            "name": "index_catalog_status_state",
+            "unique": false,
+            "columnNames": [
+              "state",
+              "ingredient_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_catalog_status_state` ON `${TABLE_NAME}` (`state`, `ingredient_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "replacement_ingredient_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "ingredient_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "conversion_evidence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`evidence_id` TEXT NOT NULL, `ingredient_id` INTEGER NOT NULL, `unit_key` TEXT NOT NULL, `grams_per_unit` REAL, `mass_basis` TEXT NOT NULL, `method` TEXT NOT NULL, `status` TEXT NOT NULL, `evidence_version` TEXT NOT NULL, `confidence` TEXT NOT NULL, `source_locator` TEXT NOT NULL, `source_excerpt` TEXT NOT NULL, `conditions` TEXT NOT NULL, `reviewed_by` TEXT, `reviewed_at` INTEGER, `supersedes_evidence_id` TEXT, `revision_id` TEXT NOT NULL, PRIMARY KEY(`evidence_id`), FOREIGN KEY(`supersedes_evidence_id`, `ingredient_id`, `unit_key`) REFERENCES `conversion_evidence`(`evidence_id`, `ingredient_id`, `unit_key`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidence_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredient_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unitKey",
+            "columnName": "unit_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gramsPerUnit",
+            "columnName": "grams_per_unit",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "massBasis",
+            "columnName": "mass_basis",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "method",
+            "columnName": "method",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceVersion",
+            "columnName": "evidence_version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceLocator",
+            "columnName": "source_locator",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceExcerpt",
+            "columnName": "source_excerpt",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "conditions",
+            "columnName": "conditions",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reviewedBy",
+            "columnName": "reviewed_by",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "reviewedAt",
+            "columnName": "reviewed_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "supersedesEvidenceId",
+            "columnName": "supersedes_evidence_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "evidence_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_evidence_revision",
+            "unique": false,
+            "columnNames": [
+              "revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evidence_revision` ON `${TABLE_NAME}` (`revision_id`)"
+          },
+          {
+            "name": "index_evidence_supersedes",
+            "unique": false,
+            "columnNames": [
+              "supersedes_evidence_id",
+              "ingredient_id",
+              "unit_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evidence_supersedes` ON `${TABLE_NAME}` (`supersedes_evidence_id`, `ingredient_id`, `unit_key`)"
+          },
+          {
+            "name": "index_evidence_ingredient_unit",
+            "unique": false,
+            "columnNames": [
+              "ingredient_id",
+              "unit_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evidence_ingredient_unit` ON `${TABLE_NAME}` (`ingredient_id`, `unit_key`)"
+          },
+          {
+            "name": "index_evidence_binding",
+            "unique": true,
+            "columnNames": [
+              "evidence_id",
+              "ingredient_id",
+              "unit_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_evidence_binding` ON `${TABLE_NAME}` (`evidence_id`, `ingredient_id`, `unit_key`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "conversion_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "supersedes_evidence_id",
+              "ingredient_id",
+              "unit_key"
+            ],
+            "referencedColumns": [
+              "evidence_id",
+              "ingredient_id",
+              "unit_key"
+            ]
+          },
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "ingredient_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ingredient_unit_options",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`option_id` TEXT NOT NULL, `ingredient_id` INTEGER NOT NULL, `unit_key` TEXT NOT NULL, `unit_kind` TEXT NOT NULL, `label_es` TEXT, `label_en` TEXT, `evidence_id` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `default_slot` INTEGER, `revision_id` TEXT NOT NULL, PRIMARY KEY(`option_id`), FOREIGN KEY(`revision_id`) REFERENCES `catalog_revision`(`revision_id`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`evidence_id`, `ingredient_id`, `unit_key`) REFERENCES `conversion_evidence`(`evidence_id`, `ingredient_id`, `unit_key`) ON UPDATE RESTRICT ON DELETE RESTRICT , FOREIGN KEY(`ingredient_id`) REFERENCES `ingredients`(`id`) ON UPDATE RESTRICT ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "optionId",
+            "columnName": "option_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ingredientId",
+            "columnName": "ingredient_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unitKey",
+            "columnName": "unit_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unitKind",
+            "columnName": "unit_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "labelEs",
+            "columnName": "label_es",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "labelEn",
+            "columnName": "label_en",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidence_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "defaultSlot",
+            "columnName": "default_slot",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "option_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_unit_revision",
+            "unique": false,
+            "columnNames": [
+              "revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_unit_revision` ON `${TABLE_NAME}` (`revision_id`)"
+          },
+          {
+            "name": "index_unit_evidence_binding",
+            "unique": false,
+            "columnNames": [
+              "evidence_id",
+              "ingredient_id",
+              "unit_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_unit_evidence_binding` ON `${TABLE_NAME}` (`evidence_id`, `ingredient_id`, `unit_key`)"
+          },
+          {
+            "name": "index_unit_default",
+            "unique": true,
+            "columnNames": [
+              "ingredient_id",
+              "default_slot"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_unit_default` ON `${TABLE_NAME}` (`ingredient_id`, `default_slot`)"
+          },
+          {
+            "name": "index_unit_ingredient_key",
+            "unique": true,
+            "columnNames": [
+              "ingredient_id",
+              "unit_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_unit_ingredient_key` ON `${TABLE_NAME}` (`ingredient_id`, `unit_key`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "catalog_revision",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "conversion_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "evidence_id",
+              "ingredient_id",
+              "unit_key"
+            ],
+            "referencedColumns": [
+              "evidence_id",
+              "ingredient_id",
+              "unit_key"
+            ]
+          },
+          {
+            "table": "ingredients",
+            "onDelete": "RESTRICT",
+            "onUpdate": "RESTRICT",
+            "columns": [
+              "ingredient_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3fe09d5bbcc4d9f6d3c851b8ca9eed87')"
+    ]
+  }
+}

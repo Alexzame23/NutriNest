@@ -29,14 +29,14 @@ data class TagValue(val tag: String, val value: Double)
 @Dao
 interface IngredientDao {
 
-    @Query("SELECT * FROM ingredients WHERE sourceKey IS NOT 'BEDCA:2494' ORDER BY name COLLATE NOCASE")
+    @Query("SELECT * FROM ingredients WHERE sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN') ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<IngredientEntity>>
 
     @Query(
         """
         SELECT * FROM ingredients
         WHERE name LIKE '%' || :query || '%'
-          AND sourceKey IS NOT 'BEDCA:2494'
+          AND sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
         ORDER BY isCustom DESC, name COLLATE NOCASE
         """
     )
@@ -57,7 +57,7 @@ interface IngredientDao {
         """
         SELECT * FROM ingredients
         WHERE foodType IN (:categoryKeys)
-          AND sourceKey IS NOT 'BEDCA:2494'
+          AND sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
           AND (:favoritesOnly = 0 OR isFavorite = 1)
           AND (:customOnly = 0 OR isCustom = 1)
           AND (
@@ -78,14 +78,14 @@ interface IngredientDao {
         customOnly: Int
     ): Flow<List<IngredientEntity>>
 
-    @Query("SELECT * FROM ingredients WHERE isFavorite = 1 AND sourceKey IS NOT 'BEDCA:2494'")
+    @Query("SELECT * FROM ingredients WHERE isFavorite = 1 AND sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')")
     fun observeFavorites(): Flow<List<IngredientEntity>>
 
     /** Most recently used, for the "Recent" view and the recipe picker. */
     @Query(
         """
         SELECT * FROM ingredients
-        WHERE lastUsedAt IS NOT NULL AND sourceKey IS NOT 'BEDCA:2494'
+        WHERE lastUsedAt IS NOT NULL AND sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
         ORDER BY lastUsedAt DESC
         LIMIT :limit
         """
@@ -96,7 +96,7 @@ interface IngredientDao {
     @Query(
         """
         SELECT * FROM ingredients
-        WHERE isCustom = 1
+        WHERE isCustom = 1 AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
         ORDER BY createdAt DESC
         LIMIT :limit
         """
@@ -169,6 +169,7 @@ interface IngredientDao {
         """
         SELECT (SELECT COUNT(*) FROM recipe_ingredients WHERE ingredientId = :ingredientId)
              + (SELECT COUNT(*) FROM shopping_items WHERE ingredientId = :ingredientId)
+             + (SELECT COUNT(*) FROM ingredient_canonical_map WHERE ingredient_id = :ingredientId)
         """
     )
     suspend fun countReferences(ingredientId: Long): Int
@@ -181,7 +182,7 @@ interface IngredientDao {
 
     // ── Duplicate detection ─────────────────────────────────────────────
 
-    @Query("SELECT COUNT(*) FROM ingredients WHERE name = :name COLLATE NOCASE")
+    @Query("SELECT COUNT(*) FROM ingredients WHERE name = :name COLLATE NOCASE AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')")
     suspend fun countByName(name: String): Int
 
     /** Exact normalised match in either language, ignoring the row being edited. */
@@ -189,7 +190,7 @@ interface IngredientDao {
         """
         SELECT COUNT(*) FROM ingredients
         WHERE (nameNorm = :normalizedName OR nameEsNorm = :normalizedName)
-          AND id != :excludingId
+          AND id != :excludingId AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
         """
     )
     suspend fun countByNormalizedName(normalizedName: String, excludingId: Long): Int
@@ -202,7 +203,7 @@ interface IngredientDao {
     @Query(
         """
         SELECT * FROM ingredients
-        WHERE id != :excludingId
+        WHERE id != :excludingId AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
           AND (
                 nameNorm LIKE '%' || :normalizedName || '%'
                 OR :normalizedName LIKE '%' || nameNorm || '%'
@@ -241,19 +242,19 @@ interface IngredientDao {
     @Query("SELECT COUNT(*) FROM ingredients")
     suspend fun count(): Int
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertNutrients(nutrients: List<IngredientNutrientEntity>)
 
     @Query("DELETE FROM ingredient_nutrients WHERE ingredientId = :ingredientId")
     suspend fun clearNutrients(ingredientId: Long)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertPortions(portions: List<IngredientPortionEntity>)
 
     @Query("DELETE FROM ingredient_portions WHERE ingredientId = :ingredientId")
     suspend fun clearPortions(ingredientId: Long)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAliases(aliases: List<IngredientAliasEntity>)
 
     @Query("DELETE FROM ingredient_aliases WHERE ingredientId = :ingredientId")

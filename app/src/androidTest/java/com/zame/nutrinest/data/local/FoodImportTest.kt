@@ -192,7 +192,7 @@ class FoodImportTest {
     }
 
     @Test
-    fun libraryUpgradeAddsTranslationsAndDetailedStepsInPlace() = runBlocking {
+    fun libraryUpgradePreservesSavedRecipeStepsAndQuantities() = runBlocking {
         val original = database.recipeDao().observeAll().first().first { it.isBuiltIn }
         val sqlite = database.openHelper.writableDatabase
         sqlite.execSQL(
@@ -211,20 +211,53 @@ class FoodImportTest {
             "UPDATE food_dataset_meta SET value = '2' " +
                 "WHERE `key` = 'built_in_recipe_library_version'"
         )
+        sqlite.execSQL("UPDATE recipe_ingredients SET grams=grams+0.123456 WHERE recipeId=?", arrayOf<Any>(original.id))
+        val quantities = CatalogTestFixtures.snapshot(sqlite, listOf("recipe_ingredients"))
         database.close()
 
         database = NutriNestDatabase.build(context)
         val upgraded = database.recipeDao().observeRecipeWithSteps(original.id).first()
         assertNotNull(upgraded)
-        assertTrue(!upgraded?.recipe?.nameEs.isNullOrBlank())
+        assertTrue(upgraded?.recipe?.nameEs == null)
         assertTrue(
             upgraded?.steps?.let { steps ->
-                steps.size >= 2 && steps.all {
-                    it.text.isNotBlank() && !it.textEs.isNullOrBlank()
-                }
+                steps.size == 1 && steps.single().text == "Old step"
             } == true
         )
+        assertEquals(quantities, CatalogTestFixtures.snapshot(database.openHelper.writableDatabase, listOf("recipe_ingredients")))
         assertEquals(250, database.recipeDao().observeAll().first().count { it.isBuiltIn })
+    }
+
+    @Test
+    fun v9ImportAndReopenPreserveSnapshotsAndRejectChangedDataset() = runBlocking {
+        database.ingredientDao().count()
+        val db = database.openHelper.writableDatabase
+        val tables = CatalogTestFixtures.tables(db)
+        val before = CatalogTestFixtures.snapshot(db, tables)
+        assertTrue(FoodDatabaseImporter.importIfNeeded(context, db))
+        assertEquals(before, CatalogTestFixtures.snapshot(db, tables))
+        db.execSQL("UPDATE food_dataset_meta SET value='different-version' WHERE `key`='dataset_version'")
+        val changedMarker = CatalogTestFixtures.snapshot(db, tables)
+        assertTrue(!FoodDatabaseImporter.importIfNeeded(context, db))
+        assertEquals(changedMarker, CatalogTestFixtures.snapshot(db, tables))
+        CanonicalCatalogStore.validate(db)
+    }
+
+    @Test
+    fun editingCreatesANewSnapshotAndKeepsOldRecipesAndNutrients() = runBlocking {
+        val dao = database.ingredientDao()
+        val food = dao.observeAll().first().first()
+        val db = database.openHelper.writableDatabase
+        val before = CanonicalCatalogStore.ingredientFingerprint(db, food.id)
+        val repository = com.zame.nutrinest.data.repository.LocalIngredientRepository(database)
+        val id = repository.save(food.copy(nutrition = food.nutrition.copy(kcal = 123.456)), emptyList(), emptyList(), emptyList())
+        assertTrue(id != food.id)
+        assertEquals(before, CanonicalCatalogStore.ingredientFingerprint(db, food.id))
+        assertEquals(food.nutrition, dao.findById(food.id)?.nutrition)
+        assertEquals(123.456, dao.findById(id)!!.nutrition.kcal, 0.0)
+        assertEquals("HIDDEN", database.canonicalCatalogDao().status(food.id)?.state)
+        assertTrue(database.canonicalCatalogDao().mapping(id) != null)
+        CanonicalCatalogStore.validate(db)
     }
 
     private companion object {

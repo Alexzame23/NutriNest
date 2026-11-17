@@ -7,52 +7,18 @@ import android.util.Log
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zame.nutrinest.data.local.entity.FoodDatasetMetaEntity
 import java.io.File
+import java.security.MessageDigest
 
-/**
- * Loads the shipped food database (`assets/nutrinest_foods.db`, derived from
- * BEDCA) into the app's own Room database.
- *
- * Room's `createFromAsset` is not an option: it replaces the whole database, and
- * ours already holds the user's recipes, profiles and menus. So the asset is
- * copied out of the APK, opened read-only on a **separate** connection, and its
- * rows are streamed into Room's connection through prepared statements.
- *
- * Deliberately no `ATTACH DATABASE`, even though it would make the mapping a
- * tidier `INSERT .. SELECT`. Android's `SQLiteDatabase` treats ATTACH as a
- * special statement and reconfigures its connection pool around it (ATTACH and
- * WAL do not mix), which throws away the `TEMP` tables Room's invalidation
- * tracker keeps per connection. The next `Flow` query then dies with
- * "no such table: room_table_modification_log". Writing through Room's own
- * connection also means the tracker sees the inserts, so observed queries
- * refresh once the import lands.
- */
+/** Additive asset bootstrap. Existing ingredient snapshots and definitions are never replaced. */
 object FoodDatabaseImporter {
-
     private const val TAG = "FoodDatabaseImporter"
     private const val ASSET_NAME = "nutrinest_foods.db"
-
-    /**
-     * Imported ingredients keep the dataset's own food id, shifted by this much.
-     *
-     * The dataset numbers foods from 3 to ~2400, which would collide with the
-     * ids Room hands out to user-created ingredients. Shifting the dataset into
-     * its own block, and then pushing the autoincrement counter past the end of
-     * that block, means neither can ever tread on the other — including when a
-     * later dataset adds foods.
-     */
     const val IMPORTED_ID_OFFSET = 1_000_000L
-    /** Not a suitable general-purpose food reference for NutriNest. */
     const val HUMAN_MILK_FOOD_ID = 2494L
     private const val USER_ID_FLOOR = 2_000_000L
-
-    /** Marks the last successful import, so user edits since then are respected. */
     private const val LAST_IMPORT_AT = "last_import_at"
+    internal const val ASSET_HASH_KEY = "dataset_asset_sha256"
 
-    /**
-     * One table's worth of copying: a query against the asset, and the insert it
-     * feeds. The insert's placeholders are bound positionally from the query's
-     * columns, so the two column lists must stay in the same order.
-     */
     private class CopyStep(
         val label: String,
         val read: String,
@@ -60,236 +26,118 @@ object FoodDatabaseImporter {
         val readArgs: (Long) -> Array<String> = { emptyArray() }
     )
 
-    /**
-     * Imports the dataset when the database has never seen it, or has seen an
-     * older version. Failures are logged and swallowed: a missing or corrupt
-     * asset should leave the user with an empty ingredient list, not a crash
-     * loop on every app start.
-     */
-    fun importIfNeeded(context: Context, db: SupportSQLiteDatabase) {
+    /** False keeps the seeder from treating a failed/unsupported import as successful. */
+    fun importIfNeeded(context: Context, db: SupportSQLiteDatabase): Boolean =
         runCatching { doImport(context, db) }
-            .onFailure { Log.e(TAG, "Food database import failed", it) }
-    }
+            .onFailure { Log.e(TAG, "Food import deferred; historical data retained", it) }
+            .getOrDefault(false)
 
-    private fun doImport(context: Context, db: SupportSQLiteDatabase) {
-        val staging = File(context.cacheDir, "food-import.db")
+    private fun doImport(context: Context, db: SupportSQLiteDatabase): Boolean {
+        val staging = File.createTempFile("food-import-", ".db", context.cacheDir)
         try {
-            copyAsset(context, staging)
-            val asset = SQLiteDatabase.openDatabase(
-                staging.absolutePath, null, SQLiteDatabase.OPEN_READONLY
-            )
-            try {
-                val assetVersion = asset.stringOf(
-                    "SELECT value FROM db_metadata WHERE key = ?",
-                    FoodDatasetMetaEntity.DATASET_VERSION
-                )
-                if (assetVersion == null) {
-                    Log.w(TAG, "Asset has no dataset_version; skipping import")
-                    return
-                }
-                val installedVersion = db.stringOf(
-                    "SELECT value FROM food_dataset_meta WHERE `key` = ?",
-                    FoodDatasetMetaEntity.DATASET_VERSION
-                )
-                if (installedVersion == assetVersion) return
-
-                val lastImportAt = db.stringOf(
-                    "SELECT value FROM food_dataset_meta WHERE `key` = ?", LAST_IMPORT_AT
-                )?.toLongOrNull() ?: 0L
-                val now = System.currentTimeMillis()
-
+            context.assets.open(ASSET_NAME).use { input -> staging.outputStream().use { input.copyTo(it) } }
+            val digest = MessageDigest.getInstance("SHA-256")
+            staging.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var read = input.read(buffer)
+                while (read >= 0) { digest.update(buffer, 0, read); read = input.read(buffer) }
+            }
+            val assetHash = CatalogFingerprint.hex(digest.digest())
+            SQLiteDatabase.openDatabase(staging.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { asset ->
+                val assetVersion = asset.rawQuery("SELECT value FROM db_metadata WHERE key='dataset_version'", null)
+                    .use { check(it.moveToFirst()); it.getString(0) }
                 db.beginTransaction()
                 try {
-                    val userState = captureUserState(db)
-                    clearReferenceData(db)
-                    dropStaleImports(db, lastImportAt)
-                    COPY_STEPS.forEach { step -> copy(asset, db, step, now) }
-                    restoreUserState(db, userState)
+                    val installedVersion = meta(db, FoodDatasetMetaEntity.DATASET_VERSION)
+                    val installedHash = meta(db, ASSET_HASH_KEY)
+                    if (installedVersion == assetVersion && installedHash == assetHash) {
+                        db.setTransactionSuccessful()
+                        return true
+                    }
+                    // Publishing a changed dataset requires a reviewed snapshot manifest, not
+                    // the old delete-and-reimport path. Defer it explicitly without burning markers.
+                    check(installedVersion == null || installedVersion == assetVersion) {
+                        "Dataset revision requires reviewed snapshot publication"
+                    }
+                    check(installedHash == null || installedHash == assetHash) {
+                        "Dataset hash changed without a reviewed publication"
+                    }
+                    val now = System.currentTimeMillis()
+                    val inserted = mutableSetOf<Long>()
+                    COPY_STEPS.forEach { copy(asset, db, it, now, inserted) }
                     reserveUserIdRange(db)
+                    CanonicalCatalogStore.backfill(db, inserted, assetHash, assetVersion)
                     writeMeta(db, FoodDatasetMetaEntity.DATASET_VERSION, assetVersion)
+                    writeMeta(db, ASSET_HASH_KEY, assetHash)
                     writeMeta(db, LAST_IMPORT_AT, now.toString())
                     db.setTransactionSuccessful()
-                } finally {
-                    db.endTransaction()
-                }
-                Log.i(
-                    TAG,
-                    "Imported food dataset $assetVersion" +
-                        (installedVersion?.let { " (replacing $it)" } ?: "")
-                )
-            } finally {
-                asset.close()
+                } finally { db.endTransaction() }
             }
-        } finally {
-            staging.delete()
-        }
+            return true
+        } finally { staging.delete() }
     }
 
-    private fun copyAsset(context: Context, target: File) {
-        context.assets.open(ASSET_NAME).use { input ->
-            target.outputStream().use { output -> input.copyTo(output) }
-        }
-    }
-
-    /**
-     * Streams one table across, binding each result column to the matching
-     * placeholder. Types come from the cursor rather than a schema, so a column
-     * that is null for one row and a number for the next is handled correctly.
-     */
-    private fun copy(
-        asset: SQLiteDatabase,
-        db: SupportSQLiteDatabase,
-        step: CopyStep,
-        now: Long
-    ) {
-        var rows = 0
+    private fun copy(asset: SQLiteDatabase, db: SupportSQLiteDatabase, step: CopyStep, now: Long,
+        inserted: MutableSet<Long>) {
         db.compileStatement(step.write).use { statement ->
             asset.rawQuery(step.read, step.readArgs(now)).use { cursor ->
                 while (cursor.moveToNext()) {
+                    if (skipExisting(db, step.label, cursor, inserted)) continue
                     statement.clearBindings()
                     for (column in 0 until cursor.columnCount) {
-                        val placeholder = column + 1
                         when (cursor.getType(column)) {
-                            Cursor.FIELD_TYPE_NULL -> statement.bindNull(placeholder)
-                            Cursor.FIELD_TYPE_INTEGER ->
-                                statement.bindLong(placeholder, cursor.getLong(column))
-                            Cursor.FIELD_TYPE_FLOAT ->
-                                statement.bindDouble(placeholder, cursor.getDouble(column))
-                            else -> statement.bindString(placeholder, cursor.getString(column))
+                            Cursor.FIELD_TYPE_NULL -> statement.bindNull(column + 1)
+                            Cursor.FIELD_TYPE_INTEGER -> statement.bindLong(column + 1, cursor.getLong(column))
+                            Cursor.FIELD_TYPE_FLOAT -> statement.bindDouble(column + 1, cursor.getDouble(column))
+                            else -> statement.bindString(column + 1, cursor.getString(column))
                         }
                     }
                     statement.executeInsert()
-                    rows++
+                    if (step.label == "ingredients") inserted += cursor.getLong(0)
                 }
             }
         }
-        Log.d(TAG, "${step.label}: $rows rows")
     }
 
-    // ── Import steps ────────────────────────────────────────────────────
-
-    /**
-     * Reference tables carry no user data, so they are replaced wholesale.
-     * Ingredient rows are not touched here — [dropStaleImports] decides which of
-     * those may be replaced.
-     */
-    private fun clearReferenceData(db: SupportSQLiteDatabase) {
-        db.execSQL("DELETE FROM ingredient_categories")
-        db.execSQL("DELETE FROM shopping_aisles")
-        db.execSQL("DELETE FROM nutrient_defs")
-    }
-
-    /**
-     * Clears out imported ingredients so a newer dataset can replace them.
-     *
-     * Rows the user has edited (their `updatedAt` moved past the last import) are
-     * left alone, as are any referenced by a recipe or shopping list — those
-     * foreign keys are RESTRICT, and silently rewriting an ingredient someone
-     * cooked with would be worse than keeping slightly older figures. Deleting
-     * the ingredient cascades to its nutrients, portions, aliases and notes.
-     */
-    private fun dropStaleImports(db: SupportSQLiteDatabase, lastImportAt: Long) {
-        db.execSQL(
-            """
-            DELETE FROM ingredients
-            WHERE isCustom = 0
-              AND updatedAt <= ?
-              AND id NOT IN (SELECT ingredientId FROM recipe_ingredients)
-              AND id NOT IN (SELECT ingredientId FROM shopping_items)
-            """.trimIndent(),
-            arrayOf<Any>(lastImportAt)
-        )
-    }
-
-    /** Favourites, usage counts and photos, held across a dataset refresh. */
-    private class UserState(
-        val id: Long,
-        val isFavorite: Int,
-        val usageCount: Int,
-        val lastUsedAt: Long?,
-        val imagePath: String?
-    )
-
-    private fun captureUserState(db: SupportSQLiteDatabase): List<UserState> {
-        val state = mutableListOf<UserState>()
-        db.query(
-            "SELECT id, isFavorite, usageCount, lastUsedAt, imagePath " +
-                "FROM ingredients WHERE isCustom = 0"
-        ).use { cursor ->
-            while (cursor.moveToNext()) {
-                state += UserState(
-                    id = cursor.getLong(0),
-                    isFavorite = cursor.getInt(1),
-                    usageCount = cursor.getInt(2),
-                    lastUsedAt = if (cursor.isNull(3)) null else cursor.getLong(3),
-                    imagePath = cursor.getString(4)
-                )
+    private fun skipExisting(db: SupportSQLiteDatabase, label: String, row: Cursor, inserted: Set<Long>): Boolean {
+        if (label in setOf("nutrients", "portions", "aliases", "quality issues")) return row.getLong(0) !in inserted
+        val table = when (label) {
+            "ingredients" -> "ingredients"
+            "categories" -> "ingredient_categories"
+            "aisles" -> "shopping_aisles"
+            "dataset metadata" -> "food_dataset_meta"
+            "nutrient definitions" -> "nutrient_defs"
+            else -> error("Unknown import step: $label")
+        }
+        val key = when (label) { "ingredients" -> "id"; "nutrient definitions" -> "tag"; else -> "key" }
+        if (label == "nutrient definitions") {
+            db.query("SELECT tag,nameEn,nameEs,unit,nutrientGroup,isPrimary,sortOrder,nrv FROM nutrient_defs WHERE tag=?", arrayOf(row.getString(0))).use { existing ->
+                if (!existing.moveToFirst()) return false
+                for (i in 0 until row.columnCount) {
+                    val same = if (row.isNull(i) || existing.isNull(i)) row.isNull(i) == existing.isNull(i)
+                        else if (row.getType(i) in listOf(Cursor.FIELD_TYPE_FLOAT, Cursor.FIELD_TYPE_INTEGER)) row.getDouble(i) == existing.getDouble(i)
+                        else row.getString(i) == existing.getString(i)
+                    check(same) { "Nutrient definition changed: ${row.getString(0)}; historical semantics retained" }
+                }
+                return true
             }
         }
-        return state
+        return db.query("SELECT 1 FROM `$table` WHERE `$key`=?", arrayOf(row.getString(0))).use { it.moveToFirst() }
     }
 
-    private fun restoreUserState(db: SupportSQLiteDatabase, state: List<UserState>) {
-        if (state.isEmpty()) return
-        db.compileStatement(
-            """
-            UPDATE ingredients
-            SET isFavorite = ?, usageCount = ?, lastUsedAt = ?,
-                imagePath = COALESCE(?, imagePath)
-            WHERE id = ? AND isCustom = 0
-            """.trimIndent()
-        ).use { statement ->
-            state.forEach { row ->
-                statement.clearBindings()
-                statement.bindLong(1, row.isFavorite.toLong())
-                statement.bindLong(2, row.usageCount.toLong())
-                row.lastUsedAt?.let { statement.bindLong(3, it) } ?: statement.bindNull(3)
-                row.imagePath?.let { statement.bindString(4, it) } ?: statement.bindNull(4)
-                statement.bindLong(5, row.id)
-                statement.executeUpdateDelete()
-            }
-        }
-    }
-
-    /**
-     * Pushes the autoincrement counter above the block reserved for imports, so
-     * ingredients the user creates from here on can never collide with a food
-     * added by a future dataset. The row is guaranteed to exist: the import above
-     * just inserted into an AUTOINCREMENT table.
-     */
     private fun reserveUserIdRange(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            "UPDATE sqlite_sequence SET seq = ? WHERE name = 'ingredients' AND seq < ?",
-            arrayOf<Any>(USER_ID_FLOOR, USER_ID_FLOOR)
-        )
+        db.execSQL("UPDATE sqlite_sequence SET seq = ? WHERE name = 'ingredients' AND seq < ?",
+            arrayOf<Any>(USER_ID_FLOOR, USER_ID_FLOOR))
     }
+
+    private fun meta(db: SupportSQLiteDatabase, key: String): String? =
+        db.query("SELECT value FROM food_dataset_meta WHERE `key`=?", arrayOf(key)).use { if (it.moveToFirst()) it.getString(0) else null }
 
     private fun writeMeta(db: SupportSQLiteDatabase, key: String, value: String) {
-        db.execSQL(
-            "INSERT OR REPLACE INTO food_dataset_meta (`key`, value) VALUES (?, ?)",
-            arrayOf<Any>(key, value)
-        )
+        db.execSQL("UPDATE food_dataset_meta SET value=? WHERE `key`=?", arrayOf(value, key))
+        db.execSQL("INSERT INTO food_dataset_meta (`key`,value) SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM food_dataset_meta WHERE `key`=?1)", arrayOf(key, value))
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────
-
-    private fun SupportSQLiteDatabase.stringOf(sql: String, vararg args: Any): String? =
-        query(sql, args).use { cursor ->
-            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getString(0) else null
-        }
-
-    private fun SQLiteDatabase.stringOf(sql: String, vararg args: String): String? =
-        rawQuery(sql, args).use { cursor ->
-            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getString(0) else null
-        }
-
-    /**
-     * The whole import, as declarative read/write pairs.
-     *
-     * Keeping each step's two column lists side by side is what makes the
-     * positional binding safe to read — and lets `tools/verify_migration.py`
-     * replay exactly these statements offline.
-     */
     private val COPY_STEPS = listOf(
         CopyStep(
             label = "categories",
@@ -315,7 +163,7 @@ object FoodDatabaseImporter {
         CopyStep(
             label = "dataset metadata",
             read = "SELECT key, value FROM db_metadata",
-            write = "INSERT OR REPLACE INTO food_dataset_meta (`key`, value) VALUES (?,?)"
+            write = "INSERT INTO food_dataset_meta (`key`, value) VALUES (?,?)"
         ),
         CopyStep(
             label = "ingredients",
@@ -354,7 +202,7 @@ object FoodDatabaseImporter {
             // omitting it made every row fail NOT NULL, which OR IGNORE then
             // swallowed without a word.
             write = """
-                INSERT OR IGNORE INTO ingredients (
+                INSERT INTO ingredients (
                     id, name, nameEs, nameNorm, nameEsNorm, baseName, foodType, aisleKey,
                     kcal, carbs, fats, protein,
                     prepState, rawSafety, servingSizeG, isLiquid, densityGml,
@@ -373,7 +221,7 @@ object FoodDatabaseImporter {
                 JOIN foods f ON f.id = n.food_id
                 WHERE f.is_deprecated = 0 AND f.id != $HUMAN_MILK_FOOD_ID
             """.trimIndent(),
-            write = "INSERT OR IGNORE INTO ingredient_nutrients (ingredientId, tag, value) " +
+            write = "INSERT INTO ingredient_nutrients (ingredientId, tag, value) " +
                 "VALUES (?,?,?)"
         ),
         CopyStep(

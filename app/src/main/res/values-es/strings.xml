@@ -208,11 +208,13 @@
     <string name="ingredient_data_quality">Calidad de los datos</string>
     <string name="ingredient_completeness">El %1$d%% del panel de nutrientes está completo</string>
     <string name="ingredient_no_micros">No hay datos de micronutrientes para este ingrediente.</string>
-    <string name="ingredient_delete_title">¿Eliminar este ingrediente?</string>
-    <string name="ingredient_delete_body">%1$s se eliminará de forma permanente.</string>
+    <string name="ingredient_delete_title">¿Archivar este ingrediente?</string>
+    <string name="ingredient_delete_body">%1$s se ocultará de las nuevas selecciones. Las recetas guardadas y sus cantidades se conservarán.</string>
     <string name="ingredient_delete_blocked_title">Todavía en uso</string>
     <string name="ingredient_delete_blocked_body">%1$s se usa en una receta o en la lista de la compra, así que no se puede eliminar. Quítalo de ahí primero.</string>
-    <string name="ingredient_deleted">Ingrediente eliminado</string>
+    <string name="ingredient_deleted">Ingrediente archivado</string>
+    <string name="ingredient_action_archive">Archivar</string>
+    <string name="ingredient_snapshot_edit_hint">Los cambios se aplican a nuevos usos. Las recetas guardadas conservan los valores anteriores del ingrediente.</string>
     <string name="ingredient_not_found">Este ingrediente ya no existe.</string>
     <string name="ingredient_nrv_share">%1$d%% VRN</string>
     <string name="ingredient_nrv_explainer">El VRN es la parte del valor de referencia diario de la UE.</string>

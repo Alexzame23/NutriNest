@@ -71,6 +71,7 @@ data class IngredientEditorUiState(
     /** Set when the user pressed save and only warnings stand in the way. */
     val confirmWarnings: Boolean = false,
     val saved: Boolean = false,
+    val savedIngredientId: Long? = null,
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val saveFailed: Boolean = false
@@ -349,11 +350,9 @@ class IngredientEditorViewModel(
                             ?: if (nameEs == trimmed) "es" else "en"
                     )
                 }
-            ) }.onSuccess {
-                if (previous?.imagePath != ingredient.imagePath) {
-                    ImageStorage.deleteManaged(getApplication(), previous?.imagePath)
-                }
-                update { copy(isSaving = false, saved = true) }
+            ) }.onSuccess { savedId ->
+                // The previous snapshot and its image still belong to historical recipes.
+                update { copy(isSaving = false, saved = true, savedIngredientId = savedId) }
             }.onFailure {
                 update { copy(isSaving = false, saveFailed = true) }
             }

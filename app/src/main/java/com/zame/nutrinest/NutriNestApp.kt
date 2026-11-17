@@ -18,7 +18,7 @@ class AppContainer(app: Application) {
     private val database = NutriNestDatabase.get(app)
 
     val ingredientRepository: IngredientRepository =
-        LocalIngredientRepository(database.ingredientDao())
+        LocalIngredientRepository(database)
 
     val foodReferenceRepository: FoodReferenceRepository =
         LocalFoodReferenceRepository(database.foodReferenceDao())

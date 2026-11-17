@@ -251,4 +251,110 @@ class MigrationTest {
             assertEquals("Sopa familiar", it.getString(0))
         }
     }
+    @Test
+    fun migrate8To9_preservesEveryHistoricalCellAndIsIdempotent() {
+        lateinit var tables: List<String>
+        lateinit var before: Map<String, List<String>>
+        helper.createDatabase("catalog-v8.db", 8).use { db ->
+            CatalogTestFixtures.seed(db, 8)
+            tables = CatalogTestFixtures.tables(db)
+            before = CatalogTestFixtures.snapshot(db, tables)
+        }
+        helper.runMigrationsAndValidate("catalog-v8.db", 9, true, NutriNestDatabase.MIGRATION_8_9).use { db ->
+            assertEquals(before, CatalogTestFixtures.snapshot(db, tables))
+            assertEquals(2L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM ingredient_canonical_map"))
+            assertEquals(0L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM ingredient_canonical_map WHERE source_head_slot IS NOT NULL"))
+            assertEquals(0L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM conversion_evidence"))
+            val allTables = CatalogTestFixtures.tables(db)
+            val first = CatalogTestFixtures.snapshot(db, allTables)
+            CanonicalCatalogStore.backfill(db)
+            CanonicalCatalogStore.backfill(db)
+            assertEquals(first, CatalogTestFixtures.snapshot(db, allTables))
+            db.query("PRAGMA foreign_key_check").use { assertTrue(!it.moveToFirst()) }
+            CatalogTestFixtures.constraints(db)
+        }
+    }
+
+    @Test
+    fun allExportedOldVersionsReach9WithUserReferencesIntact() {
+        for (version in 4..8) {
+            val name = "catalog-from-$version.db"
+            helper.createDatabase(name, version).use { CatalogTestFixtures.seed(it, version) }
+            val migrations = arrayOf(NutriNestDatabase.MIGRATION_4_5, NutriNestDatabase.MIGRATION_5_6,
+                NutriNestDatabase.MIGRATION_6_7, NutriNestDatabase.MIGRATION_7_8, NutriNestDatabase.MIGRATION_8_9)
+            helper.runMigrationsAndValidate(name, 9, true, *migrations).use { db ->
+                assertEquals(137.123456789, db.query("SELECT grams FROM recipe_ingredients WHERE recipeId=21").use { it.moveToFirst(); it.getDouble(0) }, 0.0)
+                assertEquals(543.210987, db.query("SELECT grams FROM shopping_items WHERE id=43").use { it.moveToFirst(); it.getDouble(0) }, 0.0)
+                assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT purchased FROM shopping_items WHERE id=43"))
+                assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT isFavorite FROM recipes WHERE id=21"))
+                assertEquals(1.375, db.query("SELECT factor FROM meal_portions WHERE plannedMealId=42").use { it.moveToFirst(); it.getDouble(0) }, 0.0)
+                val expectedBase = if (version >= 7) 0.925 else 1.375
+                assertEquals(expectedBase, db.query("SELECT baseFactor FROM meal_portions WHERE plannedMealId=42").use { it.moveToFirst(); it.getDouble(0) }, 0.0)
+                assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM weight_entries WHERE id=32 AND profileId=31"))
+                if (version >= 5) assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT isFavorite FROM ingredients WHERE id=11"))
+                if (version >= 7) assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM intake_entries WHERE id=51"))
+                db.query("PRAGMA foreign_key_check").use { assertTrue(!it.moveToFirst()) }
+            }
+        }
+    }
+
+    @Test
+    fun freshRoomDatabaseHasTheSameCatalogConstraints() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val room = androidx.room.Room.inMemoryDatabaseBuilder(context, NutriNestDatabase::class.java)
+            .addCallback(object : androidx.room.RoomDatabase.Callback() {
+                override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    CanonicalCatalogSchema.installValidationTriggers(db)
+                }
+            }).build()
+        try {
+                val db = room.openHelper.writableDatabase
+                CatalogTestFixtures.seed(db, 9)
+                CanonicalCatalogStore.backfill(db)
+                CatalogTestFixtures.constraints(db)
+        } finally { room.close() }
+    }
+
+    @Test
+    fun failedMigrationRollsBackOnlyTheDisposableFixture() {
+        helper.createDatabase("catalog-rollback.db", 8).use { db ->
+            CatalogTestFixtures.seed(db, 8)
+            val tables = CatalogTestFixtures.tables(db)
+            val before = CatalogTestFixtures.snapshot(db, tables)
+            db.beginTransaction()
+            try {
+                NutriNestDatabase.MIGRATION_8_9.migrate(db)
+                // Simulate interruption before Room commits; deliberately do not mark successful.
+            } finally { db.endTransaction() }
+            assertEquals(before, CatalogTestFixtures.snapshot(db, tables))
+            assertEquals(0L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM sqlite_master WHERE name='catalog_revision'"))
+        }
+    }
+
+    @Test
+    fun migratedInstallationSurvivesRealOnOpenImporterAndSeeder() {
+        val name = "catalog-real-reopen.db"
+        lateinit var tables: List<String>
+        lateinit var before: Map<String, List<String>>
+        helper.createDatabase(name, 8).use { db ->
+            CatalogTestFixtures.seed(db, 8)
+            tables = CatalogTestFixtures.tables(db)
+            before = CatalogTestFixtures.snapshot(db, tables)
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val room = NutriNestDatabase.build(context, name)
+        try {
+            val db = room.openHelper.writableDatabase
+            assertEquals(1L, CatalogTestFixtures.scalar(db, "PRAGMA foreign_keys"))
+            val after = CatalogTestFixtures.snapshot(db, tables)
+            before.forEach { (table, rows) ->
+                assertTrue("onOpen changed $table", after.getValue(table).containsAll(rows))
+            }
+            CanonicalCatalogStore.validate(db)
+        } finally { room.close() }
+        val reopened = NutriNestDatabase.build(context, name)
+        try { CanonicalCatalogStore.validate(reopened.openHelper.writableDatabase) }
+        finally { reopened.close() }
+    }
+
 }

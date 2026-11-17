@@ -130,7 +130,7 @@ fun IngredientDetailScreen(
                 TextButton(onClick = {
                     confirmDelete = false
                     viewModel.onDeleteConfirmed()
-                }) { Text(stringResource(R.string.action_delete)) }
+                }) { Text(stringResource(R.string.ingredient_action_archive)) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = false }) {
@@ -215,7 +215,7 @@ fun IngredientDetailScreen(
                     IconButton(onClick = { confirmDelete = true }) {
                         Icon(
                             Icons.Rounded.Delete,
-                            contentDescription = stringResource(R.string.action_delete)
+                            contentDescription = stringResource(R.string.ingredient_action_archive)
                         )
                     }
                 },

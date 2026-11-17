@@ -1,0 +1,11 @@
+{
+  "02-food-audit.md": "5cb2284e67d9481247d49a9c6bcf8779c9109426aa126b7e22b048287879780d",
+  "exports/02-food-audit.json": "f2b546474745d7039849da230914dca1d2065dd5bc6f9d068d1eac730b00cac4",
+  "exports/duplicate_pairs.csv": "6a8b6c8bf16fff769e1667d3a29c6f42ac844f38d968d1c502b600b22d7fddb4",
+  "exports/findings.csv": "77596862dc3dad4f9b615a32190761fa59d8c93af3434d81c7dbf2afaff8797b",
+  "exports/foods.csv": "5f90605afb3f95da7c8c13d42c2bc51566c9dbf5d960c9643e5771bafa1fef7a",
+  "exports/human_review.csv": "871e936d6b965948855c59366493b3709c17686af0441f7383a1aeaf86af916f",
+  "exports/portions.csv": "5c2f2e843c051d69a54e7d05d4aeaf41df3420efc7db0c1d9d86842b7043880a",
+  "exports/raw_cooked.csv": "c515f0afa52aaf5d56a5cb876422844b9f3433474cba0e3aa95ea8363adbb021",
+  "exports/recipe_usage.csv": "765e496bd5c0017e41dd197008192e36d367887274e00870e3465e4fd9cb14c6"
+}

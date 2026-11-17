@@ -156,7 +156,16 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
             )
         ) {
-            IngredientEditorScreen(onBack = { navController.popBackStack() })
+            IngredientEditorScreen(
+                onBack = { navController.popBackStack() },
+                onSaved = { id ->
+                    navController.popBackStack()
+                    if (navController.currentDestination?.route == Screen.IngredientDetail.route) {
+                        navController.popBackStack()
+                        navController.navigate(Screen.IngredientDetail.of(id))
+                    }
+                }
+            )
         }
 
         composable(

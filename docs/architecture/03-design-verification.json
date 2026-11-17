@@ -1,0 +1,250 @@
+{
+  "checks": [
+    {
+      "name": "v8_20_tables_data_unchanged_after_backfill",
+      "result": "PASS"
+    },
+    {
+      "name": "v8_existing_ddl_and_indexes_unchanged",
+      "result": "PASS"
+    },
+    {
+      "name": "six_additional_tables",
+      "result": "PASS"
+    },
+    {
+      "name": "937_singleton_mappings_and_statuses",
+      "result": "PASS"
+    },
+    {
+      "name": "egg_parts_rice_states_preservation_and_decaf_are_distinct",
+      "result": "PASS"
+    },
+    {
+      "name": "same_semantic_tuple_in_different_scope_allowed",
+      "result": "PASS"
+    },
+    {
+      "name": "publication_gate_accepts_complete_baseline",
+      "result": "PASS"
+    },
+    {
+      "name": "canonical_semantic_tuple_unique",
+      "result": "PASS"
+    },
+    {
+      "name": "canonical_pk_not_null",
+      "result": "PASS"
+    },
+    {
+      "name": "canonical_identity_dimensions_not_null",
+      "result": "PASS"
+    },
+    {
+      "name": "one_mapping_per_ingredient",
+      "result": "PASS"
+    },
+    {
+      "name": "mapping_missing_ingredient_fk",
+      "result": "PASS"
+    },
+    {
+      "name": "mapping_missing_canonical_fk",
+      "result": "PASS"
+    },
+    {
+      "name": "mapping_wrong_scope_fk",
+      "result": "PASS"
+    },
+    {
+      "name": "source_head_unique",
+      "result": "PASS"
+    },
+    {
+      "name": "source_head_slot_domain",
+      "result": "PASS"
+    },
+    {
+      "name": "one_status_per_ingredient",
+      "result": "PASS"
+    },
+    {
+      "name": "status_domain",
+      "result": "PASS"
+    },
+    {
+      "name": "replacement_target_fk",
+      "result": "PASS"
+    },
+    {
+      "name": "replacement_cannot_be_self",
+      "result": "PASS"
+    },
+    {
+      "name": "delete_referenced_legacy_ingredient_restricted",
+      "result": "PASS"
+    },
+    {
+      "name": "delete_unreferenced_but_mapped_ingredient_restricted",
+      "result": "PASS"
+    },
+    {
+      "name": "delete_canonical_restricted",
+      "result": "PASS"
+    },
+    {
+      "name": "delete_revision_restricted",
+      "result": "PASS"
+    },
+    {
+      "name": "revision_idempotency_key_unique",
+      "result": "PASS"
+    },
+    {
+      "name": "revision_applied_requires_sequence",
+      "result": "PASS"
+    },
+    {
+      "name": "gate_requires_mapping_coverage",
+      "result": "PASS"
+    },
+    {
+      "name": "gate_requires_status_coverage",
+      "result": "PASS"
+    },
+    {
+      "name": "gate_rejects_raw_to_cooked_mapping",
+      "result": "PASS"
+    },
+    {
+      "name": "visible_preserves_old_recipe_and_shopping_references",
+      "result": "PASS"
+    },
+    {
+      "name": "secondary_preserves_old_recipe_and_shopping_references",
+      "result": "PASS"
+    },
+    {
+      "name": "hidden_preserves_old_recipe_and_shopping_references",
+      "result": "PASS"
+    },
+    {
+      "name": "review_required_preserves_old_recipe_and_shopping_references",
+      "result": "PASS"
+    },
+    {
+      "name": "obsolete_preserves_old_recipe_and_shopping_references",
+      "result": "PASS"
+    },
+    {
+      "name": "unit_evidence_bound_to_same_ingredient",
+      "result": "PASS"
+    },
+    {
+      "name": "unit_evidence_bound_to_same_unit",
+      "result": "PASS"
+    },
+    {
+      "name": "unique_unit_per_ingredient",
+      "result": "PASS"
+    },
+    {
+      "name": "conversion_negative_rejected",
+      "result": "PASS"
+    },
+    {
+      "name": "conversion_non_numeric_rejected",
+      "result": "PASS"
+    },
+    {
+      "name": "conversion_infinity_rejected",
+      "result": "PASS"
+    },
+    {
+      "name": "accepted_evidence_requires_edible_basis_and_reviewer",
+      "result": "PASS"
+    },
+    {
+      "name": "gate_rejects_enabled_unverified_option",
+      "result": "PASS"
+    },
+    {
+      "name": "accepted_evidence_requires_mass",
+      "result": "PASS"
+    },
+    {
+      "name": "one_default_unit_per_ingredient",
+      "result": "PASS"
+    },
+    {
+      "name": "delete_used_evidence_restricted",
+      "result": "PASS"
+    },
+    {
+      "name": "accepted_unit_query_returns_only_accepted_edible_options",
+      "result": "PASS"
+    },
+    {
+      "name": "source_head_changes_without_rewriting_recipe_or_shopping",
+      "result": "PASS"
+    },
+    {
+      "name": "multiple_historical_null_heads_allowed",
+      "result": "PASS"
+    },
+    {
+      "name": "all_original_nutrients_and_portions_and_aliases_unchanged",
+      "result": "PASS"
+    },
+    {
+      "name": "all_937_original_ingredient_rows_unchanged",
+      "result": "PASS"
+    },
+    {
+      "name": "nutrition_total_exactly_preserved",
+      "result": "PASS"
+    },
+    {
+      "name": "foreign_key_check_empty",
+      "result": "PASS"
+    },
+    {
+      "name": "integrity_check_ok",
+      "result": "PASS"
+    },
+    {
+      "name": "atomic_rollback_after_mid_publication_failure",
+      "result": "PASS"
+    },
+    {
+      "name": "asset_sha256_unchanged",
+      "result": "PASS"
+    }
+  ],
+  "checks_passed": 55,
+  "command": "C:\\Python313\\python.exe docs/architecture/fixtures/verify_canonical_design.py",
+  "ddl_sha256": "191175a7e1094b9268834fa87b250331012776fbeb33483d3402ebc5a2293fbc",
+  "design": "03.1",
+  "exit_code": 0,
+  "fixture": {
+    "added_tables": 6,
+    "custom_rows": 1,
+    "historical_recipe_links": 7,
+    "nutrient_rows": 31696,
+    "original_tables": 20,
+    "shopping_items": 7,
+    "source_foods": 936
+  },
+  "limitations": [
+    "Python SQLite only; Android API 26 and Room MigrationTestHelper NOT executed",
+    "Fixture deliberately includes all 936 source foods, not just 923 active importable foods",
+    "Simulated evidence acceptance tests constraints, not edible weight or scientific validity",
+    "Production importer/seeder, semantic manifest validator and fresh Room database creation NOT implemented"
+  ],
+  "python": "3.13.7",
+  "room_v8_schema_sha256": "0b8de0c550973a5cfd159fade887ca7ea7ec30722720457c470b74eb035a74cc",
+  "source_sha256_after": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+  "source_sha256_before": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+  "sqlite": "3.50.4",
+  "verifier_sha256": "a3ea0cea7208ca94b001ae31edac4954bd77f84aef0a6c27042d1fa71765c9ae"
+}

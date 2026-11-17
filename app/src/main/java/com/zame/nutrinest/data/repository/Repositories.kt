@@ -1,5 +1,9 @@
 package com.zame.nutrinest.data.repository
 
+import androidx.room.withTransaction
+import com.zame.nutrinest.data.local.NutriNestDatabase
+import com.zame.nutrinest.data.local.CanonicalCatalogStore
+
 import com.zame.nutrinest.data.local.dao.FoodReferenceDao
 import com.zame.nutrinest.data.local.dao.IngredientDao
 import com.zame.nutrinest.data.local.dao.RecipeDao
@@ -110,7 +114,8 @@ interface RecipeRepository {
     suspend fun delete(id: Long): Boolean
 }
 
-class LocalIngredientRepository(private val dao: IngredientDao) : IngredientRepository {
+class LocalIngredientRepository(private val database: NutriNestDatabase) : IngredientRepository {
+    private val dao = database.ingredientDao()
 
     override fun observeAll() = dao.observeAll()
 
@@ -152,16 +157,36 @@ class LocalIngredientRepository(private val dao: IngredientDao) : IngredientRepo
             .take(5)
     }
 
-    override suspend fun create(ingredient: IngredientEntity) = dao.insert(ingredient)
+    override suspend fun create(ingredient: IngredientEntity) = database.withTransaction {
+        val id = dao.insert(ingredient)
+        CanonicalCatalogStore.backfill(database.openHelper.writableDatabase)
+        id
+    }
 
     override suspend fun save(
         ingredient: IngredientEntity,
         nutrients: List<IngredientNutrientEntity>,
         portions: List<IngredientPortionEntity>,
         aliases: List<IngredientAliasEntity>
-    ) = dao.upsertFull(ingredient, nutrients, portions, aliases)
+    ) = database.withTransaction {
+        // Composition edits create a local snapshot. Existing recipes keep the old ID.
+        val snapshot = if (ingredient.id == 0L) ingredient else ingredient.copy(
+            id = 0, isCustom = true, sourceKey = null, remoteId = null,
+            createdAt = System.currentTimeMillis(), usageCount = 0, lastUsedAt = null
+        )
+        val id = dao.upsertFull(snapshot, nutrients, portions, aliases)
+        val db = database.openHelper.writableDatabase
+        CanonicalCatalogStore.backfill(db)
+        if (ingredient.id != 0L) CanonicalCatalogStore.archive(db, ingredient.id, "USER_VERSIONED")
+        id
+    }
 
-    override suspend fun delete(id: Long) = dao.deleteIfUnused(id)
+    override suspend fun delete(id: Long) = database.withTransaction {
+        if (dao.findById(id) == null) false else {
+            CanonicalCatalogStore.archive(database.openHelper.writableDatabase, id, "USER_ARCHIVED")
+            true
+        }
+    }
 
     override suspend fun setFavorite(id: Long, favorite: Boolean) = dao.setFavorite(id, favorite)
 

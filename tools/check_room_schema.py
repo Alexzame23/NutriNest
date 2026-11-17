@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import glob
+from pathlib import Path
 import json
 import os
 import sqlite3
@@ -69,14 +70,16 @@ def actual_indices(conn: sqlite3.Connection, table: str) -> dict[str, dict]:
 
 
 def actual_foreign_keys(conn: sqlite3.Connection, table: str) -> set[tuple]:
-    out = set()
+    groups = {}
     for row in conn.execute(f'PRAGMA foreign_key_list("{table}")'):
-        _id, _seq, ref_table, from_col, to_col, on_update, on_delete, _match = row
-        out.add((ref_table, from_col, to_col, on_update.upper(), on_delete.upper()))
-    return out
+        groups.setdefault(row[0], []).append(row)
+    return {
+        (rows[0][2], tuple(r[3] for r in sorted(rows, key=lambda r:r[1])),
+         tuple(r[4] for r in sorted(rows, key=lambda r:r[1])),
+         rows[0][5].upper(), rows[0][6].upper())
+        for rows in groups.values()
+    }
 
-
-# ── Comparing against Room's expectations ───────────────────────────────────
 
 def normalise_default(value: str | None) -> str | None:
     """Room tolerates redundant parentheses around a default value."""
@@ -168,8 +171,8 @@ def check_entity(conn: sqlite3.Connection, entity: dict) -> None:
     expected_fks = {
         (
             fk["table"],
-            fk["columns"][0],
-            fk["referencedColumns"][0],
+            tuple(fk["columns"]),
+            tuple(fk["referencedColumns"]),
             fk.get("onUpdate", "NO ACTION").upper(),
             fk.get("onDelete", "NO ACTION").upper(),
         )
@@ -205,8 +208,17 @@ def main() -> None:
         )
     print(f"Migrated db : {MIGRATED_DB}")
 
-    conn = sqlite3.connect(f"file:{MIGRATED_DB}?mode=ro", uri=True)
+    conn = sqlite3.connect(Path(MIGRATED_DB).resolve().as_uri() + "?mode=ro", uri=True)
     entities = schema["entities"]
+    expected_tables = {e["tableName"] for e in entities}
+    found_tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                    if not r[0].startswith(("sqlite_", "room_"))}
+    if expected_tables != found_tables:
+        fail(f"Unexpected/missing tables: {found_tables ^ expected_tables}")
+    if conn.execute("PRAGMA user_version").fetchone()[0] != schema["version"]:
+        fail("user_version does not match exported Room version")
+    if conn.execute("PRAGMA foreign_key_check").fetchall():
+        fail("foreign_key_check found violations")
     print(f"Comparing {len(entities)} entities\n")
 
     for entity in entities:
@@ -222,7 +234,7 @@ def main() -> None:
         for failure in failures:
             print(f"  {failure}")
         sys.exit(1)
-    print("\nRoom would accept the migrated schema")
+    print("\nOffline schema comparison passed (actual Room validation runs in MigrationTest)")
 
 
 if __name__ == "__main__":

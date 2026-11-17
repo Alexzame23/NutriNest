@@ -8,6 +8,13 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zame.nutrinest.data.local.dao.FoodReferenceDao
+import com.zame.nutrinest.data.local.dao.CanonicalCatalogDao
+import com.zame.nutrinest.data.local.entity.CatalogRevisionEntity
+import com.zame.nutrinest.data.local.entity.CanonicalIngredientEntity
+import com.zame.nutrinest.data.local.entity.IngredientCanonicalMapEntity
+import com.zame.nutrinest.data.local.entity.IngredientCatalogStatusEntity
+import com.zame.nutrinest.data.local.entity.ConversionEvidenceEntity
+import com.zame.nutrinest.data.local.entity.IngredientUnitOptionEntity
 import com.zame.nutrinest.data.local.dao.IngredientDao
 import com.zame.nutrinest.data.local.dao.MenuDao
 import com.zame.nutrinest.data.local.dao.ProfileDao
@@ -58,15 +65,22 @@ import com.zame.nutrinest.util.TextNormalizer
         PlannedMealEntity::class,
         MealPortionEntity::class,
         ShoppingItemEntity::class,
-        IntakeEntryEntity::class
+        IntakeEntryEntity::class,
+        CatalogRevisionEntity::class,
+        CanonicalIngredientEntity::class,
+        IngredientCanonicalMapEntity::class,
+        IngredientCatalogStatusEntity::class,
+        ConversionEvidenceEntity::class,
+        IngredientUnitOptionEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(ProfileConverters::class, MenuConverters::class)
 abstract class NutriNestDatabase : RoomDatabase() {
 
     abstract fun ingredientDao(): IngredientDao
+    abstract fun canonicalCatalogDao(): CanonicalCatalogDao
     abstract fun foodReferenceDao(): FoodReferenceDao
     abstract fun recipeDao(): RecipeDao
     abstract fun profileDao(): ProfileDao
@@ -490,6 +504,16 @@ abstract class NutriNestDatabase : RoomDatabase() {
             }
         }
 
+        /** Room owns the transaction; failure rolls back all new metadata and DDL. */
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val before = CanonicalCatalogStore.legacySnapshot(db)
+                CanonicalCatalogSchema.create(db)
+                CanonicalCatalogStore.backfill(db)
+                check(before == CanonicalCatalogStore.legacySnapshot(db)) { "v9 changed historical content" }
+            }
+        }
+
         private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
             db.query(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$table'"
@@ -723,11 +747,11 @@ abstract class NutriNestDatabase : RoomDatabase() {
             }
 
         /** Internal so instrumented tests can open a fresh, uncached instance. */
-        internal fun build(appContext: Context): NutriNestDatabase =
-            Room.databaseBuilder(appContext, NutriNestDatabase::class.java, "nutrinest.db")
+        internal fun build(appContext: Context, name: String = "nutrinest.db"): NutriNestDatabase =
+            Room.databaseBuilder(appContext, NutriNestDatabase::class.java, name)
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
-                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
                 )
                 .addCallback(FoodImportCallback(appContext))
                 .build()
@@ -738,14 +762,19 @@ abstract class NutriNestDatabase : RoomDatabase() {
      *
      * `onOpen` rather than `onCreate` or the migration, so that a fresh install,
      * an upgrade and a later dataset refresh all take the same path — the
-     * importer decides what is needed by comparing dataset versions. It costs one
-     * indexed lookup per launch and does real work only when they differ.
+     * importer checks the dataset version and SHA-256. Unsupported revisions
+     * remain deferred without changing historical snapshots or seeding recipes.
      */
     private class FoodImportCallback(private val context: Context) : Callback() {
+        override fun onCreate(db: SupportSQLiteDatabase) {
+            CanonicalCatalogSchema.installValidationTriggers(db)
+        }
+
         override fun onOpen(db: SupportSQLiteDatabase) {
             super.onOpen(db)
-            FoodDatabaseImporter.importIfNeeded(context, db)
-            BuiltInRecipeSeeder.seedIfNeeded(db)
+            CanonicalCatalogStore.backfill(db)
+            if (FoodDatabaseImporter.importIfNeeded(context, db)) BuiltInRecipeSeeder.seedIfNeeded(db)
+            CanonicalCatalogStore.validate(db)
         }
     }
 }

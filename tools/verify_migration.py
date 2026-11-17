@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run NutriNest's v4->v5 migration and food import offline.
 
-The project cannot be compiled in this environment (no Android SDK), so this
-harness executes the very SQL the Kotlin runs — extracted from the sources
+This harness replays SQL extracted from Kotlin sources; instrumented tests
+validate the actual Kotlin backfill and Room callbacks. It executes migration SQL — extracted from the sources
 rather than retyped — against a database shaped like a real v4 install, and
 checks the result.
 """
@@ -317,36 +317,13 @@ def run_import(conn: sqlite3.Connection, expect_version: str) -> dict[str, tuple
     statements += extract_sql_calls(source, "compileStatement", substitutions)
     steps = extract_copy_steps(source, substitutions)
 
+    installed = conn.execute("SELECT value FROM food_dataset_meta WHERE `key`='dataset_version'").fetchone()
+    if installed is not None and installed[0] != expect_version:
+        # Like the Kotlin bootstrap, defer changed datasets without modifying markers or rows.
+        return {}
     now = int(time.time() * 1000)
-    last_import_at = int(
-        conn.execute(
-            "SELECT COALESCE(value, '0') FROM food_dataset_meta WHERE key = 'last_import_at'"
-        ).fetchone()[0]
-        if conn.execute(
-            "SELECT COUNT(*) FROM food_dataset_meta WHERE key = 'last_import_at'"
-        ).fetchone()[0]
-        else 0
-    )
-
-    # captureUserState, before anything is deleted.
-    user_state = conn.execute(
-        "SELECT id, isFavorite, usageCount, lastUsedAt, imagePath"
-        " FROM ingredients WHERE isCustom = 0"
-    ).fetchall()
-
-    # clearReferenceData + dropStaleImports, taken from the Kotlin verbatim.
-    for statement in statements:
-        if statement.startswith("DELETE FROM ingredient_categories") or \
-           statement.startswith("DELETE FROM shopping_aisles") or \
-           statement.startswith("DELETE FROM nutrient_defs"):
-            conn.execute(statement)
-    stale = next(s for s in statements if s.startswith("DELETE FROM ingredients"))
-    conn.execute(stale, (last_import_at,))
-
-    # Rows read vs rows actually written, per step. A gap means an INSERT OR
-    # IGNORE quietly dropped something — which is exactly how a missing NOT NULL
-    # column hides itself.
-    tally: dict[str, tuple[int, int]] = {}
+    inserted = set()
+    tally = {}
     asset = sqlite3.connect(f"file:{ASSET}?mode=ro", uri=True)
     try:
         for step in steps:
@@ -354,24 +331,28 @@ def run_import(conn: sqlite3.Connection, expect_version: str) -> dict[str, tuple
             read = written = 0
             for row in asset.execute(step["read"], args):
                 read += 1
+                label = step["label"]
+                if label in ("nutrients", "portions", "aliases", "quality issues"):
+                    if row[0] not in inserted:
+                        continue
+                else:
+                    table, key = {"ingredients": ("ingredients", "id"),
+                        "categories": ("ingredient_categories", "key"),
+                        "aisles": ("shopping_aisles", "key"),
+                        "dataset metadata": ("food_dataset_meta", "key"),
+                        "nutrient definitions": ("nutrient_defs", "tag")}[label]
+                    if conn.execute(f'SELECT 1 FROM {table} WHERE `{key}`=?', (row[0],)).fetchone():
+                        continue
                 written += conn.execute(step["write"], row).rowcount or 0
+                if label == "ingredients": inserted.add(row[0])
             tally[step["label"]] = (read, written)
     finally:
         asset.close()
-
-    # restoreUserState
-    restore = next(s for s in statements if s.startswith("UPDATE ingredients"))
-    for row_id, favorite, usage, last_used, image in user_state:
-        conn.execute(restore, (favorite, usage, last_used, image, row_id))
-
-    # reserveUserIdRange
     reserve = next(s for s in statements if s.startswith("UPDATE sqlite_sequence"))
     conn.execute(reserve, (USER_ID_FLOOR, USER_ID_FLOOR))
-
     for key, value in (("dataset_version", expect_version), ("last_import_at", str(now))):
-        conn.execute(
-            "INSERT OR REPLACE INTO food_dataset_meta (`key`, value) VALUES (?, ?)", (key, value)
-        )
+        conn.execute("UPDATE food_dataset_meta SET value=? WHERE `key`=?", (value, key))
+        conn.execute("INSERT INTO food_dataset_meta (`key`,value) SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM food_dataset_meta WHERE `key`=?1)", (key, value))
     conn.commit()
     return tally
 
@@ -568,7 +549,7 @@ def main() -> None:
     check("re-running duplicates no aliases",
           conn.execute("SELECT COUNT(*) FROM ingredient_aliases").fetchone()[0] == aliases_before)
 
-    print("\n5. a favourite survives a dataset refresh")
+    print("\n5. a changed dataset is deferred without changing favourites")
     victim = conn.execute(
         "SELECT id FROM ingredients WHERE isCustom = 0 AND id > ? LIMIT 1",
         (IMPORTED_ID_OFFSET,),
@@ -580,7 +561,7 @@ def main() -> None:
     kept = conn.execute(
         "SELECT isFavorite, usageCount FROM ingredients WHERE id = ?", (victim,)
     ).fetchone()
-    check("favourite and usage preserved across refresh", kept == (1, 7), str(kept))
+    check("favourite and usage preserved when refresh is deferred", kept == (1, 7), str(kept))
     check("row count stable after refresh",
           conn.execute("SELECT COUNT(*) FROM ingredients").fetchone()[0] == before)
 
@@ -649,6 +630,11 @@ def main() -> None:
               "SELECT COUNT(*) FROM planned_meals WHERE recipeId IS NULL AND isFree = 1"
           ).fetchone()[0] == 1)
 
+    print("\n7. v8 -> v9 additive catalog SQL")
+    from verify_catalog_migration import verify_catalog
+    verify_catalog(conn)
+    conn.execute("PRAGMA user_version=9")
+    conn.commit()
     conn.close()
     print()
     if failures:

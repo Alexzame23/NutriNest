@@ -4,7 +4,7 @@
 Room checks `@Query` SQL at build time, so a wrong column name is a compile
 error rather than a crash — but only on a machine with the Android SDK. This
 does the same check with sqlite3: it takes the database `verify_migration.py`
-builds by running the actual v1 -> v5 migration, then prepares every `@Query`
+builds by running the actual migration chain and v9 DDL, then prepares every `@Query`
 string found in the DAOs against it.
 
 Room's named parameters (`:id`) happen to be Python's sqlite3 syntax too, so the
@@ -53,7 +53,7 @@ def main() -> None:
             f"Run tools/verify_migration.py first."
         )
 
-    conn = sqlite3.connect(f"file:{MIGRATED_DB}?mode=ro", uri=True)
+    conn = sqlite3.connect(MIGRATED_DB.resolve().as_uri() + "?mode=ro", uri=True)
     checked = skipped = 0
     failures: list[str] = []
 

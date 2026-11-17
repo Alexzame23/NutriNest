@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Read-only access to the reference tables the food dataset brings with it.
- * These are rewritten wholesale on import and never edited by the user.
+ * Existing nutrient definitions are frozen to preserve historical semantics.
  */
 @Dao
 interface FoodReferenceDao {
@@ -27,6 +27,7 @@ interface FoodReferenceDao {
                COUNT(i.id) AS ingredientCount
         FROM ingredient_categories c
         LEFT JOIN ingredients i ON i.foodType = c.`key`
+          AND i.id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
         GROUP BY c.`key`
         ORDER BY c.sortOrder
         """

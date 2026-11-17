@@ -27,7 +27,11 @@ internal object BuiltInRecipeSeeder {
 
         val ingredientIds = mutableMapOf<Long, Long>()
         db.query(
-            "SELECT id, sourceKey FROM ingredients WHERE sourceKey LIKE 'BEDCA:%'"
+            "SELECT i.id, i.sourceKey FROM ingredients i " +
+                "JOIN ingredient_canonical_map m ON m.ingredient_id=i.id " +
+                "JOIN catalog_revision r ON r.revision_id=m.origin_revision_id " +
+                "WHERE m.source_namespace='BEDCA' AND m.source_head_slot=1 AND i.isCustom=0 " +
+                "AND r.source_sha256=(SELECT value FROM food_dataset_meta WHERE `key`='dataset_asset_sha256')"
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 cursor.getString(1)
@@ -45,45 +49,21 @@ internal object BuiltInRecipeSeeder {
 
         val warnings = mutableListOf<String>()
         var inserted = 0
-        var updated = 0
         val startedTransaction = !db.inTransaction()
         if (startedTransaction) db.beginTransaction()
         try {
             BuiltInRecipeLibrary.recipes.forEachIndexed { index, recipe ->
+                val remoteId = RecipeBooks.BUILT_IN_ID_PREFIX + recipe.key
+                // Saved recipes, including built-ins, retain their exact amounts and steps.
+                if (db.longOrNull("SELECT id FROM recipes WHERE remoteId = ?", remoteId) != null) {
+                    return@forEachIndexed
+                }
                 val missing = recipe.ingredients
                     .map { it.bedcaFoodId }
                     .filterNot { it in ingredientIds }
                     .distinct()
                 if (missing.isNotEmpty()) {
                     warnings += "${recipe.key}: missing ${missing.joinToString { "BEDCA:$it" }}"
-                    return@forEachIndexed
-                }
-
-                val remoteId = RecipeBooks.BUILT_IN_ID_PREFIX + recipe.key
-                val existingId = db.longOrNull(
-                    "SELECT id FROM recipes WHERE remoteId = ?",
-                    remoteId
-                )
-                if (existingId != null) {
-                    // Later library versions add translations and refine the
-                    // source-checked instructions without touching user state.
-                    // Keep the recipe id and favorite state while refreshing
-                    // the bundled instructions and BEDCA ingredient amounts.
-                    db.execSQL(
-                        "UPDATE recipes SET nameEs = ? WHERE id = ?",
-                        arrayOf<Any>(recipe.nameEs, existingId)
-                    )
-                    db.execSQL(
-                        "DELETE FROM recipe_steps WHERE recipeId = ?",
-                        arrayOf<Any>(existingId)
-                    )
-                    db.execSQL(
-                        "DELETE FROM recipe_ingredients WHERE recipeId = ?",
-                        arrayOf<Any>(existingId)
-                    )
-                    db.insertIngredients(existingId, recipe, ingredientIds)
-                    db.insertSteps(existingId, recipe)
-                    updated++
                     return@forEachIndexed
                 }
 
@@ -128,7 +108,7 @@ internal object BuiltInRecipeSeeder {
             }
 
             db.writeMeta(WARNING_META_KEY, warnings.joinToString(" | ").ifEmpty { "none" })
-            db.writeMeta(VERSION_META_KEY, LIBRARY_VERSION)
+            if (warnings.isEmpty()) db.writeMeta(VERSION_META_KEY, LIBRARY_VERSION)
             if (startedTransaction) db.setTransactionSuccessful()
         } finally {
             if (startedTransaction) db.endTransaction()
@@ -137,7 +117,7 @@ internal object BuiltInRecipeSeeder {
         warnings.forEach { Log.w(TAG, it) }
         Log.i(
             TAG,
-            "Installed $inserted and updated $updated built-in recipes; " +
+            "Installed $inserted built-in recipes; " +
                 "${warnings.size} warnings"
         )
     }
@@ -194,13 +174,8 @@ internal object BuiltInRecipeSeeder {
         query(sql, arrayOf(arg)).use { if (it.moveToFirst()) it.getLong(0) else null }
 
     private fun SupportSQLiteDatabase.writeMeta(key: String, value: String) {
-        compileStatement(
-            "INSERT OR REPLACE INTO food_dataset_meta (`key`, value) VALUES (?, ?)"
-        ).use {
-            it.bindString(1, key)
-            it.bindString(2, value)
-            it.executeInsert()
-        }
+        execSQL("UPDATE food_dataset_meta SET value=? WHERE `key`=?", arrayOf(value, key))
+        execSQL("INSERT INTO food_dataset_meta (`key`,value) SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM food_dataset_meta WHERE `key`=?1)", arrayOf(key, value))
     }
 
     private const val BUILT_IN_CREATED_AT = 1_700_000_000_000L
