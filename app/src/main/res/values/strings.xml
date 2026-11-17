@@ -602,4 +602,6 @@
     <string name="notification_body">Take a minute to generate next week\'s meal plan and shopping list.</string>
     <string name="quantity_error_missing_density">No documented density is available. Enter the edible weight in grams.</string>
     <string name="quantity_error_unverified_factor">This conversion factor has not been validated. Enter the edible weight in grams.</string>
+    <string name="catalog_secondary">Alternative preparation or part</string>
+    <string name="catalog_review_required">Identity pending review · not interchangeable</string>
 </resources>

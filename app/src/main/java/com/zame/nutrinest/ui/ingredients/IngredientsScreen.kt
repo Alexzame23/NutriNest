@@ -498,6 +498,13 @@ private fun IngredientRow(
                     }
                 }
                 Spacer(Modifier.height(4.dp))
+                if (ingredient.catalogRank in 1..2) {
+                    Text(
+                        stringResource(if (ingredient.catalogRank == 1) R.string.catalog_secondary else R.string.catalog_review_required),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Text(
                     stringResource(R.string.kcal_per_100g, ingredient.nutrition.kcal.roundToInt()),
                     style = MaterialTheme.typography.bodySmall,

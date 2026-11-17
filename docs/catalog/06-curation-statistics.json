@@ -1,0 +1,39 @@
+{
+  "rulesVersion": "practical-catalog-v1",
+  "sourceSha256": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+  "rulesSha256": "10c42b622cb5e296e14d3f2f2326e5b08cf17f319bc0eee668a0eb88360c8a1e",
+  "sourceRecords": 936,
+  "importableRecords": 923,
+  "preservedSourceNutrients": 31696,
+  "before": {
+    "VISIBLE": 923
+  },
+  "after": {
+    "VISIBLE": 820,
+    "SECONDARY": 99,
+    "REVIEW_REQUIRED": 4
+  },
+  "allSourceStates": {
+    "VISIBLE": 820,
+    "OBSOLETE": 12,
+    "SECONDARY": 99,
+    "REVIEW_REQUIRED": 4,
+    "HIDDEN": 1
+  },
+  "normalizedMetadata": 923,
+  "bilingualNames": 923,
+  "editedDisplayNames": 11,
+  "mergedIdentities": 0,
+  "changedOriginalMacros": 0,
+  "deletedRecords": 0,
+  "recipes": 250,
+  "recipeLinks": 1421,
+  "uniqueRecipeFoodIds": 122,
+  "recipeFoodStates": {
+    "VISIBLE": 117,
+    "SECONDARY": 5
+  },
+  "missingRecipeFoodIds": [],
+  "coverageGap": "No whole raw chicken egg in source; no composition invented",
+  "scope": "Static source/rules verification; actual Kotlin idempotence and rollback are instrumented tests"
+}

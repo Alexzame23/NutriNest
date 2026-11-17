@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 
 /**
@@ -247,13 +248,19 @@ data class IngredientEntity(
      */
     val remoteId: String? = null
 ) {
+    /** Selector-only overlays. Never stored or copied into nutritional snapshots. */
+    @Ignore var catalogNameEs: String? = null
+    @Ignore var catalogNameEn: String? = null
+    @Ignore var catalogRank: Int = 0
+
     /** True when the dataset left enough of the nutrient panel blank to warn about. */
     val hasIncompleteData: Boolean
         get() = quality != DataQuality.OK || completenessPct < 50
 
     /** Name to show for the given language, falling back to the primary name. */
     fun displayName(spanish: Boolean): String =
-        if (spanish) nameEs?.takeIf { it.isNotBlank() } ?: name else name
+        if (spanish) catalogNameEs ?: nameEs?.takeIf { it.isNotBlank() } ?: name
+        else catalogNameEn ?: name
 }
 
 /**

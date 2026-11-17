@@ -286,8 +286,8 @@ class IngredientsViewModel(
     private fun sort(items: List<IngredientEntity>, sort: IngredientSort): List<IngredientEntity> {
         val byName = compareBy(collator()) { it: IngredientEntity -> it.displayName(spanish) }
         return when (sort) {
-            IngredientSort.NAME_ASC -> items.sortedWith(byName)
-            IngredientSort.NAME_DESC -> items.sortedWith(byName.reversed())
+            IngredientSort.NAME_ASC -> items.sortedWith(compareBy<IngredientEntity> { it.catalogRank }.then(byName))
+            IngredientSort.NAME_DESC -> items.sortedWith(compareBy<IngredientEntity> { it.catalogRank }.then(byName.reversed()))
             IngredientSort.CALORIES_DESC ->
                 items.sortedWith(compareByDescending<IngredientEntity> { it.nutrition.kcal }.then(byName))
             IngredientSort.CALORIES_ASC ->

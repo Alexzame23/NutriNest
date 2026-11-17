@@ -1,0 +1,53 @@
+{
+  "before": {
+    "states": {
+      "VISIBLE": 923
+    },
+    "ingredients": 923,
+    "mapped": 923,
+    "bilingual": 923,
+    "recipeLinks": 0,
+    "missingRecipeReferences": 0,
+    "favorites": 0,
+    "custom": 0
+  },
+  "after": {
+    "states": {
+      "REVIEW_REQUIRED": 4,
+      "SECONDARY": 99,
+      "VISIBLE": 820
+    },
+    "ingredients": 923,
+    "mapped": 923,
+    "bilingual": 923,
+    "recipeLinks": 1421,
+    "missingRecipeReferences": 0,
+    "favorites": 0,
+    "custom": 0
+  },
+  "firstLogicalSha256": "d204270a7f8caff864a3adafcf77493fbaeece47bdd6860a3aa3d77b26163d58",
+  "secondLogicalSha256": "d204270a7f8caff864a3adafcf77493fbaeece47bdd6860a3aa3d77b26163d58",
+  "repeatCount": 2,
+  "foreignKeys": "ok",
+  "integrity": "ok",
+  "manifestBytes": 1152970,
+  "fullSuite": {
+    "suite": "Full instrumented suite before final metadata guard and LF pinning",
+    "androidApi": 36,
+    "tests": 34,
+    "failures": 0,
+    "errors": 0,
+    "unitTests": 127,
+    "unitFailures": 0
+  },
+  "finalCurationSuite": {
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "testCases": []
+  },
+  "evidenceRun": "Standalone final-APK instrumentation: twoTransformationsHaveIdenticalCountsAndLogicalHashes; OK (1 test)",
+  "sourceSha256": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+  "rulesSha256": "10c42b622cb5e296e14d3f2f2326e5b08cf17f319bc0eee668a0eb88360c8a1e"
+}

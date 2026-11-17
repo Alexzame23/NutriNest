@@ -608,4 +608,6 @@
     <string name="notification_body">Dedica un minuto a generar el plan de comidas y la lista de la compra.</string>
     <string name="quantity_error_missing_density">No hay una densidad documentada. Introduce el peso comestible en gramos.</string>
     <string name="quantity_error_unverified_factor">Este factor de conversión está pendiente de validar. Introduce el peso comestible en gramos.</string>
+    <string name="catalog_secondary">Preparación o parte alternativa</string>
+    <string name="catalog_review_required">Identidad pendiente de revisión · no intercambiable</string>
 </resources>

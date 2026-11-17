@@ -120,21 +120,22 @@ internal object CanonicalCatalogStore {
         return CatalogFingerprint.sha256(record + children)
     }
 
-    private fun beginRevision(db: SupportSQLiteDatabase, key: String, kind: String, source: String,
-        assetHash: String? = null, datasetVersion: String? = null): String {
+    internal fun beginRevision(db: SupportSQLiteDatabase, key: String, kind: String, source: String,
+        assetHash: String? = null, datasetVersion: String? = null,
+        rulesVersion: String = "sqlite-typed-v1", actor: String = "NutriNest v9"): String {
         val id = UUID.randomUUID().toString()
         val parent = db.query("SELECT revision_id FROM catalog_revision WHERE state='APPLIED' ORDER BY applied_seq DESC LIMIT 1")
             .use { if (it.moveToFirst()) it.getString(0) else null }
         db.execSQL("""
             INSERT INTO catalog_revision (revision_id,revision_key,parent_revision_id,kind,state,source_namespace,
             dataset_version,source_sha256,manifest_json,manifest_sha256,rules_version,actor,created_at)
-            VALUES (?,?,?,?,'STAGED',?,?,?,'{}',?,'sqlite-typed-v1','NutriNest v9',?)
+            VALUES (?,?,?,?,'STAGED',?,?,?,'{}',?,?,?,?)
         """.trimIndent(), arrayOf<Any?>(id, key, parent, kind, source, datasetVersion, assetHash,
-            CatalogFingerprint.sha256("{}"), System.currentTimeMillis()))
+            CatalogFingerprint.sha256("{}"), rulesVersion, actor, System.currentTimeMillis()))
         return id
     }
 
-    private fun finishRevision(db: SupportSQLiteDatabase, id: String, manifest: JSONObject) {
+    internal fun finishRevision(db: SupportSQLiteDatabase, id: String, manifest: JSONObject) {
         validate(db)
         val hashes = JSONObject()
         db.query("SELECT ingredient_id,record_sha256 FROM ingredient_canonical_map WHERE origin_revision_id=? ORDER BY ingredient_id", arrayOf<Any?>(id)).use { c ->

@@ -691,7 +691,9 @@ private fun IngredientPickerSheet(
                         (!customOnly || ingredient.isCustom) &&
                         (needle.isEmpty() ||
                             ingredient.nameNorm.contains(needle) ||
-                            ingredient.nameEsNorm?.contains(needle) == true)
+                            ingredient.nameEsNorm?.contains(needle) == true ||
+                            TextNormalizer.normalize(ingredient.displayName(true)).contains(needle) ||
+                            TextNormalizer.normalize(ingredient.displayName(false)).contains(needle))
                 }
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = 32.dp),
@@ -729,6 +731,12 @@ private fun IngredientPickerSheet(
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.SemiBold
                                     )
+                                    if (ingredient.catalogRank in 1..2) {
+                                        Text(
+                                            stringResource(if (ingredient.catalogRank == 1) R.string.catalog_secondary else R.string.catalog_review_required),
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
                                     Text(
                                         IngredientCategories
                                             .shortName(ingredient.categoryKey, spanish) + " · " +

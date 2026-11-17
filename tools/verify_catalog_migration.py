@@ -31,7 +31,7 @@ def metadata_fixture(conn):
     find = lambda prefix: next(s for s in statements if s.startswith(prefix))
     digest = hashlib.sha256(b'fixture').hexdigest()
     conn.execute(find("INSERT INTO catalog_revision"), ("fixture-revision", "fixture-baseline", None,
-        "BASELINE", "LEGACY:fixture", None, None, digest, 1))
+        "BASELINE", "LEGACY:fixture", None, None, digest, "sqlite-typed-v1", "fixture", 1))
     for row_id, name, es, norm, es_norm, prep, custom, source in pending:
         scope = "local:fixture" if custom else "global"
         conn.execute(find("INSERT INTO canonical_ingredients"), (f"fixture-{row_id}", scope,

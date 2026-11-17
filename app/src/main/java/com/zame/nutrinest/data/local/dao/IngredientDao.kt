@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.Flow
 /** A nutrient tag and its value, for callers that only need the numbers. */
 data class TagValue(val tag: String, val value: Double)
 
+data class CatalogPresentation(val ingredientId: Long, val nameEs: String?, val nameEn: String?, val rank: Int)
+
 /**
  * Reads and writes for ingredients.
  *
@@ -28,6 +30,21 @@ data class TagValue(val tag: String, val value: Double)
  */
 @Dao
 interface IngredientDao {
+
+    @Query("""
+        SELECT m.ingredient_id AS ingredientId,c.name_es AS nameEs,c.name_en AS nameEn,
+          CASE s.state WHEN 'VISIBLE' THEN 0 WHEN 'SECONDARY' THEN 1
+            WHEN 'REVIEW_REQUIRED' THEN 2 ELSE 3 END AS `rank`
+        FROM ingredient_canonical_map m JOIN canonical_ingredients c ON c.canonical_id=m.canonical_id
+        JOIN ingredient_catalog_status s ON s.ingredient_id=m.ingredient_id
+        JOIN catalog_revision r ON r.revision_id=c.updated_revision_id
+        WHERE r.state='APPLIED' AND r.rules_version='practical-catalog-v1'
+    """)
+    fun observeCatalogPresentation(): Flow<List<CatalogPresentation>>
+
+    /** Recovery/export includes archived records. Historical ID queries remain unfiltered too. */
+    @Query("SELECT * FROM ingredients ORDER BY id")
+    fun observeHistorical(): Flow<List<IngredientEntity>>
 
     @Query("SELECT * FROM ingredients WHERE sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN') ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<IngredientEntity>>
@@ -57,13 +74,19 @@ interface IngredientDao {
         """
         SELECT * FROM ingredients
         WHERE foodType IN (:categoryKeys)
-          AND sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')
+          AND (:favoritesOnly = 1 OR (sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')))
           AND (:favoritesOnly = 0 OR isFavorite = 1)
           AND (:customOnly = 0 OR isCustom = 1)
           AND (
                 :normalizedQuery = ''
                 OR nameNorm LIKE '%' || :normalizedQuery || '%'
                 OR nameEsNorm LIKE '%' || :normalizedQuery || '%'
+                OR id IN (
+                    SELECT m.ingredient_id FROM ingredient_canonical_map m
+                    JOIN canonical_ingredients c ON c.canonical_id=m.canonical_id
+                    WHERE c.name_es_norm LIKE '%' || :normalizedQuery || '%'
+                       OR c.name_en_norm LIKE '%' || :normalizedQuery || '%'
+                )
                 OR id IN (
                     SELECT ingredientId FROM ingredient_aliases
                     WHERE aliasNorm LIKE '%' || :normalizedQuery || '%'
@@ -78,7 +101,7 @@ interface IngredientDao {
         customOnly: Int
     ): Flow<List<IngredientEntity>>
 
-    @Query("SELECT * FROM ingredients WHERE isFavorite = 1 AND sourceKey IS NOT 'BEDCA:2494' AND id NOT IN (SELECT ingredient_id FROM ingredient_catalog_status WHERE state='HIDDEN')")
+    @Query("SELECT * FROM ingredients WHERE isFavorite = 1")
     fun observeFavorites(): Flow<List<IngredientEntity>>
 
     /** Most recently used, for the "Recent" view and the recipe picker. */

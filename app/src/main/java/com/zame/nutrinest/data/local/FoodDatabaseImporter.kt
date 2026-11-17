@@ -36,45 +36,53 @@ object FoodDatabaseImporter {
         val staging = File.createTempFile("food-import-", ".db", context.cacheDir)
         try {
             context.assets.open(ASSET_NAME).use { input -> staging.outputStream().use { input.copyTo(it) } }
-            val digest = MessageDigest.getInstance("SHA-256")
-            staging.inputStream().use { input ->
-                val buffer = ByteArray(8192)
-                var read = input.read(buffer)
-                while (read >= 0) { digest.update(buffer, 0, read); read = input.read(buffer) }
-            }
-            val assetHash = CatalogFingerprint.hex(digest.digest())
-            SQLiteDatabase.openDatabase(staging.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { asset ->
-                val assetVersion = asset.rawQuery("SELECT value FROM db_metadata WHERE key='dataset_version'", null)
-                    .use { check(it.moveToFirst()); it.getString(0) }
-                db.beginTransaction()
-                try {
-                    val installedVersion = meta(db, FoodDatasetMetaEntity.DATASET_VERSION)
-                    val installedHash = meta(db, ASSET_HASH_KEY)
-                    if (installedVersion == assetVersion && installedHash == assetHash) {
-                        db.setTransactionSuccessful()
-                        return true
-                    }
-                    // Publishing a changed dataset requires a reviewed snapshot manifest, not
-                    // the old delete-and-reimport path. Defer it explicitly without burning markers.
-                    check(installedVersion == null || installedVersion == assetVersion) {
-                        "Dataset revision requires reviewed snapshot publication"
-                    }
-                    check(installedHash == null || installedHash == assetHash) {
-                        "Dataset hash changed without a reviewed publication"
-                    }
-                    val now = System.currentTimeMillis()
-                    val inserted = mutableSetOf<Long>()
-                    COPY_STEPS.forEach { copy(asset, db, it, now, inserted) }
-                    reserveUserIdRange(db)
-                    CanonicalCatalogStore.backfill(db, inserted, assetHash, assetVersion)
-                    writeMeta(db, FoodDatasetMetaEntity.DATASET_VERSION, assetVersion)
-                    writeMeta(db, ASSET_HASH_KEY, assetHash)
-                    writeMeta(db, LAST_IMPORT_AT, now.toString())
-                    db.setTransactionSuccessful()
-                } finally { db.endTransaction() }
-            }
-            return true
+            return importStaged(context, db, staging)
         } finally { staging.delete() }
+    }
+
+    /** Shared by the asset path and update simulations; staging must be an isolated delivery file. */
+    internal fun importStaged(context: Context, db: SupportSQLiteDatabase, staging: File): Boolean {
+        val digest = MessageDigest.getInstance("SHA-256")
+        staging.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var read = input.read(buffer)
+            while (read >= 0) { digest.update(buffer, 0, read); read = input.read(buffer) }
+        }
+        val assetHash = CatalogFingerprint.hex(digest.digest())
+        SQLiteDatabase.openDatabase(staging.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { asset ->
+            val assetVersion = asset.rawQuery("SELECT value FROM db_metadata WHERE key='dataset_version'", null)
+                .use { check(it.moveToFirst()); it.getString(0) }
+            db.beginTransaction()
+            try {
+                val installedVersion = meta(db, FoodDatasetMetaEntity.DATASET_VERSION)
+                val installedHash = meta(db, ASSET_HASH_KEY)
+                if (installedVersion == assetVersion && installedHash == assetHash) {
+                    // Editorial revisions must also run on an already installed dataset.
+                    CuratedCatalog.apply(context, db, assetHash, assetVersion)
+                    db.setTransactionSuccessful()
+                    return true
+                }
+                // Publishing a changed dataset requires a reviewed snapshot manifest, not
+                // the old delete-and-reimport path. Defer it explicitly without burning markers.
+                check(installedVersion == null || installedVersion == assetVersion) {
+                    "Dataset revision requires reviewed snapshot publication"
+                }
+                check(installedHash == null || installedHash == assetHash) {
+                    "Dataset hash changed without a reviewed publication"
+                }
+                val now = System.currentTimeMillis()
+                val inserted = mutableSetOf<Long>()
+                COPY_STEPS.forEach { copy(asset, db, it, now, inserted) }
+                reserveUserIdRange(db)
+                CanonicalCatalogStore.backfill(db, inserted, assetHash, assetVersion)
+                CuratedCatalog.apply(context, db, assetHash, assetVersion)
+                writeMeta(db, FoodDatasetMetaEntity.DATASET_VERSION, assetVersion)
+                writeMeta(db, ASSET_HASH_KEY, assetHash)
+                writeMeta(db, LAST_IMPORT_AT, now.toString())
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+        }
+        return true
     }
 
     private fun copy(asset: SQLiteDatabase, db: SupportSQLiteDatabase, step: CopyStep, now: Long,

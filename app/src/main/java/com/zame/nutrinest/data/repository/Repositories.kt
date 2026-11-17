@@ -28,6 +28,7 @@ import com.zame.nutrinest.data.local.entity.RecipeWithSteps
 import com.zame.nutrinest.data.local.entity.ShoppingAisleEntity
 import com.zame.nutrinest.util.TextNormalizer
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 /**
@@ -117,9 +118,24 @@ interface RecipeRepository {
 class LocalIngredientRepository(private val database: NutriNestDatabase) : IngredientRepository {
     private val dao = database.ingredientDao()
 
-    override fun observeAll() = dao.observeAll()
+    private fun Flow<List<IngredientEntity>>.withCatalogPresentation(): Flow<List<IngredientEntity>> =
+        combine(dao.observeCatalogPresentation()) { items, presentation ->
+            val byId = presentation.associateBy { it.ingredientId }
+            items.map { item ->
+                item.copy().apply {
+                    byId[id]?.let { display ->
+                        catalogNameEs = display.nameEs
+                        catalogNameEn = display.nameEn
+                        catalogRank = display.rank
+                    }
+                }
+            }.sortedBy { it.catalogRank }
+        }
 
-    override fun search(query: String) = dao.search(query)
+    override fun observeAll() = dao.observeAll().withCatalogPresentation()
+
+    override fun search(query: String) = dao.observeFiltered(TextNormalizer.normalize(query),
+        IngredientCategories.ALL, 0, 0).withCatalogPresentation()
 
     override fun observeFiltered(
         query: String,
@@ -132,7 +148,7 @@ class LocalIngredientRepository(private val database: NutriNestDatabase) : Ingre
         categoryKeys = categoryKeys.ifEmpty { IngredientCategories.ALL.toSet() }.toList(),
         favoritesOnly = if (favoritesOnly) 1 else 0,
         customOnly = if (customOnly) 1 else 0
-    )
+    ).withCatalogPresentation()
 
     override fun observeRecentlyUsed(limit: Int) = dao.observeRecentlyUsed(limit)
     override fun observeRecentlyAdded(limit: Int) = dao.observeRecentlyAdded(limit)
