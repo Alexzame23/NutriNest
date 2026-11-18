@@ -13,14 +13,23 @@ function retryAt(value, now) {
 }
 
 /** The adapter owns the URL and headers. The deadline includes reading the body. */
-export async function download(url, { fetchImpl = fetch, userAgent, timeoutMs, maxBytes, now = Date.now }) {
+export async function download(url, {
+    fetchImpl = fetch, userAgent, timeoutMs, maxBytes, now = Date.now, validator, beforeRequest,
+}) {
+    beforeRequest?.();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+        const headers = { 'User-Agent': userAgent, 'Accept-Encoding': 'identity' };
+        if (validator?.etag) headers['If-None-Match'] = validator.etag;
+        else if (validator?.lastModified) headers['If-Modified-Since'] = validator.lastModified;
         const response = await fetchImpl(url, {
             method: 'GET', redirect: 'manual', signal: controller.signal,
-            headers: { 'User-Agent': userAgent, 'Accept-Encoding': 'identity' },
+            headers,
         });
+        if (response.status === 304 && (headers['If-None-Match'] || headers['If-Modified-Since'])) {
+            return { notModified: true };
+        }
         if (response.status !== 200) {
             const { status } = response;
             throw new ProviderError(HTTP_CODES.get(status) ?? (status >= 500 ? 'UPSTREAM_ERROR' : 'HTTP_ERROR'),
@@ -40,7 +49,10 @@ export async function download(url, { fetchImpl = fetch, userAgent, timeoutMs, m
             if (length > maxBytes) throw new ProviderError('LIMIT_EXCEEDED', 'Compressed feed exceeds byte limit');
             chunks.push(chunk);
         }
-        return { bytes: Buffer.concat(chunks, length), lastModified: response.headers.get('last-modified') };
+        return {
+            bytes: Buffer.concat(chunks, length), lastModified: response.headers.get('last-modified'),
+            etag: response.headers.get('etag'),
+        };
     } catch (error) {
         if (error instanceof ProviderError) throw error;
         if (controller.signal.aborted) throw new ProviderError('TIMEOUT', 'Download timed out', { retryable: true });

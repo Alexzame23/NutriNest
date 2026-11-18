@@ -38,8 +38,8 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Price provider contracts
-        run: node --test backend/prices/provider.test.mjs
+      - name: Price provider and synchronization contracts
+        run: node --test backend/prices/provider.test.mjs backend/prices/price-sync.test.mjs
 
       - uses: actions/setup-java@v4
         with:

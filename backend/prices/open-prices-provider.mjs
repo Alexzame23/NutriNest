@@ -118,6 +118,7 @@ async function loadStores(file, locations) {
 async function loadPrices(file, stores, { from, through, catalog }) {
     const latest = new Map();
     const seen = new Set();
+    let hasFuture = false;
     await scanExport(file, row => {
         requireField(row.location_id === null || positiveId(row.location_id), 'price.location_id');
         const store = stores.get(row.location_id);
@@ -133,8 +134,12 @@ async function loadPrices(file, stores, { from, through, catalog }) {
             (row.duplicate_of === null || positiveId(row.duplicate_of)), 'price discount or duplicate');
         requireField((row.currency === null || (typeof row.currency === 'string' && /^[A-Z]{3}$/.test(row.currency))) &&
             (row.price_per === null || typeof row.price_per === 'string'), 'price unit or currency');
-        if (row.date === null || row.date < from || row.date > through || row.currency !== 'EUR' ||
+        if (row.date === null || row.date < from || row.currency !== 'EUR' ||
             (row.price_per !== null && row.price_per !== '') || row.price_is_discounted || row.duplicate_of !== null) return;
+        if (row.date > through) {
+            hasFuture = true;
+            return;
+        }
 
         requireField(!seen.has(row.id), 'duplicate price ID');
         requireField(seen.size < 10_000, 'pilot price rows', 'LIMIT_EXCEEDED');
@@ -149,36 +154,62 @@ async function loadPrices(file, stores, { from, through, catalog }) {
             latest.set(key, { id: row.id, price });
         }
     });
-    return [...latest.values()].sort((a, b) => a.id - b.id).map(row => row.price);
+    return { prices: [...latest.values()].sort((a, b) => a.id - b.id).map(row => row.price), hasFuture };
 }
 
 /** Internal pilot only. Uses official daily exports and reviewed package/location configuration. */
 export class OpenPricesProvider extends PriceProvider {
-    static async load(plan, { fetchImpl, userAgent } = {}) {
+    #revalidation;
+
+    getRevalidation() {
+        return structuredClone(this.#revalidation);
+    }
+
+    static async load(plan, { fetchImpl, userAgent, previous, beforeRequest, now = Date.now } = {}) {
         const config = pilotConfiguration(plan);
         requireField(isLabel(userAgent) && /^[\x20-\x7e]{1,200}$/.test(userAgent),
             'backend User-Agent', 'INVALID_CONFIGURATION');
-        const downloadOptions = { fetchImpl, userAgent, timeoutMs: 60_000, maxBytes: MAX_COMPRESSED };
+        const downloadOptions = { fetchImpl, userAgent, timeoutMs: 60_000, maxBytes: MAX_COMPRESSED, beforeRequest, now };
+        const planKey = createHash('sha256').update(JSON.stringify([plan.stores, plan.products])).digest('hex');
+        const cache = previous?.planKey === planKey ? previous : null;
         const inputs = [];
 
-        async function readFile(name, parse) {
+        async function readFile(name, parse, prior) {
             const url = new URL(`${name}.jsonl.gz`, EXPORT_ROOT).href;
-            const file = await download(url, downloadOptions);
-            inputs.push({
+            const known = prior && cache.inputs.find(input => input.url === url);
+            const file = await download(url, { ...downloadOptions, validator: known });
+            if (file.notModified) {
+                inputs.push({ ...known, status: 304 });
+                return prior;
+            }
+            const input = {
                 url, sha256: createHash('sha256').update(file.bytes).digest('hex'),
-                byteLength: file.bytes.length, lastModified: file.lastModified,
-            });
+                byteLength: file.bytes.length, lastModified: file.lastModified, etag: file.etag, status: 200,
+            };
+            inputs.push(input);
+            if (known?.sha256 === input.sha256) return prior;
             return parse(file);
         }
 
-        const stores = await readFile('locations', file => loadStores(file, config.locations));
-        const prices = await readFile('prices', file => loadPrices(file, stores, config));
-        return new OpenPricesProvider({
+        const storeEntries = await readFile('locations', async file => [...await loadStores(file, config.locations)],
+            cache?.storeEntries);
+        const stores = new Map(storeEntries);
+        // A reversed window or newly eligible future row requires parsing the original file.
+        const reusable = cache && config.from >= cache.from && config.through >= cache.through &&
+            (!cache.result.hasFuture || config.through === cache.through);
+        const previousPrices = reusable ? {
+            ...cache.result,
+            prices: cache.result.prices.filter(price => price.record.observedOn >= config.from),
+        } : null;
+        const result = await readFile('prices', file => loadPrices(file, stores, config), previousPrices);
+        const provider = new OpenPricesProvider({
             source: SOURCE, simulated: false, usage: 'INTERNAL_PILOT',
             capabilities: ['CATALOG', 'PRODUCT', 'STORE_PRICES', 'METADATA'],
             coverage: { from: config.from, through: config.through, country: 'ES', currency: 'EUR' },
             retailers: [...config.retailers.values()], stores: [...stores.values()],
-            retrievedAt: new Date().toISOString(), inputs,
-        }, [...config.catalog.values()], prices);
+            retrievedAt: new Date(now()).toISOString(), inputs,
+        }, [...config.catalog.values()], result.prices);
+        provider.#revalidation = { planKey, from: config.from, through: config.through, inputs, storeEntries, result };
+        return provider;
     }
 }

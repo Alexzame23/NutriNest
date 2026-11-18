@@ -1,9 +1,10 @@
 // Run with a separate npm tool prefix. This verifier does not install application dependencies.
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
-const { readFileSync } = require('node:fs');
+const { mkdtempSync, readFileSync, rmSync } = require('node:fs');
 const { createRequire } = require('node:module');
-const { resolve } = require('node:path');
+const { tmpdir } = require('node:os');
+const { join, resolve } = require('node:path');
 
 async function main() {
     const deps = createRequire(resolve(process.argv[2], 'package.json'));
@@ -65,6 +66,28 @@ async function main() {
     };
     assert(validateSnapshot(candidateSnapshot), JSON.stringify(validateSnapshot.errors));
     console.log('Normalized simulated batch maps to the Phase 11 snapshot schema');
+
+    const { syncPrices } = await import('../backend/prices/price-sync.mjs');
+    const { syncPolicy } = await import('../backend/prices/sync-policy.mjs');
+    const { PriceSyncStore } = await import('../backend/prices/sync-store.mjs');
+    const directory = mkdtempSync(join(tmpdir(), 'nutrinest-publication-'));
+    const policy = syncPolicy({ source: 'fake', regionId });
+    const store = new PriceSyncStore(join(directory, 'prices.sqlite'), policy.sourceId, regionId);
+    try {
+        const result = await syncPrices(store, policy, { now: () => Date.parse(generatedAt) });
+        assert.equal(result.status, 'SUCCEEDED');
+        const published = store.publication();
+        const publicManifest = JSON.parse(published.manifest);
+        const publicSnapshot = JSON.parse(published.snapshot);
+        assert(validateManifest(publicManifest), JSON.stringify(validateManifest.errors));
+        assert(validateSnapshot(publicSnapshot), JSON.stringify(validateSnapshot.errors));
+        assert.equal(publicManifest.sha256, createHash('sha256').update(published.snapshot).digest('hex'));
+        assert.equal(publicManifest.byteLength, Buffer.byteLength(published.snapshot));
+        console.log('Scheduled publication passes the existing manifest and snapshot wire schemas');
+    } finally {
+        store.close();
+        rmSync(directory, { recursive: true, force: true });
+    }
 
     const db = new PGlite();
     try {
