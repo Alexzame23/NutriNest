@@ -356,6 +356,10 @@
     <string name="create_recipe_add_step">Añadir paso</string>
     <string name="create_recipe_new_ingredient">Crear un ingrediente</string>
     <string name="create_recipe_quantity">Cantidad (%1$s)</string>
+    <string name="recipe_edible_weight">Peso comestible: %1$s g</string>
+    <string name="recipe_measure_units">unidad</string>
+    <string name="recipe_measure_portions">porción</string>
+    <string name="recipe_edit_quantity">Editar cantidad del ingrediente</string>
     <string name="create_recipe_image_framing">Encuadre de la foto</string>
     <string name="create_recipe_step_hint">Describe este paso…</string>
     <string name="create_recipe_step_photo">Añadir foto al paso %1$d</string>

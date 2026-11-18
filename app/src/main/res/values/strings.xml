@@ -354,6 +354,10 @@
     <string name="create_recipe_add_step">Add step</string>
     <string name="create_recipe_new_ingredient">Create new ingredient</string>
     <string name="create_recipe_quantity">Quantity (%1$s)</string>
+    <string name="recipe_edible_weight">Edible weight: %1$s g</string>
+    <string name="recipe_measure_units">unit</string>
+    <string name="recipe_measure_portions">portion</string>
+    <string name="recipe_edit_quantity">Edit ingredient quantity</string>
     <string name="create_recipe_image_framing">Photo framing</string>
     <string name="create_recipe_step_hint">Describe this step…</string>
     <string name="create_recipe_step_photo">Add photo to step %1$d</string>

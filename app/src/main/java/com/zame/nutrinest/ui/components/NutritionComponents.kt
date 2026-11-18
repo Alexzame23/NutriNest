@@ -38,7 +38,8 @@ import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.domain.nutrition.MeasureConversions
-import com.zame.nutrinest.data.local.entity.IngredientEntity
+import com.zame.nutrinest.domain.nutrition.RecipeMeasure
+import com.zame.nutrinest.domain.nutrition.RecipeQuantity
 import com.zame.nutrinest.ui.theme.Amber
 import com.zame.nutrinest.ui.theme.Apricot
 import com.zame.nutrinest.ui.theme.Caramel
@@ -343,21 +344,45 @@ private fun trimZeros(text: String): String =
 /** An amount in grams. See [MeasureConversions.formatGrams]. */
 fun formatGrams(value: Double): String = MeasureConversions.formatGrams(value)
 
-/** Shows a recipe ingredient in the unit selected when the recipe was created. */
-fun formatRecipeQuantity(
-    ingredient: IngredientEntity,
-    grams: Double,
-    quantityUnit: String
+@Composable
+internal fun formatRecipeAmount(amount: Double): String {
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val separator = java.text.DecimalFormatSymbols.getInstance(locale).decimalSeparator
+    return amount.toString().removeSuffix(".0").replace('.', separator)
+}
+
+@Composable
+internal fun formatSavedRecipeQuantity(
+    quantity: RecipeQuantity,
+    options: List<RecipeMeasure>,
+    spanish: Boolean,
+    scale: Double = 1.0
 ): String {
-    val unit = MeasureConversions.MeasureUnit.entries
-        .firstOrNull { it.name == quantityUnit }
-        ?: MeasureConversions.MeasureUnit.GRAM
-    return MeasureConversions.formatRecipeQuantity(
-        grams = grams,
-        unit = unit,
-        isLiquid = ingredient.isLiquid,
-        densityGml = ingredient.densityGml
-    )
+    val grams = quantity.grams * scale
+    val amount = quantity.originalAmount
+    if (amount == null) {
+        // Historical rows may have a display unit without a sourced conversion or original amount.
+        val massUnit = MeasureConversions.MeasureUnit.entries.firstOrNull {
+            it.name == quantity.unitKey && !it.isVolume
+        }
+        return if (massUnit == null || (massUnit == MeasureConversions.MeasureUnit.GRAM && scale == 1.0)) {
+            "${formatRecipeAmount(grams)} g"
+        } else {
+            MeasureConversions.formatRecipeQuantity(grams, massUnit, isLiquid = false, densityGml = null)
+        }
+    }
+    val measure = options.firstOrNull { it.unit.key == quantity.unitKey }
+    val label = if (measure != null) {
+        if (spanish) measure.labelEs else measure.labelEn
+    } else when {
+        quantity.unitKey.startsWith("UNIT:") -> stringResource(R.string.recipe_measure_units)
+        quantity.unitKey.startsWith("PORTION:") -> stringResource(R.string.recipe_measure_portions)
+        quantity.unitKey == "MILLILITRE" -> "ml"
+        quantity.unitKey == "LITRE" -> "L"
+        else -> return "${formatRecipeAmount(grams)} g"
+    }
+    val separator = if (quantity.unitKey.startsWith("UNIT:") || quantity.unitKey.startsWith("PORTION:")) " × " else " "
+    return formatRecipeAmount(amount * scale) + separator + label
 }
 
 /**

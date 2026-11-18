@@ -12,8 +12,12 @@ import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeEntity
+import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
+import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.RecipeRepository
+import com.zame.nutrinest.domain.nutrition.RecipeMeasure
+import com.zame.nutrinest.domain.nutrition.RecipeQuantity
 import com.zame.nutrinest.util.ImageStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +30,7 @@ data class RecipeDetailUiState(
     val recipe: RecipeEntity? = null,
     val steps: List<RecipeStepEntity> = emptyList(),
     val ingredients: List<IngredientWithQuantity> = emptyList(),
+    val measures: Map<Long, List<RecipeMeasure>> = emptyMap(),
     val deleted: Boolean = false,
     /** A weekly menu still plans this recipe, so the delete was refused. */
     val deleteBlocked: Boolean = false,
@@ -42,6 +47,7 @@ data class RecipeDetailUiState(
 class RecipeDetailViewModel(
     private val app: Application,
     private val repository: RecipeRepository,
+    ingredientRepository: IngredientRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -58,13 +64,15 @@ class RecipeDetailViewModel(
     val uiState: StateFlow<RecipeDetailUiState> = combine(
         repository.observeRecipeWithSteps(recipeId),
         repository.observeIngredientsOf(recipeId),
+        ingredientRepository.observeRecipeMeasures(),
         deletion
-    ) { withSteps, ingredients, deleteState ->
+    ) { withSteps, ingredients, measures, deleteState ->
         RecipeDetailUiState(
             recipe = withSteps?.recipe,
             // @Relation does not order its rows, so the numbering is applied here.
             steps = withSteps?.steps?.sortedBy { it.position }.orEmpty(),
             ingredients = ingredients,
+            measures = measures,
             deleted = deleteState.done,
             deleteBlocked = deleteState.blocked,
             operationFailed = deleteState.failed,
@@ -77,6 +85,22 @@ class RecipeDetailViewModel(
         viewModelScope.launch {
             runCatching { repository.setFavorite(recipe.id, !recipe.isFavorite) }
                 .onFailure { deletion.value = deletion.value.copy(failed = true) }
+        }
+    }
+
+    fun updateIngredientQuantity(previous: IngredientWithQuantity, quantity: RecipeQuantity) {
+        if (uiState.value.recipe?.isBuiltIn != false || previous.quantity == quantity) return
+        val ingredientId = previous.ingredient.id
+        val options = uiState.value.measures[ingredientId] ?: listOf(RecipeMeasure.GRAMS)
+        if (options.none { it.supports(quantity) }) {
+            deletion.value = deletion.value.copy(failed = true)
+            return
+        }
+        viewModelScope.launch {
+            val saved = runCatching {
+                repository.updateIngredientQuantity(recipeId, previous.quantity, RecipeIngredientInput(ingredientId, quantity))
+            }.getOrDefault(false)
+            if (!saved) deletion.value = deletion.value.copy(failed = true)
         }
     }
 
@@ -113,7 +137,9 @@ class RecipeDetailViewModel(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
                     as NutriNestApp
-                RecipeDetailViewModel(app, app.container.recipeRepository, createSavedStateHandle())
+                RecipeDetailViewModel(
+                    app, app.container.recipeRepository, app.container.ingredientRepository, createSavedStateHandle()
+                )
             }
         }
     }

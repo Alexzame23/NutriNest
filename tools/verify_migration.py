@@ -206,7 +206,7 @@ def run_migration_7_8(conn: sqlite3.Connection) -> None:
     """Apply the bilingual recipe-title and instruction migration."""
     source = open(DB_KT).read()
     marker = source.index("internal val MIGRATION_7_8")
-    end = source.index("private fun tableExists", marker)
+    end = source.index("internal val MIGRATION_8_9", marker)
     for statement in extract_exec_sql(source[marker:end]):
         conn.execute(statement)
     conn.commit()
@@ -633,7 +633,20 @@ def main() -> None:
     print("\n7. v8 -> v9 additive catalog SQL")
     from verify_catalog_migration import verify_catalog
     verify_catalog(conn)
-    conn.execute("PRAGMA user_version=9")
+
+    print("\n8. v9 -> v10 additive recipe quantities")
+    original = conn.execute("SELECT recipeId, ingredientId, grams, quantityUnit FROM recipe_ingredients ORDER BY 1, 2").fetchall()
+    with open(DB_KT, encoding="utf-8") as database_file:
+        source = database_file.read()
+    start = source.index("internal val MIGRATION_9_10")
+    end = source.index("private fun tableExists", start)
+    for statement in extract_exec_sql(source[start:end]):
+        conn.execute(statement)
+    migrated = conn.execute("SELECT recipeId, ingredientId, grams, quantityUnit FROM recipe_ingredients ORDER BY 1, 2").fetchall()
+    check("recipe ingredient IDs, grams and legacy units are identical", migrated == original)
+    check("historical quantities have no inferred original amount or reference",
+          not conn.execute("SELECT 1 FROM recipe_ingredients WHERE originalQuantity IS NOT NULL OR quantityEvidenceId IS NOT NULL").fetchall())
+    conn.execute("PRAGMA user_version=10")
     conn.commit()
     conn.close()
     print()

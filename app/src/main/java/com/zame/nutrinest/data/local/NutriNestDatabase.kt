@@ -73,7 +73,7 @@ import com.zame.nutrinest.util.TextNormalizer
         ConversionEvidenceEntity::class,
         IngredientUnitOptionEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 @TypeConverters(ProfileConverters::class, MenuConverters::class)
@@ -514,6 +514,13 @@ abstract class NutriNestDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `recipe_ingredients` ADD COLUMN `originalQuantity` REAL")
+                db.execSQL("ALTER TABLE `recipe_ingredients` ADD COLUMN `quantityEvidenceId` TEXT")
+            }
+        }
+
         private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
             db.query(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$table'"
@@ -751,7 +758,8 @@ abstract class NutriNestDatabase : RoomDatabase() {
             Room.databaseBuilder(appContext, NutriNestDatabase::class.java, name)
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
-                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
+                    MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                    MIGRATION_9_10
                 )
                 .addCallback(FoodImportCallback(appContext))
                 .build()

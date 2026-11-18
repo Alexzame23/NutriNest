@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.local.entity.RecipeIngredientCrossRef
@@ -11,6 +12,7 @@ import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
 import com.zame.nutrinest.data.local.entity.RecipeNutrition
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
 import com.zame.nutrinest.data.local.entity.RecipeWithSteps
+import com.zame.nutrinest.domain.nutrition.RecipeQuantity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -25,7 +27,7 @@ interface RecipeDao {
 
     @Query(
         """
-        SELECT i.*, ri.grams, ri.quantityUnit FROM ingredients i
+        SELECT i.*, ri.grams, ri.quantityUnit, ri.originalQuantity, ri.quantityEvidenceId FROM ingredients i
         INNER JOIN recipe_ingredients ri ON ri.ingredientId = i.id
         WHERE ri.recipeId = :recipeId
         """
@@ -89,6 +91,21 @@ interface RecipeDao {
     @Insert
     suspend fun insertCrossRefs(refs: List<RecipeIngredientCrossRef>)
 
+    @Query("SELECT * FROM recipe_ingredients WHERE recipeId = :recipeId AND ingredientId = :ingredientId")
+    suspend fun ingredientLink(recipeId: Long, ingredientId: Long): RecipeIngredientCrossRef?
+
+    @Update
+    suspend fun updateIngredientLink(ref: RecipeIngredientCrossRef)
+
+    @Transaction
+    suspend fun updateIngredientQuantity(
+        recipeId: Long, previous: RecipeQuantity, input: RecipeIngredientInput
+    ): Boolean {
+        if (ingredientLink(recipeId, input.ingredientId)?.quantity != previous) return false
+        updateIngredientLink(input.crossRef(recipeId))
+        return true
+    }
+
     /**
      * Atomically saves a full recipe: header row, ingredient links, and steps.
      * If any insert fails the whole recipe is rolled back.
@@ -107,16 +124,7 @@ interface RecipeDao {
             "A recipe needs at least one non-empty step"
         }
         val recipeId = insertRecipe(recipe)
-        insertCrossRefs(
-            ingredients.map { input ->
-                RecipeIngredientCrossRef(
-                    recipeId = recipeId,
-                    ingredientId = input.ingredientId,
-                    grams = input.grams,
-                    quantityUnit = input.quantityUnit
-                )
-            }
-        )
+        insertCrossRefs(ingredients.map { it.crossRef(recipeId) })
         insertSteps(
             steps.mapIndexed { index, (text, imagePath) ->
                 RecipeStepEntity(

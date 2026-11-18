@@ -180,7 +180,7 @@ interface MenuDao {
 
     @Query(
         """
-        SELECT i.*, ri.grams, ri.quantityUnit FROM ingredients i
+        SELECT i.*, ri.grams, ri.quantityUnit, ri.originalQuantity, ri.quantityEvidenceId FROM ingredients i
         INNER JOIN recipe_ingredients ri ON ri.ingredientId = i.id
         WHERE ri.recipeId = :recipeId
         """

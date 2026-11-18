@@ -7,6 +7,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
+import com.zame.nutrinest.domain.nutrition.RecipeQuantity
 
 @Entity(tableName = "recipes", indices = [Index(value = ["name"], unique = true)])
 data class RecipeEntity(
@@ -120,15 +121,30 @@ data class RecipeIngredientCrossRef(
     val grams: Double,
     /** The unit the cook chose, retained for recipe instructions/display. */
     @ColumnInfo(defaultValue = "'GRAM'")
-    val quantityUnit: String = "GRAM"
-)
+    val quantityUnit: String = "GRAM",
+    val originalQuantity: Double? = null,
+    /** Stable catalog evidence key, including the identity of a counted unit or portion. */
+    val quantityEvidenceId: String? = null
+) {
+    val quantity: RecipeQuantity get() = RecipeQuantity(grams, quantityUnit, originalQuantity, quantityEvidenceId)
+}
 
 /** Input to an atomic recipe save. Quantities are always canonical grams. */
 data class RecipeIngredientInput(
     val ingredientId: Long,
     val grams: Double,
-    val quantityUnit: String = "GRAM"
-)
+    val quantityUnit: String = "GRAM",
+    val originalQuantity: Double? = null,
+    val quantityEvidenceId: String? = null
+) {
+    constructor(ingredientId: Long, quantity: RecipeQuantity) : this(
+        ingredientId, quantity.grams, quantity.unitKey, quantity.originalAmount, quantity.evidenceId
+    )
+
+    fun crossRef(recipeId: Long) = RecipeIngredientCrossRef(
+        recipeId, ingredientId, grams, quantityUnit, originalQuantity, quantityEvidenceId
+    )
+}
 
 @Entity(
     tableName = "recipe_steps",
@@ -158,8 +174,11 @@ data class RecipeStepEntity(
 data class IngredientWithQuantity(
     @Embedded val ingredient: IngredientEntity,
     val grams: Double,
-    val quantityUnit: String = "GRAM"
+    val quantityUnit: String = "GRAM",
+    val originalQuantity: Double? = null,
+    val quantityEvidenceId: String? = null
 ) {
+    val quantity: RecipeQuantity get() = RecipeQuantity(grams, quantityUnit, originalQuantity, quantityEvidenceId)
     val nutrition: NutritionValues get() = ingredient.nutrition.forGrams(grams)
 }
 

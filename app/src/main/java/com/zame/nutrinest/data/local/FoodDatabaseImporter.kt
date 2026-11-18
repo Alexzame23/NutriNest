@@ -59,6 +59,7 @@ object FoodDatabaseImporter {
                 if (installedVersion == assetVersion && installedHash == assetHash) {
                     // Editorial revisions must also run on an already installed dataset.
                     CuratedCatalog.apply(context, db, assetHash, assetVersion)
+                    RecipeMeasureCatalog.publish(db, assetHash, assetVersion)
                     db.setTransactionSuccessful()
                     return true
                 }
@@ -76,6 +77,7 @@ object FoodDatabaseImporter {
                 reserveUserIdRange(db)
                 CanonicalCatalogStore.backfill(db, inserted, assetHash, assetVersion)
                 CuratedCatalog.apply(context, db, assetHash, assetVersion)
+                RecipeMeasureCatalog.publish(db, assetHash, assetVersion)
                 writeMeta(db, FoodDatasetMetaEntity.DATASET_VERSION, assetVersion)
                 writeMeta(db, ASSET_HASH_KEY, assetHash)
                 writeMeta(db, LAST_IMPORT_AT, now.toString())

@@ -50,7 +50,7 @@ import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.components.SlowMarqueeText
-import com.zame.nutrinest.ui.components.formatRecipeQuantity
+import com.zame.nutrinest.ui.components.formatSavedRecipeQuantity
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
@@ -235,10 +235,11 @@ fun MealDetailScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatRecipeQuantity(
-                                        ingredient.ingredient,
-                                        ingredient.grams * portion.portion.factor,
-                                        ingredient.quantityUnit
+                                    formatSavedRecipeQuantity(
+                                        ingredient.quantity,
+                                        options = emptyList(),
+                                        spanish = spanish,
+                                        scale = portion.portion.factor
                                     ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
@@ -267,10 +268,11 @@ fun MealDetailScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatRecipeQuantity(
-                                        ingredient.ingredient,
-                                        ingredient.grams * state.householdFactor,
-                                        ingredient.quantityUnit
+                                    formatSavedRecipeQuantity(
+                                        ingredient.quantity,
+                                        options = emptyList(),
+                                        spanish = spanish,
+                                        scale = state.householdFactor
                                     ),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold

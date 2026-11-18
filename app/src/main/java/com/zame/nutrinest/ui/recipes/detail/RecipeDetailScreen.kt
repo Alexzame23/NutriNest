@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
@@ -51,13 +52,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.RecipeBooks
+import com.zame.nutrinest.data.local.entity.IngredientWithQuantity
+import com.zame.nutrinest.domain.nutrition.RecipeMeasure
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.SlowMarqueeText
 import com.zame.nutrinest.ui.components.StatusChip
 import com.zame.nutrinest.ui.components.formatGrams
-import com.zame.nutrinest.ui.components.formatRecipeQuantity
+import com.zame.nutrinest.ui.components.formatRecipeAmount
+import com.zame.nutrinest.ui.components.formatSavedRecipeQuantity
+import com.zame.nutrinest.ui.ingredients.prepStateLabel
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.ui.recipes.EditRecipeQuantityDialog
 import com.zame.nutrinest.ui.recipes.recipeCategoryColor
 import com.zame.nutrinest.ui.recipes.recipeCategoryIcon
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
@@ -79,8 +85,10 @@ fun RecipeDetailScreen(
     viewModel: RecipeDetailViewModel = viewModel(factory = RecipeDetailViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val measures = state.measures
     val spanish = rememberIsSpanish()
     var confirmDelete by remember { mutableStateOf(false) }
+    var editingIngredient by remember { mutableStateOf<IngredientWithQuantity?>(null) }
 
     LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
 
@@ -90,6 +98,20 @@ fun RecipeDetailScreen(
         // than an error, so it must not flash "no longer here" on the way out.
         if (!state.isLoading && !state.deleted) MissingRecipe(onBack)
         return
+    }
+
+    editingIngredient?.let { item ->
+        EditRecipeQuantityDialog(
+            ingredientName = item.ingredient.displayName(spanish),
+            saved = item.quantity,
+            options = measures[item.ingredient.id] ?: listOf(RecipeMeasure.GRAMS),
+            spanish = spanish,
+            onDismiss = { editingIngredient = null },
+            onSave = { quantity ->
+                viewModel.updateIngredientQuantity(item, quantity)
+                editingIngredient = null
+            }
+        )
     }
 
     if (confirmDelete) {
@@ -244,25 +266,35 @@ fun RecipeDetailScreen(
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
+                                    val kcal = stringResource(R.string.kcal_value, item.nutrition.kcal.roundToInt())
+                                    val preparation = item.ingredient.prepState
                                     Text(
-                                        stringResource(
-                                            R.string.kcal_value,
-                                            item.nutrition.kcal.roundToInt()
-                                        ),
+                                        if (preparation == "UNSPECIFIED") kcal
+                                        else stringResource(prepStateLabel(preparation)) + " · " + kcal,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                Text(
-                                    formatRecipeQuantity(
-                                        item.ingredient,
-                                        item.grams,
-                                        item.quantityUnit
-                                    ),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        formatSavedRecipeQuantity(
+                                            item.quantity, measures[item.ingredient.id].orEmpty(), spanish
+                                        ),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    if (item.originalQuantity != null) {
+                                        Text(
+                                            stringResource(R.string.recipe_edible_weight, formatRecipeAmount(item.grams)),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                                if (!recipe.isBuiltIn) {
+                                    IconButton(onClick = { editingIngredient = item }) {
+                                        Icon(Icons.Rounded.Edit, stringResource(R.string.recipe_edit_quantity))
+                                    }
+                                }
                             }
                         }
                     }

@@ -26,6 +26,8 @@ import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
 import com.zame.nutrinest.data.local.entity.RecipeUsage
 import com.zame.nutrinest.data.local.entity.RecipeWithSteps
 import com.zame.nutrinest.data.local.entity.ShoppingAisleEntity
+import com.zame.nutrinest.domain.nutrition.RecipeMeasure
+import com.zame.nutrinest.domain.nutrition.RecipeQuantity
 import com.zame.nutrinest.util.TextNormalizer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -38,6 +40,7 @@ import kotlinx.coroutines.flow.map
  */
 interface IngredientRepository {
     fun observeAll(): Flow<List<IngredientEntity>>
+    fun observeRecipeMeasures(): Flow<Map<Long, List<RecipeMeasure>>>
     fun search(query: String): Flow<List<IngredientEntity>>
 
     /**
@@ -111,6 +114,10 @@ interface RecipeRepository {
 
     suspend fun setFavorite(id: Long, favorite: Boolean)
 
+    suspend fun updateIngredientQuantity(
+        recipeId: Long, previous: RecipeQuantity, input: RecipeIngredientInput
+    ): Boolean
+
     /** @return false when a weekly menu still plans this recipe. */
     suspend fun delete(id: Long): Boolean
 }
@@ -133,6 +140,12 @@ class LocalIngredientRepository(private val database: NutriNestDatabase) : Ingre
         }
 
     override fun observeAll() = dao.observeAll().withCatalogPresentation()
+
+    override fun observeRecipeMeasures() = database.canonicalCatalogDao().observeRecipeMeasures().map { rows ->
+        rows.groupBy { it.evidence.ingredientId }.mapValues { (_, options) ->
+            listOf(RecipeMeasure.GRAMS) + options.mapNotNull { it.toRecipeMeasure() }
+        }
+    }
 
     override fun search(query: String) = dao.observeFiltered(TextNormalizer.normalize(query),
         IngredientCategories.ALL, 0, 0).withCatalogPresentation()
@@ -240,6 +253,10 @@ class LocalRecipeRepository(private val dao: RecipeDao) : RecipeRepository {
     ) = dao.insertFullRecipe(recipe, ingredients, steps)
 
     override suspend fun setFavorite(id: Long, favorite: Boolean) = dao.setFavorite(id, favorite)
+
+    override suspend fun updateIngredientQuantity(
+        recipeId: Long, previous: RecipeQuantity, input: RecipeIngredientInput
+    ) = dao.updateIngredientQuantity(recipeId, previous, input)
 
     override suspend fun delete(id: Long) = dao.deleteIfUnused(id)
 }

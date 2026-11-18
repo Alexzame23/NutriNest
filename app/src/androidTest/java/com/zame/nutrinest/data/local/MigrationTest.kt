@@ -276,6 +276,44 @@ class MigrationTest {
     }
 
     @Test
+    fun migrate9To10_preservesGramsUnitsNutritionAndMedia() {
+        val name = "recipe-quantities-v9.db"
+        lateinit var tables: List<String>
+        lateinit var historical: Map<String, List<String>>
+        helper.createDatabase(name, 9).use { db ->
+            CatalogTestFixtures.seed(db, 9)
+            db.execSQL("INSERT INTO recipe_ingredients (recipeId,ingredientId,grams,quantityUnit) VALUES (21,12,53.52,'OLD_UNKNOWN')")
+            db.execSQL("UPDATE recipes SET coverImagePath='cover.jpg'")
+            db.execSQL("UPDATE recipe_steps SET imagePath='step.jpg'")
+            tables = CatalogTestFixtures.tables(db).filterNot { it == "recipe_ingredients" }
+            historical = CatalogTestFixtures.snapshot(db, tables)
+        }
+        helper.runMigrationsAndValidate(name, 10, true, NutriNestDatabase.MIGRATION_9_10).use { db ->
+            assertEquals(historical, CatalogTestFixtures.snapshot(db, tables))
+            db.query("""
+                SELECT ri.ingredientId, grams, quantityUnit, originalQuantity, quantityEvidenceId, kcal * grams / 100.0
+                FROM recipe_ingredients ri JOIN ingredients i ON i.id=ri.ingredientId
+                WHERE recipeId=21 ORDER BY ri.ingredientId
+            """.trimIndent()).use {
+                assertTrue(it.moveToNext())
+                assertEquals(11L, it.getLong(0))
+                assertEquals(137.123456789, it.getDouble(1), 0.0)
+                assertEquals("LITRE", it.getString(2))
+                assertTrue(it.isNull(3) && it.isNull(4))
+                assertEquals(123.45 * 137.123456789 / 100.0, it.getDouble(5), 1e-12)
+                assertTrue(it.moveToNext())
+                assertEquals(12L, it.getLong(0))
+                assertEquals(53.52, it.getDouble(1), 0.0)
+                assertEquals("OLD_UNKNOWN", it.getString(2))
+                assertTrue(it.isNull(3) && it.isNull(4))
+                assertEquals(91.0 * 53.52 / 100.0, it.getDouble(5), 1e-12)
+                assertTrue(!it.moveToNext())
+            }
+            db.query("PRAGMA foreign_key_check").use { assertTrue(!it.moveToFirst()) }
+        }
+    }
+
+    @Test
     fun allExportedOldVersionsReach9WithUserReferencesIntact() {
         for (version in 4..8) {
             val name = "catalog-from-$version.db"
@@ -338,7 +376,7 @@ class MigrationTest {
         lateinit var before: Map<String, List<String>>
         helper.createDatabase(name, 8).use { db ->
             CatalogTestFixtures.seed(db, 8)
-            tables = CatalogTestFixtures.tables(db)
+            tables = CatalogTestFixtures.tables(db).filterNot { it == "recipe_ingredients" }
             before = CatalogTestFixtures.snapshot(db, tables)
         }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -349,6 +387,17 @@ class MigrationTest {
             val after = CatalogTestFixtures.snapshot(db, tables)
             before.forEach { (table, rows) ->
                 assertTrue("onOpen changed $table", after.getValue(table).containsAll(rows))
+            }
+            db.query("""
+                SELECT ingredientId, grams, quantityUnit, originalQuantity, quantityEvidenceId
+                FROM recipe_ingredients WHERE recipeId=21
+            """.trimIndent()).use {
+                assertTrue(it.moveToFirst())
+                assertEquals(11L, it.getLong(0))
+                assertEquals(137.123456789, it.getDouble(1), 0.0)
+                assertEquals("LITRE", it.getString(2))
+                assertTrue(it.isNull(3) && it.isNull(4))
+                assertTrue(!it.moveToNext())
             }
             CanonicalCatalogStore.validate(db)
         } finally { room.close() }

@@ -1,11 +1,21 @@
 package com.zame.nutrinest.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.zame.nutrinest.data.local.entity.*
 import kotlinx.coroutines.flow.Flow
+
+data class CatalogRecipeMeasure(
+    @Embedded val evidence: ConversionEvidenceEntity,
+    @ColumnInfo(name = "unit_kind") val kind: String,
+    @ColumnInfo(name = "label_en") val labelEn: String?,
+    @ColumnInfo(name = "label_es") val labelEs: String?,
+    @ColumnInfo(name = "default_slot") val defaultSlot: Long?
+)
 
 /** Historical lookup never filters status. Publication remains an explicit reviewed operation. */
 @Dao
@@ -33,6 +43,19 @@ interface CanonicalCatalogDao {
           AND r.state='APPLIED' AND ro.state='APPLIED'
     """)
     suspend fun acceptedEvidence(ingredientId: Long): List<ConversionEvidenceEntity>
+
+    @Query("""
+        SELECT e.*, o.unit_kind, o.label_en, o.label_es, o.default_slot
+        FROM ingredient_unit_options o
+        JOIN conversion_evidence e ON e.evidence_id=o.evidence_id
+          AND e.ingredient_id=o.ingredient_id AND e.unit_key=o.unit_key
+        JOIN catalog_revision r ON r.revision_id=e.revision_id
+        JOIN catalog_revision ro ON ro.revision_id=o.revision_id
+        WHERE o.enabled=1 AND e.status='ACCEPTED' AND e.mass_basis='EDIBLE'
+          AND e.confidence<>'UNVERIFIED' AND r.state='APPLIED' AND ro.state='APPLIED'
+        ORDER BY o.default_slot DESC, e.unit_key
+    """)
+    fun observeRecipeMeasures(): Flow<List<CatalogRecipeMeasure>>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertEvidence(evidence: ConversionEvidenceEntity)

@@ -18,21 +18,20 @@ import com.zame.nutrinest.data.local.entity.RecipeImageCrop
 import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.RecipeRepository
-import com.zame.nutrinest.domain.nutrition.ConversionResult
-import com.zame.nutrinest.domain.nutrition.IngredientQuantityConversions
+import com.zame.nutrinest.domain.nutrition.RecipeMeasure
+import com.zame.nutrinest.domain.nutrition.RecipeQuantity
 import com.zame.nutrinest.util.ImageStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** An ingredient added to the draft recipe with its quantity. */
 data class DraftIngredient(
     val ingredient: IngredientEntity,
-    val grams: Double,
-    val quantityUnit: String = "GRAM",
-    val isQuantityValid: Boolean = true
+    val quantity: RecipeQuantity
 )
 
 data class DraftStep(
@@ -64,7 +63,7 @@ data class CreateRecipeUiState(
 ) {
     val totalNutrition: NutritionValues
         get() = ingredients.fold(NutritionValues()) { acc, item ->
-            acc + item.ingredient.nutrition.forGrams(item.grams)
+            acc + item.ingredient.nutrition.forGrams(item.quantity.grams)
         }
 }
 
@@ -78,9 +77,10 @@ class CreateRecipeViewModel(
     val uiState = _uiState.asStateFlow()
     private val draftImages = mutableSetOf<String>()
 
-    /** Full ingredient database for the picker sheet. */
-    val allIngredients = ingredientRepository.observeAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** Publish picker rows only once their initial catalog options are available. */
+    val ingredientCatalog = combine(ingredientRepository.observeAll(), ingredientRepository.observeRecipeMeasures()) {
+        ingredients, measures -> ingredients to measures
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList<IngredientEntity>() to emptyMap())
 
     /** Existing recipe folders used by the creation dropdown. */
     val folders = recipeRepository.observeFolders()
@@ -116,50 +116,32 @@ class CreateRecipeViewModel(
 
     fun addIngredient(
         ingredient: IngredientEntity,
-        grams: Double,
-        quantityUnit: String = "GRAM"
+        quantity: RecipeQuantity
     ) = update {
-        // Same ingredient twice merges into one entry with summed grams.
-        val existing = ingredients.find { it.ingredient.id == ingredient.id }
-        val totalGrams = (existing?.grams ?: 0.0) + grams
-        if (!validQuantity(ingredient, grams, quantityUnit) ||
-            !validQuantity(ingredient, totalGrams, quantityUnit)) {
-            return@update copy(error = RecipeFormError.INVALID_QUANTITY)
-        }
-        val newList = if (existing != null) {
-            ingredients.map {
-                if (it.ingredient.id == ingredient.id) {
-                    it.copy(grams = totalGrams, quantityUnit = quantityUnit, isQuantityValid = true)
-                } else it
-            }
-        } else {
-            ingredients + DraftIngredient(ingredient, grams, quantityUnit)
-        }
-        copy(ingredients = newList)
+        if (!validQuantity(ingredient.id, quantity)) return@update copy(error = RecipeFormError.INVALID_QUANTITY)
+        val previous = ingredients.find { it.ingredient.id == ingredient.id }?.quantity
+        if (previous == null) return@update copy(ingredients = ingredients + DraftIngredient(ingredient, quantity))
+        val total = previous + quantity
+        if (!validQuantity(ingredient.id, total)) return@update copy(error = RecipeFormError.INVALID_QUANTITY)
+        copy(ingredients = ingredients.map {
+            if (it.ingredient.id == ingredient.id) it.copy(quantity = total) else it
+        })
     }
 
     fun removeIngredient(ingredientId: Long) = update {
         copy(ingredients = ingredients.filterNot { it.ingredient.id == ingredientId })
     }
 
-    fun updateIngredientQuantity(ingredientId: Long, grams: Double, quantityUnit: String) = update {
+    fun updateIngredientQuantity(ingredientId: Long, quantity: RecipeQuantity) = update {
+        if (!validQuantity(ingredientId, quantity)) return@update copy(error = RecipeFormError.INVALID_QUANTITY)
         copy(ingredients = ingredients.map {
-            if (it.ingredient.id != ingredientId) it
-            else if (validQuantity(it.ingredient, grams, quantityUnit)) {
-                it.copy(grams = grams, quantityUnit = quantityUnit, isQuantityValid = true)
-            } else it.copy(isQuantityValid = false)
+            if (it.ingredient.id == ingredientId) it.copy(quantity = quantity) else it
         })
     }
 
-    fun invalidateIngredientQuantity(ingredientId: Long) = update {
-        copy(ingredients = ingredients.map {
-            if (it.ingredient.id == ingredientId) it.copy(isQuantityValid = false) else it
-        })
-    }
-
-    private fun validQuantity(ingredient: IngredientEntity, grams: Double, unit: String): Boolean =
-        grams.isFinite() && grams > 0 && grams <= MAX_INGREDIENT_GRAMS &&
-            IngredientQuantityConversions.fromGrams(grams, unit, ingredient) is ConversionResult.Success
+    private fun validQuantity(ingredientId: Long, quantity: RecipeQuantity): Boolean =
+        ingredientCatalog.value.second[ingredientId].orEmpty().any { it.supports(quantity) } ||
+            RecipeMeasure.GRAMS.supports(quantity)
 
     fun onStepTextChange(index: Int, text: String) = update {
         copy(steps = steps.mapIndexed { i, s -> if (i == index) s.copy(text = text) else s })
@@ -207,9 +189,7 @@ class CreateRecipeViewModel(
             val error = when {
                 name.isEmpty() -> RecipeFormError.NAME_REQUIRED
                 state.ingredients.isEmpty() -> RecipeFormError.NO_INGREDIENTS
-                state.ingredients.any {
-                    !it.isQuantityValid || !validQuantity(it.ingredient, it.grams, it.quantityUnit)
-                } -> RecipeFormError.INVALID_QUANTITY
+                state.ingredients.any { !validQuantity(it.ingredient.id, it.quantity) } -> RecipeFormError.INVALID_QUANTITY
                 nonEmptySteps.isEmpty() -> RecipeFormError.NO_STEPS
                 recipeRepository.existsByName(name) -> RecipeFormError.DUPLICATE_NAME
                 else -> null
@@ -230,7 +210,7 @@ class CreateRecipeViewModel(
                         coverImageCrop = state.coverImageCrop
                     ),
                     ingredients = state.ingredients.map {
-                        RecipeIngredientInput(it.ingredient.id, it.grams, it.quantityUnit)
+                        RecipeIngredientInput(it.ingredient.id, it.quantity)
                     },
                     steps = nonEmptySteps.map { it.text.trim() to it.imagePath }
                 )
@@ -260,7 +240,6 @@ class CreateRecipeViewModel(
     }
 
     companion object {
-        private const val MAX_INGREDIENT_GRAMS = 100_000.0
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp

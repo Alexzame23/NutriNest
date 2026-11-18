@@ -19,13 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddAPhoto
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,7 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -68,20 +67,22 @@ import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.local.entity.RecipeImageCrop
 import com.zame.nutrinest.data.local.entity.RecipeCategories
 import com.zame.nutrinest.data.local.entity.RecipeBooks
-import com.zame.nutrinest.domain.nutrition.MeasureConversions
-import com.zame.nutrinest.domain.nutrition.ConversionError
-import com.zame.nutrinest.domain.nutrition.ConversionResult
-import com.zame.nutrinest.domain.nutrition.IngredientQuantityConversions
+import com.zame.nutrinest.domain.nutrition.RecipeMeasure
+import com.zame.nutrinest.domain.nutrition.RecipeQuantity
 import com.zame.nutrinest.ui.components.ImagePickerBox
 import com.zame.nutrinest.ui.components.KeyedDropdown
 import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
-import com.zame.nutrinest.ui.components.formatRecipeQuantity
+import com.zame.nutrinest.ui.components.formatSavedRecipeQuantity
+import com.zame.nutrinest.ui.ingredients.prepStateLabel
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.ui.recipes.EditRecipeQuantityDialog
+import com.zame.nutrinest.ui.recipes.RecipeQuantityEditor
+import com.zame.nutrinest.ui.recipes.RecipeQuantityFields
+import com.zame.nutrinest.ui.recipes.label
 import com.zame.nutrinest.ui.recipes.recipeCategoryLabel
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import com.zame.nutrinest.util.TextNormalizer
-import com.zame.nutrinest.util.toLocalizedDoubleOrNull
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -93,11 +94,13 @@ fun CreateRecipeScreen(
     viewModel: CreateRecipeViewModel = viewModel(factory = CreateRecipeViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val allIngredients by viewModel.allIngredients.collectAsStateWithLifecycle()
+    val catalog by viewModel.ingredientCatalog.collectAsStateWithLifecycle()
+    val (allIngredients, measures) = catalog
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
     val snackbarHostState = remember { SnackbarHostState() }
     var showIngredientPicker by remember { mutableStateOf(false) }
+    var editingIngredient by remember { mutableStateOf<DraftIngredient?>(null) }
 
     // Navigate back once saved.
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
@@ -214,10 +217,8 @@ fun CreateRecipeScreen(
                 DraftIngredientRow(
                     draft = draft,
                     spanish = spanish,
-                    onQuantityChange = { grams, unit ->
-                        viewModel.updateIngredientQuantity(draft.ingredient.id, grams, unit)
-                    },
-                    onInvalidQuantity = { viewModel.invalidateIngredientQuantity(draft.ingredient.id) },
+                    options = measures[draft.ingredient.id].orEmpty(),
+                    onEdit = { editingIngredient = draft },
                     onRemove = { viewModel.removeIngredient(draft.ingredient.id) }
                 )
             }
@@ -272,14 +273,29 @@ fun CreateRecipeScreen(
     if (showIngredientPicker) {
         IngredientPickerSheet(
             ingredients = allIngredients,
+            measures = measures,
             onDismiss = { showIngredientPicker = false },
-            onPicked = { ingredient, grams, quantityUnit ->
-                viewModel.addIngredient(ingredient, grams, quantityUnit)
+            onPicked = { ingredient, quantity ->
+                viewModel.addIngredient(ingredient, quantity)
                 showIngredientPicker = false
             },
             onCreateIngredient = {
                 showIngredientPicker = false
                 onCreateIngredient()
+            }
+        )
+    }
+
+    editingIngredient?.let { draft ->
+        EditRecipeQuantityDialog(
+            ingredientName = draft.ingredient.displayName(spanish),
+            saved = draft.quantity,
+            options = measures[draft.ingredient.id] ?: listOf(RecipeMeasure.GRAMS),
+            spanish = spanish,
+            onDismiss = { editingIngredient = null },
+            onSave = { quantity ->
+                viewModel.updateIngredientQuantity(draft.ingredient.id, quantity)
+                editingIngredient = null
             }
         )
     }
@@ -349,25 +365,10 @@ private fun SectionTitle(text: String) {
 private fun DraftIngredientRow(
     draft: DraftIngredient,
     spanish: Boolean,
-    onQuantityChange: (Double, String) -> Unit,
-    onInvalidQuantity: () -> Unit,
+    options: List<RecipeMeasure>,
+    onEdit: () -> Unit,
     onRemove: () -> Unit
 ) {
-    val unit = draft.quantityUnit.toMeasureUnit()
-    val amount = (IngredientQuantityConversions.fromGrams(
-        draft.grams, unit.name, draft.ingredient
-    ) as? ConversionResult.Success)?.quantity?.amount ?: draft.grams
-    var amountText by remember(draft.ingredient.id, draft.quantityUnit) {
-        mutableStateOf(amount.toString())
-    }
-    val inputResult = recipeQuantityResult(amountText, unit, draft.ingredient)
-    val inputError = quantityError(inputResult)
-    // Adding the same ingredient again changes grams outside this text field.
-    LaunchedEffect(draft.grams, draft.quantityUnit) {
-        val enteredGrams = (recipeQuantityResult(amountText, unit, draft.ingredient)
-            as? ConversionResult.Success)?.quantity?.amount
-        if (draft.isQuantityValid && enteredGrams != draft.grams) amountText = amount.toString()
-    }
     Card(
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -380,106 +381,24 @@ private fun DraftIngredientRow(
                 Text(
                     draft.ingredient.displayName(spanish),
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontWeight = FontWeight.SemiBold
                 )
+                val kcal = draft.ingredient.nutrition.forGrams(draft.quantity.grams).kcal.roundToInt()
                 Text(
-                    "${draft.ingredient.nutrition.forGrams(draft.grams).kcal.roundToInt()} kcal · " +
-                        formatRecipeQuantity(draft.ingredient, draft.grams, draft.quantityUnit),
+                    stringResource(R.string.kcal_value, kcal) + " · " +
+                        formatSavedRecipeQuantity(draft.quantity, options, spanish),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                if (draft.ingredient.isLiquid) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        QuantityUnits.forEach { candidate ->
-                            FilterChip(
-                                selected = candidate == unit,
-                                enabled = inputResult is ConversionResult.Success && IngredientQuantityConversions.fromGrams(
-                                    draft.grams, candidate.name, draft.ingredient
-                                ) is ConversionResult.Success,
-                                onClick = {
-                                    onQuantityChange(draft.grams, candidate.name)
-                                },
-                                label = { Text(candidate.symbol()) }
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { text ->
-                        amountText = text
-                        val result = recipeQuantityResult(text, unit, draft.ingredient)
-                        if (result is ConversionResult.Success) {
-                            onQuantityChange(result.quantity.amount, unit.name)
-                        } else {
-                            onInvalidQuantity()
-                        }
-                    },
-                    label = { Text(unit.symbol()) },
-                    isError = inputError != null,
-                    supportingText = inputError?.let { message -> { Text(message) } },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.width(90.dp)
-                )
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Rounded.Edit, stringResource(R.string.recipe_edit_quantity))
             }
             IconButton(onClick = onRemove) {
-                Icon(
-                    Icons.Rounded.Delete,
-                    contentDescription = stringResource(R.string.action_remove),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Icon(Icons.Rounded.Delete, stringResource(R.string.action_remove))
             }
         }
     }
-}
-
-private val QuantityUnits = listOf(
-    MeasureConversions.MeasureUnit.GRAM,
-    MeasureConversions.MeasureUnit.LITRE
-)
-
-private fun recipeQuantityResult(
-    text: String,
-    unit: MeasureConversions.MeasureUnit,
-    ingredient: IngredientEntity
-): ConversionResult {
-    val amount = text.toLocalizedDoubleOrNull()
-        ?: return ConversionResult.Failure(ConversionError.INVALID_AMOUNT)
-    val result = IngredientQuantityConversions.toGrams(amount, unit.name, ingredient)
-    return if (result is ConversionResult.Success && result.quantity.amount > 100_000.0) {
-        ConversionResult.Failure(ConversionError.INVALID_AMOUNT)
-    } else result
-}
-
-@Composable
-private fun quantityError(result: ConversionResult): String? = when (result) {
-    is ConversionResult.Success -> null
-    is ConversionResult.Failure -> stringResource(when (result.error) {
-        ConversionError.MISSING_DENSITY -> R.string.quantity_error_missing_density
-        ConversionError.UNVERIFIED_EVIDENCE -> R.string.quantity_error_unverified_factor
-        else -> R.string.recipe_error_invalid_quantity
-    })
-}
-
-private fun String.toMeasureUnit(): MeasureConversions.MeasureUnit =
-    MeasureConversions.MeasureUnit.entries.firstOrNull { it.name == this }
-        ?: MeasureConversions.MeasureUnit.GRAM
-
-private fun MeasureConversions.MeasureUnit.symbol(): String = when (this) {
-    MeasureConversions.MeasureUnit.LITRE -> "L"
-    MeasureConversions.MeasureUnit.MILLILITRE -> "ml"
-    MeasureConversions.MeasureUnit.KILOGRAM -> "kg"
-    MeasureConversions.MeasureUnit.OUNCE -> "oz"
-    MeasureConversions.MeasureUnit.POUND -> "lb"
-    MeasureConversions.MeasureUnit.CUP -> "cup"
-    MeasureConversions.MeasureUnit.TABLESPOON -> "tbsp"
-    MeasureConversions.MeasureUnit.TEASPOON -> "tsp"
-    MeasureConversions.MeasureUnit.GRAM -> "g"
 }
 
 @Composable
@@ -583,15 +502,14 @@ private fun StepEditor(
 @Composable
 private fun IngredientPickerSheet(
     ingredients: List<IngredientEntity>,
+    measures: Map<Long, List<RecipeMeasure>>,
     onDismiss: () -> Unit,
-    onPicked: (IngredientEntity, Double, String) -> Unit,
+    onPicked: (IngredientEntity, RecipeQuantity) -> Unit,
     onCreateIngredient: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<IngredientEntity?>(null) }
     val spanish = rememberIsSpanish()
-    var quantityText by remember { mutableStateOf("100") }
-    var selectedUnit by remember { mutableStateOf(MeasureConversions.MeasureUnit.GRAM) }
     var selectedCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var customOnly by remember { mutableStateOf(false) }
@@ -711,11 +629,7 @@ private fun IngredientPickerSheet(
                     }
                     items(filtered, key = { it.id }) { ingredient ->
                         Card(
-                            onClick = {
-                                pending = ingredient
-                                quantityText = "100"
-                                selectedUnit = MeasureConversions.MeasureUnit.GRAM
-                            },
+                            onClick = { pending = ingredient },
                             shape = MaterialTheme.shapes.small,
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
@@ -737,13 +651,17 @@ private fun IngredientPickerSheet(
                                             style = MaterialTheme.typography.labelSmall
                                         )
                                     }
+                                    val preferred = RecipeMeasure.default(measures[ingredient.id].orEmpty())
+                                    val subtitle = listOf(
+                                        IngredientCategories.shortName(ingredient.categoryKey, spanish),
+                                        stringResource(prepStateLabel(ingredient.prepState)).takeUnless {
+                                            ingredient.prepState == "UNSPECIFIED"
+                                        },
+                                        preferred.label(spanish),
+                                        stringResource(R.string.kcal_per_100g, ingredient.nutrition.kcal.roundToInt())
+                                    ).filterNotNull().joinToString(" · ")
                                     Text(
-                                        IngredientCategories
-                                            .shortName(ingredient.categoryKey, spanish) + " · " +
-                                            stringResource(
-                                                R.string.kcal_per_100g,
-                                                ingredient.nutrition.kcal.roundToInt()
-                                            ),
+                                        subtitle,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -760,49 +678,15 @@ private fun IngredientPickerSheet(
                     }
                 }
             } else {
-                // ── Quantity entry ─────────────────────────────────
-                val quantityResult = recipeQuantityResult(quantityText, selectedUnit, selected)
-                val quantityError = quantityError(quantityResult)
+                val options = measures[selected.id] ?: listOf(RecipeMeasure.GRAMS)
+                val editor = remember(selected.id) { RecipeQuantityEditor(options) }
                 Text(
                     selected.displayName(spanish),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(Modifier.height(12.dp))
-                if (selected.isLiquid) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        QuantityUnits.forEach { unit ->
-                            FilterChip(
-                                selected = selectedUnit == unit,
-                                onClick = {
-                                    (quantityResult as? ConversionResult.Success)?.let { result ->
-                                        (IngredientQuantityConversions.fromGrams(
-                                            result.quantity.amount, unit.name, selected
-                                        ) as? ConversionResult.Success)?.let {
-                                            quantityText = it.quantity.amount.toString()
-                                        }
-                                    }
-                                    selectedUnit = unit
-                                },
-                                label = { Text(unit.symbol()) }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-                OutlinedTextField(
-                    value = quantityText,
-                    onValueChange = { quantityText = it },
-                    isError = quantityError != null,
-                    supportingText = quantityError?.let { message -> { Text(message) } },
-                    label = {
-                        Text(stringResource(R.string.create_recipe_quantity, selectedUnit.symbol()))
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                RecipeQuantityFields(editor, options, spanish)
                 Spacer(Modifier.height(16.dp))
                 Row(
                     Modifier
@@ -815,12 +699,8 @@ private fun IngredientPickerSheet(
                         modifier = Modifier.weight(1f)
                     ) { Text(stringResource(R.string.action_back)) }
                     androidx.compose.material3.Button(
-                        onClick = {
-                            (quantityResult as? ConversionResult.Success)?.let {
-                                onPicked(selected, it.quantity.amount, selectedUnit.name)
-                            }
-                        },
-                        enabled = quantityResult is ConversionResult.Success,
+                        onClick = { editor.quantity?.let { onPicked(selected, it) } },
+                        enabled = editor.quantity != null,
                         modifier = Modifier.weight(1f)
                     ) { Text(stringResource(R.string.action_add)) }
                 }
