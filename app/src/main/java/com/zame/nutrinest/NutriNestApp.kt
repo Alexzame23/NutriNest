@@ -2,6 +2,8 @@ package com.zame.nutrinest
 
 import android.app.Application
 import com.zame.nutrinest.data.local.NutriNestDatabase
+import com.zame.nutrinest.data.prices.PriceSnapshotReader
+import com.zame.nutrinest.data.prices.RoomPriceSnapshotCache
 import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.LocalFoodReferenceRepository
@@ -31,6 +33,8 @@ class AppContainer(app: Application) {
 
     val menuRepository: MenuRepository =
         LocalMenuRepository(database)
+
+    val priceSnapshots: PriceSnapshotReader = RoomPriceSnapshotCache(database)
 }
 
 class NutriNestApp : Application() {

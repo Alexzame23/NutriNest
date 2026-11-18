@@ -1,0 +1,47 @@
+{
+  "contractVersion": 1,
+  "regionId": "test-region",
+  "revision": 1,
+  "generatedAt": "2026-11-18T12:00:00Z",
+  "expiresAt": "2026-11-20T12:00:00Z",
+  "sources": [
+    {"id":"test-source","name":"Test source","kind":"AUTHORIZED_IMPORT","licenseRef":"test-license","attribution":"Test fixture"}
+  ],
+  "retailers": [
+    {"id":"retailer-a","origin":{"sourceId":"test-source","recordKey":"a"},"name":"Test retailer A"},
+    {"id":"retailer-b","origin":{"sourceId":"test-source","recordKey":"b"},"name":"Test retailer B"}
+  ],
+  "stores": [
+    {"id":"store-a","origin":{"sourceId":"test-source","recordKey":"store-a"},"retailerId":"retailer-a","name":"Test store","postalCode":"08001"}
+  ],
+  "zones": [
+    {"id":"zone-a","origin":{"sourceId":"test-source","recordKey":"zone-a"},"retailerId":"retailer-a","name":"Test price zone"}
+  ],
+  "products": [
+    {"id":"pasta","origin":{"sourceId":"test-source","recordKey":"pasta"},"name":"Test pasta","brand":"Test brand","variant":"Whole grain","attributes":{"format":"fusilli"}},
+    {"id":"apples","origin":{"sourceId":"test-source","recordKey":"apples"},"name":"Test apples","attributes":{}}
+  ],
+  "packages": [
+    {"id":"pasta-pack","origin":{"sourceId":"test-source","recordKey":"pack-a"},"productId":"pasta","gtin":"0036000291452","weightMode":"FIXED","saleUnit":"PACKAGE","netContent":{"amount":"500","unit":"G"},"unitsPerPackage":2},
+    {"id":"apple-bulk","origin":{"sourceId":"test-source","recordKey":"pack-b"},"productId":"apples","weightMode":"VARIABLE","saleUnit":"KG"}
+  ],
+  "matches": [
+    {"origin":{"sourceId":"test-source","recordKey":"match-a"},"ingredientKey":"test-pasta-dry","mappingVersion":1,"packageId":"pasta-pack","kind":"EXACT","confidence":"HIGH"}
+  ],
+  "prices": [
+    {
+      "record":{"origin":{"sourceId":"test-source","recordKey":"offer-a"},"revision":1,"retailerId":"retailer-a","packageId":"pasta-pack","scope":{"type":"STORE","storeId":"store-a"},"observedOn":"2026-11-17","confidence":"HIGH"},
+      "amount":"1.2345","currency":"EUR","per":"PACKAGE","kind":"REGULAR"
+    },
+    {
+      "record":{"origin":{"sourceId":"test-source","recordKey":"offer-b"},"revision":2,"retailerId":"retailer-a","packageId":"apple-bulk","scope":{"type":"ONLINE","zoneId":"zone-a"},"observedOn":"2026-11-18","observedAt":"2026-11-18T10:00:00Z","confidence":"MEDIUM"},
+      "amount":"0.99","currency":"EUR","per":"KG","kind":"PROMOTIONAL","eligibility":"LOYALTY","validUntil":"2026-11-22"
+    }
+  ],
+  "availability": [
+    {
+      "record":{"origin":{"sourceId":"test-source","recordKey":"offer-a"},"revision":1,"retailerId":"retailer-a","packageId":"pasta-pack","scope":{"type":"ZONE","zoneId":"zone-a"},"observedOn":"2026-11-18","confidence":"LOW"},
+      "state":"OUT_OF_STOCK"
+    }
+  ]
+}

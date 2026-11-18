@@ -1,0 +1,288 @@
+openapi: 3.1.1
+info:
+  title: NutriNest Price Snapshots
+  version: 1.0.0
+  description: Read-only contract for regional snapshots from NutriNest's own backend.
+paths:
+  /v1/price-regions/{regionId}/manifest:
+    parameters:
+      - $ref: '#/components/parameters/RegionId'
+      - $ref: '#/components/parameters/IfNoneMatch'
+    get:
+      operationId: getPriceManifest
+      summary: Obtain the active publication for a region
+      responses:
+        '200':
+          description: Current publication. Clients revalidate on each synchronization.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Manifest' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '404': { description: Unknown region or latest publication is unavailable }
+        '429': { $ref: '#/components/responses/Retry' }
+        '503': { $ref: '#/components/responses/Retry' }
+  /v1/price-regions/{regionId}/snapshots/{revision}:
+    parameters:
+      - $ref: '#/components/parameters/RegionId'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      - name: revision
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/PublicationRevision' }
+    get:
+      operationId: getPriceSnapshot
+      summary: Download the immutable snapshot for a published revision
+      responses:
+        '200':
+          description: UTF-8 JSON. Validate length and SHA-256 after decompression, before installation.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Snapshot' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        '404': { description: Unknown region or revision }
+        '410': { description: Withdrawn or expired revision. It must no longer be used. }
+        '429': { $ref: '#/components/responses/Retry' }
+        '503': { $ref: '#/components/responses/Retry' }
+components:
+  parameters:
+    RegionId:
+      name: regionId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Id' }
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      schema: { type: string }
+  headers:
+    ETag:
+      description: Validator for this HTTP representation. A 304 does not renew snapshot expiry.
+      schema: { type: string }
+  responses:
+    NotModified:
+      description: Representation unchanged
+      headers:
+        ETag: { $ref: '#/components/headers/ETag' }
+    Retry:
+      description: Temporarily unavailable or rate limited
+      headers:
+        Retry-After:
+          description: HTTP date or delay in seconds
+          schema: { type: string }
+  schemas:
+    Id:
+      type: string
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$'
+    NullableId:
+      anyOf:
+        - $ref: '#/components/schemas/Id'
+        - type: 'null'
+    Label:
+      type: string
+      pattern: '\S'
+    PublicationRevision: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    PositiveInt: { type: integer, format: int32, minimum: 1, maximum: 2147483647 }
+    Confidence: { type: string, enum: [LOW, MEDIUM, HIGH] }
+    SaleUnit: { type: string, enum: [PACKAGE, KG] }
+    SnapshotHeader:
+      type: object
+      required: [contractVersion, regionId, revision, generatedAt, expiresAt]
+      properties:
+        contractVersion: { type: integer, const: 1 }
+        regionId: { $ref: '#/components/schemas/Id' }
+        revision: { $ref: '#/components/schemas/PublicationRevision' }
+        generatedAt: { type: string, format: date-time }
+        expiresAt:
+          type: string
+          format: date-time
+          description: Hard upper bound on offline use, strictly after generatedAt, at millisecond precision or coarser.
+    Manifest:
+      allOf:
+        - $ref: '#/components/schemas/SnapshotHeader'
+        - type: object
+          required: [sha256, byteLength]
+          properties:
+            sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+            byteLength: { type: integer, minimum: 1, maximum: 1048576 }
+    Snapshot:
+      description: >
+        Full replacement for a region, including an empty publication. Every reference must
+        resolve within this document. Includes only the published revision of each observation
+        by source and record key, separately for price and availability.
+      allOf:
+        - $ref: '#/components/schemas/SnapshotHeader'
+        - type: object
+          required: [sources, retailers, stores, zones, products, packages, matches, prices, availability]
+          properties:
+            sources: { type: array, items: { $ref: '#/components/schemas/PriceSource' } }
+            retailers: { type: array, items: { $ref: '#/components/schemas/Retailer' } }
+            stores: { type: array, items: { $ref: '#/components/schemas/Store' } }
+            zones: { type: array, items: { $ref: '#/components/schemas/PriceZone' } }
+            products: { type: array, items: { $ref: '#/components/schemas/Product' } }
+            packages: { type: array, items: { $ref: '#/components/schemas/ProductPackage' } }
+            matches: { type: array, items: { $ref: '#/components/schemas/IngredientProductMatch' } }
+            prices: { type: array, items: { $ref: '#/components/schemas/PriceObservation' } }
+            availability: { type: array, items: { $ref: '#/components/schemas/AvailabilityObservation' } }
+    Origin:
+      type: object
+      required: [sourceId, recordKey]
+      properties:
+        sourceId: { $ref: '#/components/schemas/Id' }
+        recordKey: { type: string, pattern: '\S', maxLength: 256 }
+    NamedRecord:
+      type: object
+      required: [id, origin, name]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        origin: { $ref: '#/components/schemas/Origin' }
+        name: { $ref: '#/components/schemas/Label' }
+    PriceSource:
+      type: object
+      required: [id, name, kind, licenseRef, attribution]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        name: { $ref: '#/components/schemas/Label' }
+        kind: { type: string, enum: [OPEN_DATA, LICENSED_FEED, AUTHORIZED_IMPORT] }
+        licenseRef: { $ref: '#/components/schemas/Label' }
+        attribution: { $ref: '#/components/schemas/Label' }
+    Retailer:
+      $ref: '#/components/schemas/NamedRecord'
+    Store:
+      allOf:
+        - $ref: '#/components/schemas/NamedRecord'
+        - type: object
+          required: [retailerId]
+          properties:
+            retailerId: { $ref: '#/components/schemas/Id' }
+            postalCode: { type: [string, 'null'], pattern: '^[0-9]{5}$' }
+    PriceZone:
+      allOf:
+        - $ref: '#/components/schemas/NamedRecord'
+        - type: object
+          required: [retailerId]
+          properties:
+            retailerId: { $ref: '#/components/schemas/Id' }
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/NamedRecord'
+        - type: object
+          required: [attributes]
+          properties:
+            brand: { type: [string, 'null'] }
+            variant: { type: [string, 'null'] }
+            attributes:
+              type: object
+              propertyNames: { pattern: '\S' }
+              additionalProperties: { type: string }
+    NetContent:
+      type: object
+      required: [amount, unit]
+      properties:
+        amount: { type: string, pattern: '^(?!0(?:[.]0+)?$)(0|[1-9][0-9]{0,8})([.][0-9]{1,3})?$' }
+        unit: { type: string, enum: [G, ML, UNIT] }
+      if:
+        properties: { unit: { const: UNIT } }
+      then:
+        properties: { amount: { pattern: '^[1-9][0-9]{0,8}([.]0{1,3})?$' } }
+    ProductPackage:
+      type: object
+      required: [id, origin, productId, weightMode, saleUnit]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        origin: { $ref: '#/components/schemas/Origin' }
+        productId: { $ref: '#/components/schemas/Id' }
+        gtin:
+          type: [string, 'null']
+          pattern: '^(?=.*[1-9])(?:[0-9]{8}|[0-9]{12,14})$'
+          description: Original GTIN, including leading zeroes. The check digit must be valid.
+        weightMode: { type: string, enum: [FIXED, VARIABLE] }
+        saleUnit: { $ref: '#/components/schemas/SaleUnit' }
+      oneOf:
+        - required: [netContent, unitsPerPackage]
+          properties:
+            weightMode: { const: FIXED }
+            saleUnit: { const: PACKAGE }
+            netContent: { $ref: '#/components/schemas/NetContent' }
+            unitsPerPackage: { $ref: '#/components/schemas/PositiveInt' }
+        - properties:
+            weightMode: { const: VARIABLE }
+            saleUnit: { const: KG }
+            netContent: { type: 'null' }
+            unitsPerPackage: { type: 'null' }
+    IngredientProductMatch:
+      type: object
+      required: [origin, ingredientKey, mappingVersion, packageId, kind, confidence]
+      properties:
+        origin: { $ref: '#/components/schemas/Origin' }
+        ingredientKey:
+          $ref: '#/components/schemas/Id'
+          description: Versioned editorial key shared with clients. No local database identifiers.
+        mappingVersion: { $ref: '#/components/schemas/PositiveInt' }
+        packageId: { $ref: '#/components/schemas/Id' }
+        kind: { type: string, enum: [EXACT, ALTERNATIVE] }
+        confidence: { $ref: '#/components/schemas/Confidence' }
+    Scope:
+      type: object
+      required: [type]
+      oneOf:
+        - required: [storeId]
+          properties:
+            type: { const: STORE }
+            storeId: { $ref: '#/components/schemas/Id' }
+            zoneId: { type: 'null' }
+        - required: [zoneId]
+          properties:
+            type: { const: ZONE }
+            storeId: { type: 'null' }
+            zoneId: { $ref: '#/components/schemas/Id' }
+        - properties:
+            type: { const: ONLINE }
+            storeId: { type: 'null' }
+            zoneId: { $ref: '#/components/schemas/NullableId' }
+        - properties:
+            type: { const: UNKNOWN }
+            storeId: { type: 'null' }
+            zoneId: { type: 'null' }
+    ObservationRecord:
+      type: object
+      required: [origin, revision, retailerId, packageId, scope, observedOn, confidence]
+      properties:
+        origin: { $ref: '#/components/schemas/Origin' }
+        revision: { $ref: '#/components/schemas/PositiveInt' }
+        retailerId: { $ref: '#/components/schemas/Id' }
+        packageId: { $ref: '#/components/schemas/Id' }
+        scope: { $ref: '#/components/schemas/Scope' }
+        observedOn: { type: string, format: date }
+        observedAt: { type: [string, 'null'], format: date-time }
+        confidence: { $ref: '#/components/schemas/Confidence' }
+    PriceObservation:
+      type: object
+      required: [record, amount, currency, per, kind]
+      properties:
+        record: { $ref: '#/components/schemas/ObservationRecord' }
+        amount:
+          type: string
+          pattern: '^(0|[1-9][0-9]{0,8})([.][0-9]{1,4})?$'
+        currency: { type: string, const: EUR }
+        per: { $ref: '#/components/schemas/SaleUnit' }
+        kind: { type: string, enum: [REGULAR, PROMOTIONAL] }
+        validUntil: { type: [string, 'null'], format: date }
+      oneOf:
+        - properties:
+            kind: { const: REGULAR }
+            eligibility: { type: 'null' }
+            validUntil: { type: 'null' }
+        - required: [eligibility]
+          properties:
+            kind: { const: PROMOTIONAL }
+            eligibility: { type: string, enum: [PUBLIC, LOYALTY, CONDITIONAL, UNKNOWN] }
+    AvailabilityObservation:
+      type: object
+      required: [record, state]
+      properties:
+        record: { $ref: '#/components/schemas/ObservationRecord' }
+        state: { type: string, enum: [IN_STOCK, OUT_OF_STOCK, LIMITED, UNKNOWN] }

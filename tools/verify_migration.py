@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run NutriNest's v4->v5 migration and food import offline.
+"""Run NutriNest's migrations and food import offline.
 
 This harness replays SQL extracted from Kotlin sources; instrumented tests
 validate the actual Kotlin backfill and Room callbacks. It executes migration SQL — extracted from the sources
@@ -9,6 +9,7 @@ checks the result.
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import sys
@@ -28,6 +29,7 @@ SRC = f"{REPO}/app/src/main/java/com/zame/nutrinest"
 DB_KT = f"{SRC}/data/local/NutriNestDatabase.kt"
 IMPORTER_KT = f"{SRC}/data/local/FoodDatabaseImporter.kt"
 ASSET = f"{REPO}/app/src/main/assets/nutrinest_foods.db"
+ROOM_SCHEMAS = f"{REPO}/app/schemas/com.zame.nutrinest.data.local.NutriNestDatabase"
 
 IMPORTED_ID_OFFSET = 1_000_000
 USER_ID_FLOOR = 2_000_000
@@ -45,7 +47,7 @@ def check(label: str, condition: bool, detail: str = "") -> None:
 
 # ── Fixture: a v1 database with user data in it ─────────────────────────────
 # Room generates the v1 schema; it is the one thing the harness states itself.
-# Everything after that comes from the real migrations in NutriNestDatabase.kt.
+# Everything after that comes from the Kotlin migrations or exported Room schema.
 
 V1_SCHEMA = [
     """CREATE TABLE `ingredients` (
@@ -646,9 +648,23 @@ def main() -> None:
     check("recipe ingredient IDs, grams and legacy units are identical", migrated == original)
     check("historical quantities have no inferred original amount or reference",
           not conn.execute("SELECT 1 FROM recipe_ingredients WHERE originalQuantity IS NOT NULL OR quantityEvidenceId IS NOT NULL").fetchall())
-    conn.execute("PRAGMA user_version=10")
+    print("\n9. v10 -> v11 additive price snapshot cache")
+    with open(f"{ROOM_SCHEMAS}/10.json", encoding="utf-8") as previous_schema:
+        old_entities = json.load(previous_schema)["database"]["entities"]
+    with open(f"{ROOM_SCHEMAS}/11.json", encoding="utf-8") as current_schema:
+        entities = json.load(current_schema)["database"]["entities"]
+    old_by_name = {e["tableName"]: e for e in old_entities}
+    new_by_name = {e["tableName"]: e for e in entities}
+    check("all original Room entities remain identical",
+          all(new_by_name.get(name) == entity for name, entity in old_by_name.items()))
+    added = new_by_name.keys() - old_by_name.keys()
+    check("the only new entity is price_snapshot_cache", added == {"price_snapshot_cache"})
+    cache = new_by_name["price_snapshot_cache"]
+    conn.execute(cache["createSql"].replace("${TABLE_NAME}", cache["tableName"]))
+    check("the new cache starts empty", not conn.execute("SELECT 1 FROM price_snapshot_cache").fetchall())
+    conn.execute("PRAGMA user_version=11")
 
-    print("\n9. Exact BEDCA source-to-v10 comparison")
+    print("\n10. Exact BEDCA source-to-v11 comparison")
     source_macros = asset.execute("""
         SELECT f.id + ?, m.kcal, m.protein_g, m.carbs_g, m.fat_g
         FROM foods f JOIN food_macros m ON m.food_id = f.id
@@ -667,8 +683,8 @@ def main() -> None:
         SELECT ingredientId, tag, value FROM ingredient_nutrients WHERE ingredientId > ? ORDER BY ingredientId, tag
     """, (IMPORTED_ID_OFFSET,)).fetchall()
     check(f"{len(source_nutrients)} imported nutrient rows match the asset exactly", source_nutrients == stored_nutrients)
-    check("v10 foreign keys are intact", not conn.execute("PRAGMA foreign_key_check").fetchall())
-    check("v10 SQLite integrity", conn.execute("PRAGMA integrity_check").fetchall() == [("ok",)])
+    check("v11 foreign keys are intact", not conn.execute("PRAGMA foreign_key_check").fetchall())
+    check("v11 SQLite integrity", conn.execute("PRAGMA integrity_check").fetchall() == [("ok",)])
     asset.close()
     conn.commit()
     conn.close()

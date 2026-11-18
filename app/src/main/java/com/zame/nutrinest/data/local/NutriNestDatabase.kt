@@ -1,6 +1,7 @@
 package com.zame.nutrinest.data.local
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -17,6 +18,7 @@ import com.zame.nutrinest.data.local.entity.ConversionEvidenceEntity
 import com.zame.nutrinest.data.local.entity.IngredientUnitOptionEntity
 import com.zame.nutrinest.data.local.dao.IngredientDao
 import com.zame.nutrinest.data.local.dao.MenuDao
+import com.zame.nutrinest.data.local.dao.PriceSnapshotDao
 import com.zame.nutrinest.data.local.dao.ProfileDao
 import com.zame.nutrinest.data.local.dao.RecipeDao
 import com.zame.nutrinest.data.local.entity.FoodDatasetMetaEntity
@@ -42,6 +44,7 @@ import com.zame.nutrinest.data.local.entity.ShoppingAisleEntity
 import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.local.entity.WeeklyMenuEntity
 import com.zame.nutrinest.data.local.entity.WeightEntryEntity
+import com.zame.nutrinest.data.prices.CachedPriceSnapshot
 import com.zame.nutrinest.util.TextNormalizer
 
 @Database(
@@ -71,9 +74,11 @@ import com.zame.nutrinest.util.TextNormalizer
         IngredientCanonicalMapEntity::class,
         IngredientCatalogStatusEntity::class,
         ConversionEvidenceEntity::class,
-        IngredientUnitOptionEntity::class
+        IngredientUnitOptionEntity::class,
+        CachedPriceSnapshot::class
     ],
-    version = 10,
+    version = 11,
+    autoMigrations = [AutoMigration(from = 10, to = 11)],
     exportSchema = true
 )
 @TypeConverters(ProfileConverters::class, MenuConverters::class)
@@ -85,6 +90,7 @@ abstract class NutriNestDatabase : RoomDatabase() {
     abstract fun recipeDao(): RecipeDao
     abstract fun profileDao(): ProfileDao
     abstract fun menuDao(): MenuDao
+    abstract fun priceSnapshotDao(): PriceSnapshotDao
 
     companion object {
         @Volatile private var instance: NutriNestDatabase? = null
