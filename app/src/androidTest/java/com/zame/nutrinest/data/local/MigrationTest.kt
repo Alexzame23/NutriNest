@@ -314,13 +314,14 @@ class MigrationTest {
     }
 
     @Test
-    fun allExportedOldVersionsReach9WithUserReferencesIntact() {
-        for (version in 4..8) {
-            val name = "catalog-from-$version.db"
+    fun allExportedOldVersionsReach10WithUserReferencesIntact() {
+        for (version in 4..9) {
+            val name = "catalog-to10-from-$version.db"
             helper.createDatabase(name, version).use { CatalogTestFixtures.seed(it, version) }
             val migrations = arrayOf(NutriNestDatabase.MIGRATION_4_5, NutriNestDatabase.MIGRATION_5_6,
-                NutriNestDatabase.MIGRATION_6_7, NutriNestDatabase.MIGRATION_7_8, NutriNestDatabase.MIGRATION_8_9)
-            helper.runMigrationsAndValidate(name, 9, true, *migrations).use { db ->
+                NutriNestDatabase.MIGRATION_6_7, NutriNestDatabase.MIGRATION_7_8, NutriNestDatabase.MIGRATION_8_9,
+                NutriNestDatabase.MIGRATION_9_10)
+            helper.runMigrationsAndValidate(name, 10, true, *migrations).use { db ->
                 assertEquals(137.123456789, db.query("SELECT grams FROM recipe_ingredients WHERE recipeId=21").use { it.moveToFirst(); it.getDouble(0) }, 0.0)
                 assertEquals(543.210987, db.query("SELECT grams FROM shopping_items WHERE id=43").use { it.moveToFirst(); it.getDouble(0) }, 0.0)
                 assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT purchased FROM shopping_items WHERE id=43"))
@@ -331,6 +332,33 @@ class MigrationTest {
                 assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM weight_entries WHERE id=32 AND profileId=31"))
                 if (version >= 5) assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT isFavorite FROM ingredients WHERE id=11"))
                 if (version >= 7) assertEquals(1L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM intake_entries WHERE id=51"))
+                db.query("PRAGMA foreign_key_check").use { assertTrue(!it.moveToFirst()) }
+            }
+        }
+    }
+
+    @Test
+    fun partialV6RecoversMissingTablesWithoutRebuildingProfileMeals() {
+        for (missing in listOf("intake_entries", "profile_meal_plans")) {
+            val name = "partial-v6-$missing.db"
+            val tables = listOf("weekly_menus", "planned_meals", "meal_portions", "profile_meal_plans",
+                "intake_entries", "shopping_items").filterNot { it == missing }
+            val before = helper.createDatabase(name, 6).use { db ->
+                CatalogTestFixtures.seed(db, 6)
+                // Model a pre-release install that ran per-profile DDL before
+                // publishing its v6 marker. Exported v6 predates that DDL.
+                NutriNestDatabase.MIGRATION_5_6.migrate(db)
+                db.execSQL("UPDATE planned_meals SET profileId=31,course='MAIN' WHERE id=42")
+                db.execSQL("UPDATE meal_portions SET baseFactor=0.925 WHERE plannedMealId=42")
+                db.execSQL("INSERT INTO profile_meal_plans VALUES (31,'LUNCH',0.43,0)")
+                db.execSQL("INSERT INTO intake_entries (id,profileId,dayStart,label,grams,kcal,carbs,fats,protein,loggedAt) VALUES (51,31,123,'Fixture intake',87.123,101.2,3.4,5.6,7.8,999)")
+                db.execSQL("DROP TABLE $missing")
+                CatalogTestFixtures.snapshot(db, tables)
+            }
+            helper.runMigrationsAndValidate(name, 10, true, NutriNestDatabase.MIGRATION_6_7,
+                NutriNestDatabase.MIGRATION_7_8, NutriNestDatabase.MIGRATION_8_9, NutriNestDatabase.MIGRATION_9_10).use { db ->
+                assertEquals(before, CatalogTestFixtures.snapshot(db, tables))
+                assertEquals(0L, CatalogTestFixtures.scalar(db, "SELECT COUNT(*) FROM $missing"))
                 db.query("PRAGMA foreign_key_check").use { assertTrue(!it.moveToFirst()) }
             }
         }

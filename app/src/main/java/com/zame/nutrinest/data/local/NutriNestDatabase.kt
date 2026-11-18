@@ -462,12 +462,12 @@ abstract class NutriNestDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Some pre-release v6 databases ran an incomplete per-person
                 // migration. Finish it here so those installs can recover.
-                if (!tableExists(db, "profile_meal_plans")) {
-                    addMenuScopeColumns(db)
+                addMenuScopeColumns(db)
+                if (!columnExists(db, "planned_meals", "profileId")) {
                     rebuildPlannedMeals(db)
-                    addPortionBaseFactor(db)
-                    createPerPersonTables(db)
                 }
+                addPortionBaseFactor(db)
+                createPerPersonTables(db)
                 if (!columnExists(db, "recipes", "coverImageCrop")) {
                     db.execSQL(
                         "ALTER TABLE `recipes` ADD COLUMN `coverImageCrop` " +
@@ -520,11 +520,6 @@ abstract class NutriNestDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `recipe_ingredients` ADD COLUMN `quantityEvidenceId` TEXT")
             }
         }
-
-        private fun tableExists(db: SupportSQLiteDatabase, table: String): Boolean =
-            db.query(
-                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '$table'"
-            ).use { it.moveToFirst() }
 
         private fun columnExists(
             db: SupportSQLiteDatabase,

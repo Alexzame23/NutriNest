@@ -639,7 +639,7 @@ def main() -> None:
     with open(DB_KT, encoding="utf-8") as database_file:
         source = database_file.read()
     start = source.index("internal val MIGRATION_9_10")
-    end = source.index("private fun tableExists", start)
+    end = source.index("private fun columnExists", start)
     for statement in extract_exec_sql(source[start:end]):
         conn.execute(statement)
     migrated = conn.execute("SELECT recipeId, ingredientId, grams, quantityUnit FROM recipe_ingredients ORDER BY 1, 2").fetchall()
@@ -647,6 +647,29 @@ def main() -> None:
     check("historical quantities have no inferred original amount or reference",
           not conn.execute("SELECT 1 FROM recipe_ingredients WHERE originalQuantity IS NOT NULL OR quantityEvidenceId IS NOT NULL").fetchall())
     conn.execute("PRAGMA user_version=10")
+
+    print("\n9. Exact BEDCA source-to-v10 comparison")
+    source_macros = asset.execute("""
+        SELECT f.id + ?, m.kcal, m.protein_g, m.carbs_g, m.fat_g
+        FROM foods f JOIN food_macros m ON m.food_id = f.id
+        WHERE f.is_deprecated = 0 AND f.id != 2494 ORDER BY f.id
+    """, (IMPORTED_ID_OFFSET,)).fetchall()
+    stored_macros = conn.execute("""
+        SELECT id, kcal, protein, carbs, fats FROM ingredients WHERE id > ? ORDER BY id
+    """, (IMPORTED_ID_OFFSET,)).fetchall()
+    check(f"{len(source_macros)} imported macro panels match the asset exactly", source_macros == stored_macros)
+    source_nutrients = asset.execute("""
+        SELECT f.id + ?, n.tag, n.value
+        FROM foods f JOIN food_nutrients n ON n.food_id = f.id
+        WHERE f.is_deprecated = 0 AND f.id != 2494 ORDER BY f.id, n.tag
+    """, (IMPORTED_ID_OFFSET,)).fetchall()
+    stored_nutrients = conn.execute("""
+        SELECT ingredientId, tag, value FROM ingredient_nutrients WHERE ingredientId > ? ORDER BY ingredientId, tag
+    """, (IMPORTED_ID_OFFSET,)).fetchall()
+    check(f"{len(source_nutrients)} imported nutrient rows match the asset exactly", source_nutrients == stored_nutrients)
+    check("v10 foreign keys are intact", not conn.execute("PRAGMA foreign_key_check").fetchall())
+    check("v10 SQLite integrity", conn.execute("PRAGMA integrity_check").fetchall() == [("ok",)])
+    asset.close()
     conn.commit()
     conn.close()
     print()

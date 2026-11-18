@@ -29,13 +29,13 @@ internal object CatalogTestFixtures {
         if (version >= 5) {
             db.execSQL("UPDATE ingredients SET isFavorite=1, usageCount=7, nameNorm='fixture', densityGml=1.07, sourceKey='BEDCA:123' WHERE id=11")
             db.execSQL("UPDATE ingredients SET sourceKey='BEDCA:123' WHERE id=12")
-            db.execSQL("INSERT INTO ingredient_categories VALUES ('EGGS','Eggs','Huevos','egg','#FFFFFF',1)")
+            db.execSQL("INSERT OR IGNORE INTO ingredient_categories VALUES ('EGGS','Eggs','Huevos','egg','#FFFFFF',1)")
             db.execSQL("INSERT INTO shopping_aisles VALUES ('FIXTURE','Fixture','Fixture',1)")
             db.execSQL("INSERT INTO nutrient_defs VALUES ('FIXTURE','Fixture','Fixture','g','fixture',0,1,NULL)")
             db.execSQL("INSERT INTO ingredient_nutrients VALUES (11,'FIXTURE',0.123456789)")
-            db.execSQL("INSERT INTO ingredient_portions VALUES (61,11,'Synthetic unit','Unidad ficticia',43.7,'UNIT',1)")
-            db.execSQL("INSERT INTO ingredient_aliases VALUES (62,11,'Fixture alias','fixture alias','en')")
-            db.execSQL("INSERT INTO ingredient_quality_issues VALUES (63,11,'FIXTURE','WARNING','Preserve')")
+            db.execSQL("INSERT INTO ingredient_portions VALUES (900061,11,'Synthetic unit','Unidad ficticia',43.7,'UNIT',1)")
+            db.execSQL("INSERT INTO ingredient_aliases VALUES (900062,11,'Fixture alias','fixture alias','en')")
+            db.execSQL("INSERT INTO ingredient_quality_issues VALUES (900063,11,'FIXTURE','WARNING','Preserve')")
             db.execSQL("INSERT INTO food_dataset_meta VALUES ('fixture','original metadata')")
         }
         if (version >= 8) {
@@ -45,8 +45,12 @@ internal object CatalogTestFixtures {
     }
 
     /** Independent raw row snapshots (including NULL/type and exact double bits). */
-    fun snapshot(db: SupportSQLiteDatabase, tables: List<String>): Map<String, List<String>> = tables.associateWith { table ->
-        db.query("SELECT * FROM `$table`").use { c ->
+    fun snapshot(
+        db: SupportSQLiteDatabase,
+        tables: List<String>,
+        projections: Map<String, String> = emptyMap()
+    ): Map<String, List<String>> = tables.associateWith { table ->
+        db.query("SELECT ${projections[table] ?: "*"} FROM `$table`").use { c ->
             buildList { while (c.moveToNext()) add((0 until c.columnCount).joinToString("|") { i ->
                 val value = when (c.getType(i)) {
                     Cursor.FIELD_TYPE_NULL -> "NULL"

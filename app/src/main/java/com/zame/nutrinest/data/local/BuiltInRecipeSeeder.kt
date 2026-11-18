@@ -26,18 +26,33 @@ internal object BuiltInRecipeSeeder {
         if (db.meta(VERSION_META_KEY) == LIBRARY_VERSION) return
 
         val ingredientIds = mutableMapOf<Long, Long>()
-        db.query(
-            "SELECT i.id, i.sourceKey FROM ingredients i " +
-                "JOIN ingredient_canonical_map m ON m.ingredient_id=i.id " +
-                "JOIN catalog_revision r ON r.revision_id=m.origin_revision_id " +
-                "WHERE m.source_namespace='BEDCA' AND m.source_head_slot=1 AND i.isCustom=0 " +
-                "AND r.source_sha256=(SELECT value FROM food_dataset_meta WHERE `key`='dataset_asset_sha256')"
-        ).use { cursor ->
+        val neededIds = BuiltInRecipeLibrary.recipes.flatMap { it.ingredients }.map { it.bedcaFoodId }.toSet()
+        db.query("""
+            SELECT i.id, i.sourceKey, m.source_namespace, m.record_sha256
+            FROM ingredients i
+            JOIN ingredient_canonical_map m ON m.ingredient_id=i.id
+            JOIN canonical_ingredients c ON c.canonical_id=m.canonical_id
+            JOIN catalog_revision origin ON origin.revision_id=m.origin_revision_id
+            JOIN catalog_revision editorial ON editorial.revision_id=c.updated_revision_id
+            JOIN food_dataset_meta asset ON asset.key='dataset_asset_sha256'
+            WHERE i.isCustom=0 AND (
+                (m.source_namespace='BEDCA' AND m.source_head_slot=1 AND origin.source_sha256=asset.value)
+                OR
+                (m.mapping_basis='LEGACY_SINGLETON' AND m.source_namespace LIKE 'LEGACY:%'
+                 AND editorial.revision_key='curation:' || ? || ':' || asset.value
+                 AND editorial.state='APPLIED' AND c.variant_key=lower(i.sourceKey))
+            )
+        """.trimIndent(), arrayOf(CuratedCatalog.VERSION)).use { cursor ->
             while (cursor.moveToNext()) {
-                cursor.getString(1)
-                    .removePrefix("BEDCA:")
-                    .toLongOrNull()
-                    ?.let { bedcaId -> ingredientIds[bedcaId] = cursor.getLong(0) }
+                val ingredientId = cursor.getLong(0)
+                val foodId = cursor.getString(1)?.removePrefix("BEDCA:")?.toLongOrNull() ?: continue
+                if (foodId !in neededIds) continue
+                // The curation matched the complete v8 snapshot. Use it only to fill
+                // missing library entries, without promoting its provenance or replacing recipes.
+                if (cursor.getString(2) != "BEDCA" &&
+                    (ingredientId != FoodDatabaseImporter.IMPORTED_ID_OFFSET + foodId ||
+                        CanonicalCatalogStore.ingredientFingerprint(db, ingredientId) != cursor.getString(3))) continue
+                ingredientIds[foodId] = ingredientId
             }
         }
         // The food import may have failed or not run yet. Do not burn the
