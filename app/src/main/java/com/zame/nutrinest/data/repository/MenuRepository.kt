@@ -58,7 +58,7 @@ interface MenuRepository {
     fun observeDayMeals(weekStart: Long, day: Int): Flow<List<PlannedMealWithPortions>>
 
     suspend fun setPurchased(itemId: Long, purchased: Boolean)
-    suspend fun getIngredientsOf(recipeId: Long): List<IngredientWithQuantity>
+    fun observeIngredientsOf(recipeId: Long): Flow<List<IngredientWithQuantity>>
     suspend fun hasMenu(weekStart: Long): Boolean
 
     /** Runs the generator for [weekStart] and persists the result. */
@@ -117,7 +117,7 @@ class LocalMenuRepository(
 
     override suspend fun setPurchased(itemId: Long, purchased: Boolean) =
         dao.setPurchased(itemId, purchased)
-    override suspend fun getIngredientsOf(recipeId: Long) = dao.getIngredientsOf(recipeId)
+    override fun observeIngredientsOf(recipeId: Long) = database.recipeDao().observeIngredientsOf(recipeId)
     override suspend fun hasMenu(weekStart: Long) = dao.getMenu(weekStart) != null
 
     // ── Generation ──────────────────────────────────────────────────────

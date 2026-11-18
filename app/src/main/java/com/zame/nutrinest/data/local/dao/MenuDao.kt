@@ -227,7 +227,8 @@ interface MenuDao {
 
     /**
      * Replaces the menu for [weekStart] in one transaction: deletes the old
-     * one (cascading meals/portions/shopping items) and writes the new plan.
+     * one (cascading meals/portions/shopping items) and writes the new plan,
+     * carrying the purchased flags for ingredients still on the list.
      */
     @Transaction
     suspend fun replaceMenu(
@@ -249,6 +250,7 @@ interface MenuDao {
         require(shoppingItems.all { it.grams.isFinite() && it.grams > 0.0 }) {
             "Shopping quantities must be finite and positive"
         }
+        val purchased = getMenu(weekStart)?.let { purchasedIngredientIds(it.id).toSet() }.orEmpty()
         deleteMenu(weekStart)
         val menuId = insertMenu(
             WeeklyMenuEntity(
@@ -263,7 +265,9 @@ interface MenuDao {
             portions.map { it.copy(plannedMealId = mealId) }
         }
         insertPortions(allPortions)
-        insertShoppingItems(shoppingItems.map { it.copy(menuId = menuId) })
+        insertShoppingItems(shoppingItems.map {
+            it.copy(menuId = menuId, purchased = it.purchased || it.ingredientId in purchased)
+        })
         return menuId
     }
 

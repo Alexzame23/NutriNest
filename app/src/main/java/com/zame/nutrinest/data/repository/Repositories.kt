@@ -5,6 +5,7 @@ import com.zame.nutrinest.data.local.NutriNestDatabase
 import com.zame.nutrinest.data.local.CanonicalCatalogStore
 
 import com.zame.nutrinest.data.local.dao.FoodReferenceDao
+import com.zame.nutrinest.data.local.dao.CatalogPresentation
 import com.zame.nutrinest.data.local.dao.IngredientDao
 import com.zame.nutrinest.data.local.dao.RecipeDao
 import com.zame.nutrinest.data.local.dao.TagValue
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.map
  */
 interface IngredientRepository {
     fun observeAll(): Flow<List<IngredientEntity>>
+    fun observeCatalogPresentation(): Flow<Map<Long, CatalogPresentation>>
     fun observeRecipeMeasures(): Flow<Map<Long, List<RecipeMeasure>>>
     fun search(query: String): Flow<List<IngredientEntity>>
 
@@ -126,8 +128,7 @@ class LocalIngredientRepository(private val database: NutriNestDatabase) : Ingre
     private val dao = database.ingredientDao()
 
     private fun Flow<List<IngredientEntity>>.withCatalogPresentation(): Flow<List<IngredientEntity>> =
-        combine(dao.observeCatalogPresentation()) { items, presentation ->
-            val byId = presentation.associateBy { it.ingredientId }
+        combine(observeCatalogPresentation()) { items, byId ->
             items.map { item ->
                 item.copy().apply {
                     byId[id]?.let { display ->
@@ -140,6 +141,9 @@ class LocalIngredientRepository(private val database: NutriNestDatabase) : Ingre
         }
 
     override fun observeAll() = dao.observeAll().withCatalogPresentation()
+
+    override fun observeCatalogPresentation() =
+        dao.observeCatalogPresentation().map { entries -> entries.associateBy { it.ingredientId } }
 
     override fun observeRecipeMeasures() = database.canonicalCatalogDao().observeRecipeMeasures().map { rows ->
         rows.groupBy { it.evidence.ingredientId }.mapValues { (_, options) ->

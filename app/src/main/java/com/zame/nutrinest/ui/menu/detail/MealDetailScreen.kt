@@ -50,7 +50,7 @@ import com.zame.nutrinest.ui.components.MacroDonutChart
 import com.zame.nutrinest.ui.components.NutritionSummary
 import com.zame.nutrinest.ui.components.OptionDropdown
 import com.zame.nutrinest.ui.components.SlowMarqueeText
-import com.zame.nutrinest.ui.components.formatSavedRecipeQuantity
+import com.zame.nutrinest.ui.menu.formatMealIngredientQuantity
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.recipes.toRecipeImageAlignment
 import java.io.File
@@ -230,16 +230,16 @@ fun MealDetailScreen(
                         state.baseIngredients.forEach { ingredient ->
                             Row(Modifier.fillMaxWidth()) {
                                 Text(
-                                    ingredient.ingredient.displayName(spanish),
+                                    state.ingredientCatalog.nameOf(ingredient.ingredient, spanish),
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatSavedRecipeQuantity(
-                                        ingredient.quantity,
-                                        options = emptyList(),
+                                    formatMealIngredientQuantity(
+                                        ingredient,
+                                        options = state.ingredientCatalog.measures[ingredient.ingredient.id].orEmpty(),
                                         spanish = spanish,
-                                        scale = portion.portion.factor
+                                        factor = portion.portion.factor
                                     ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
@@ -263,16 +263,16 @@ fun MealDetailScreen(
                         state.baseIngredients.forEach { ingredient ->
                             Row(Modifier.fillMaxWidth()) {
                                 Text(
-                                    ingredient.ingredient.displayName(spanish),
+                                    state.ingredientCatalog.nameOf(ingredient.ingredient, spanish),
                                     style = MaterialTheme.typography.bodyLarge,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    formatSavedRecipeQuantity(
-                                        ingredient.quantity,
-                                        options = emptyList(),
+                                    formatMealIngredientQuantity(
+                                        ingredient,
+                                        options = state.ingredientCatalog.measures[ingredient.ingredient.id].orEmpty(),
                                         spanish = spanish,
-                                        scale = state.householdFactor
+                                        factor = state.householdFactor
                                     ),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold

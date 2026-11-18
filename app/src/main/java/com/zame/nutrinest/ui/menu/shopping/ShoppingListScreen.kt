@@ -31,6 +31,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -47,22 +48,38 @@ import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.ShoppingItemWithIngredient
+import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.MenuRepository
-import com.zame.nutrinest.ui.components.formatWeight
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
+import com.zame.nutrinest.ui.menu.ShoppingQuantity
+import com.zame.nutrinest.ui.menu.formatNaturalQuantity
+import com.zame.nutrinest.ui.menu.formatShoppingWeight
+import com.zame.nutrinest.ui.menu.observeMenuIngredientCatalog
 import com.zame.nutrinest.util.WeekUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.text.Collator
+import java.util.Locale
+
+internal data class ShoppingRow(
+    val source: ShoppingItemWithIngredient,
+    val nameEn: String,
+    val nameEs: String,
+    val quantity: ShoppingQuantity
+) {
+    fun name(spanish: Boolean): String = if (spanish) nameEs else nameEn
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShoppingListViewModel(
-    private val repository: MenuRepository
+    private val repository: MenuRepository,
+    ingredientRepository: IngredientRepository
 ) : ViewModel() {
 
     private val viewingWeekStart = MutableStateFlow(WeekUtils.weekStartOf())
@@ -70,19 +87,17 @@ class ShoppingListViewModel(
         .map { it == WeekUtils.weekStartOf() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    /**
-     * Ingredient category → items, in the food dataset's own category order
-     * rather than alphabetically, so the list reads produce-first the way a
-     * shop is laid out.
-     */
-    val groupedItems = viewingWeekStart
+    internal val rows = viewingWeekStart
         .flatMapLatest { repository.observeShoppingItems(it) }
-        .map { items ->
-            items
-                .sortedBy { it.ingredient.name.lowercase() }
-                .groupBy { it.ingredient.categoryKey }
-                .toList()
-                .sortedBy { (key, _) -> IngredientCategories.ALL.indexOf(key) }
+        .combine(ingredientRepository.observeMenuIngredientCatalog()) { items, catalog ->
+            items.map { row ->
+                ShoppingRow(
+                    row,
+                    nameEn = catalog.nameOf(row.ingredient, spanish = false),
+                    nameEs = catalog.nameOf(row.ingredient, spanish = true),
+                    quantity = ShoppingQuantity.from(row.item.grams, catalog.measures[row.item.ingredientId].orEmpty())
+                )
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -99,7 +114,7 @@ class ShoppingListViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp
-                ShoppingListViewModel(app.container.menuRepository)
+                ShoppingListViewModel(app.container.menuRepository, app.container.ingredientRepository)
             }
         }
     }
@@ -111,8 +126,9 @@ fun ShoppingListScreen(
     onBack: () -> Unit,
     viewModel: ShoppingListViewModel = viewModel(factory = ShoppingListViewModel.Factory)
 ) {
-    val grouped by viewModel.groupedItems.collectAsStateWithLifecycle()
+    val rows by viewModel.rows.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
+    val grouped = remember(rows, spanish) { groupShoppingRows(rows, spanish) }
     val isCurrentWeek by viewModel.isCurrentWeek.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -197,10 +213,10 @@ fun ShoppingListScreen(
                                 modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
                             )
                         }
-                        items(items.size, key = { i -> items[i].item.id }) { i ->
+                        items(items.size, key = { i -> items[i].source.item.id }) { i ->
                             val item = items[i]
                             Card(
-                                onClick = { viewModel.togglePurchased(item) },
+                                onClick = { viewModel.togglePurchased(item.source) },
                                 shape = MaterialTheme.shapes.small,
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surface
@@ -211,33 +227,54 @@ fun ShoppingListScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Checkbox(
-                                        checked = item.item.purchased,
-                                        onCheckedChange = { viewModel.togglePurchased(item) }
+                                        checked = item.source.item.purchased,
+                                        onCheckedChange = { viewModel.togglePurchased(item.source) }
                                     )
-                                    Text(
-                                        item.ingredient.displayName(spanish),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        textDecoration =
-                                            if (item.item.purchased) TextDecoration.LineThrough
-                                            else null,
-                                        color =
-                                            if (item.item.purchased)
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            else MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Text(
-                                        formatWeight(item.item.grams),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    ShoppingItemText(item, spanish, Modifier.weight(1f))
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+internal fun groupShoppingRows(rows: List<ShoppingRow>, spanish: Boolean): List<Pair<String, List<ShoppingRow>>> {
+    val collator = Collator.getInstance(if (spanish) Locale.forLanguageTag("es") else Locale.ENGLISH)
+    return rows.groupBy { it.source.ingredient.categoryKey }
+        .toList()
+        .sortedBy { (key, _) -> IngredientCategories.ALL.indexOf(key) }
+        .map { (key, items) ->
+            key to items.sortedWith { a, b -> collator.compare(a.name(spanish), b.name(spanish)) }
+        }
+}
+
+@Composable
+internal fun ShoppingItemText(row: ShoppingRow, spanish: Boolean, modifier: Modifier = Modifier) {
+    val purchased = row.source.item.purchased
+    val quantity = row.quantity
+    val weight = formatShoppingWeight(quantity.requiredGrams)
+    val required = quantity.required?.let { formatNaturalQuantity(it, spanish) + " · " + weight } ?: weight
+    Column(modifier.padding(vertical = 8.dp)) {
+        Text(
+            row.name(spanish),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            textDecoration = if (purchased) TextDecoration.LineThrough else null,
+            color = if (purchased) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            stringResource(R.string.shopping_quantity_required, required),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        quantity.toBuy?.let {
+            Text(
+                stringResource(R.string.shopping_quantity_to_buy, formatNaturalQuantity(it, spanish)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

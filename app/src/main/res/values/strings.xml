@@ -517,6 +517,8 @@
 
     <!-- ── Shopping list ──────────────────────────────────────────── -->
     <string name="shopping_list_title">Shopping List</string>
+    <string name="shopping_quantity_required">Needed · %1$s</string>
+    <string name="shopping_quantity_to_buy">Estimated to buy · %1$s</string>
     <string name="shopping_list_empty_title">Nothing to buy yet</string>
     <string name="shopping_list_empty_body">Generate a weekly menu and the list fills itself automatically.</string>
 

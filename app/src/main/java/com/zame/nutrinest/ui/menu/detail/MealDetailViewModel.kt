@@ -14,14 +14,16 @@ import com.zame.nutrinest.data.local.entity.PlannedMealWithRecipe
 import com.zame.nutrinest.data.local.entity.PortionWithProfile
 import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.data.local.entity.RecipeStepEntity
+import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.MealScopeTarget
 import com.zame.nutrinest.data.repository.MenuRepository
 import com.zame.nutrinest.data.repository.RecipeRepository
+import com.zame.nutrinest.ui.menu.MenuIngredientCatalog
+import com.zame.nutrinest.ui.menu.observeMenuIngredientCatalog
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -30,6 +32,7 @@ data class MealDetailUiState(
     val meal: PlannedMealWithRecipe? = null,
     val steps: List<RecipeStepEntity> = emptyList(),
     val baseIngredients: List<IngredientWithQuantity> = emptyList(),
+    val ingredientCatalog: MenuIngredientCatalog = MenuIngredientCatalog(),
     val portions: List<PortionWithProfile> = emptyList(),
     val profiles: List<ProfileEntity> = emptyList()
 ) {
@@ -73,6 +76,7 @@ data class MealDetailUiState(
 class MealDetailViewModel(
     private val repository: MenuRepository,
     recipeRepository: RecipeRepository,
+    ingredientRepository: IngredientRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -92,18 +96,16 @@ class MealDetailViewModel(
                         ?: flowOf(emptyList()),
                     repository.observePortions(mealId),
                     repository.observeProfiles(),
-                    flow {
-                        emit(
-                            mealWithRecipe.recipe
-                                ?.let { repository.getIngredientsOf(it.id) }
-                                ?: emptyList()
-                        )
-                    }
-                ) { steps, portions, profiles, ingredients ->
+                    mealWithRecipe.recipe
+                        ?.let { repository.observeIngredientsOf(it.id) }
+                        ?: flowOf(emptyList()),
+                    ingredientRepository.observeMenuIngredientCatalog()
+                ) { steps, portions, profiles, ingredients, catalog ->
                     MealDetailUiState(
                         meal = mealWithRecipe,
                         steps = steps,
                         baseIngredients = ingredients,
+                        ingredientCatalog = catalog,
                         portions = portions.sortedBy { it.profile.name },
                         profiles = profiles
                     )
@@ -142,6 +144,7 @@ class MealDetailViewModel(
                 MealDetailViewModel(
                     app.container.menuRepository,
                     app.container.recipeRepository,
+                    app.container.ingredientRepository,
                     createSavedStateHandle()
                 )
             }

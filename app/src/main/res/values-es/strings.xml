@@ -523,6 +523,8 @@
     <string name="intake_invalid_values">Usa calorías positivas y valores numéricos no negativos para los macros.</string>
 
     <string name="shopping_list_title">Lista de la compra</string>
+    <string name="shopping_quantity_required">Necesario · %1$s</string>
+    <string name="shopping_quantity_to_buy">Compra estimada · %1$s</string>
     <string name="shopping_list_empty_title">Todavía no hay nada que comprar</string>
     <string name="shopping_list_empty_body">Genera un menú semanal y la lista se rellenará sola.</string>
 
