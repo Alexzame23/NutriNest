@@ -34,6 +34,13 @@ jobs:
       - name: Translations are complete and consistent
         run: python3 tools/check_strings.py
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Price provider contracts
+        run: node --test backend/prices/provider.test.mjs
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

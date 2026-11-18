@@ -49,6 +49,23 @@ async function main() {
     }
     console.log('OpenAPI, manifest, shared JSON fixture and 7 negative wire cases passed');
 
+    const { FakePriceProvider } = await import('../backend/prices/fake-price-provider.mjs');
+    const provider = await FakePriceProvider.load();
+    const { source, retailers, stores } = provider.getMetadata();
+    const { items } = provider.listCatalog();
+    // The publisher will assign revisions when it persists price candidates.
+    const candidateSnapshot = {
+        contractVersion, regionId, revision, generatedAt, expiresAt,
+        sources: [source], retailers, stores, zones: [],
+        products: items.map(item => item.product), packages: items.map(item => item.package),
+        matches: [], availability: [],
+        prices: provider.listPrices(stores[0].id).items.map(price => ({
+            ...price, record: { ...price.record, revision: 1 },
+        })),
+    };
+    assert(validateSnapshot(candidateSnapshot), JSON.stringify(validateSnapshot.errors));
+    console.log('Normalized simulated batch maps to the Phase 11 snapshot schema');
+
     const db = new PGlite();
     try {
         await db.exec(readFileSync('docs/prices/11-commercial-schema.sql', 'utf8'));

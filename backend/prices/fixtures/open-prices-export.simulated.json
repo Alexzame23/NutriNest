@@ -1,0 +1,34 @@
+{
+  "simulated": true,
+  "plan": {
+    "from": "2026-11-01",
+    "through": "2026-11-18",
+    "stores": [
+      {
+        "locationId": 101,
+        "osmId": 99101,
+        "osmType": "NODE",
+        "name": "Tienda simulada",
+        "retailerKey": "test-retailer",
+        "retailerName": "Cadena simulada"
+      }
+    ],
+    "products": [
+      {
+        "externalId": "pack-v1",
+        "gtin": "0036000291452",
+        "name": "Pasta simulada",
+        "netContent": { "amount": "500", "unit": "G" },
+        "unitsPerPackage": 1
+      }
+    ]
+  },
+  "locations": [
+    { "id": 101, "type": "OSM", "osm_id": 99101, "osm_type": "NODE", "osm_address_country_code": "ES", "osm_address_postcode": "08001" },
+    { "id": 102, "type": "OSM", "osm_id": 99102, "osm_type": "NODE", "osm_address_country_code": "FR" }
+  ],
+  "prices": [
+    { "id": 501, "location_id": 101, "type": "PRODUCT", "product_code": "036000291452", "date": "2026-11-15", "currency": "EUR", "price": "1.500", "price_per": null, "price_is_discounted": false, "duplicate_of": null },
+    { "id": 502, "location_id": 101, "type": "PRODUCT", "product_code": "0036000291452", "date": "2026-11-17", "currency": "EUR", "price": "1.200", "price_per": null, "price_is_discounted": false, "duplicate_of": null, "owner": "test-private-input", "proof_id": 42 }
+  ]
+}

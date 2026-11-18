@@ -1,0 +1,25 @@
+{
+  "simulated": true,
+  "retailerName": "Cadena simulada",
+  "storeName": "Tienda simulada",
+  "products": [
+    {
+      "externalId": "pasta",
+      "gtin": "0036000291452",
+      "name": "Pasta simulada",
+      "netContent": { "amount": "500", "unit": "G" },
+      "unitsPerPackage": 1
+    },
+    {
+      "externalId": "juice",
+      "gtin": "4006381333931",
+      "name": "Zumo simulado",
+      "netContent": { "amount": "1000", "unit": "ML" },
+      "unitsPerPackage": 1
+    }
+  ],
+  "prices": [
+    { "externalId": "offer-1", "productExternalId": "pasta", "observedOn": "2026-11-17", "amount": "1.2345" },
+    { "externalId": "offer-2", "productExternalId": "juice", "observedOn": "2026-11-17", "amount": "2.35" }
+  ]
+}
