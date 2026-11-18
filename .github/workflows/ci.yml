@@ -39,7 +39,7 @@ jobs:
           node-version: '24'
 
       - name: Price provider and synchronization contracts
-        run: node --test backend/prices/provider.test.mjs backend/prices/price-sync.test.mjs
+        run: node --test backend/prices/provider.test.mjs backend/prices/price-sync.test.mjs backend/prices/matching.test.mjs
 
       - uses: actions/setup-java@v4
         with:
