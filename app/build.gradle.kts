@@ -1,7 +1,18 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+val retailPriceBaseUrl = providers.gradleProperty("nutrinestRetailPriceBaseUrl").orElse("").get().trim()
+if (retailPriceBaseUrl.isNotEmpty()) {
+    val url = URI(retailPriceBaseUrl)
+    require(url.scheme == "https" && url.host != null && url.rawUserInfo == null &&
+        url.rawQuery == null && url.rawFragment == null) {
+        "nutrinestRetailPriceBaseUrl must be an HTTPS publisher URL without credentials, query or fragment"
+    }
 }
 
 android {
@@ -20,6 +31,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["retailPriceBaseUrl"] = retailPriceBaseUrl
     }
 
     buildTypes {
@@ -28,6 +40,10 @@ android {
                 enable = true
             }
         }
+    }
+    if (retailPriceBaseUrl.isNotEmpty()) {
+        sourceSets.named("debug") { manifest.srcFile("src/retail/AndroidManifest.xml") }
+        sourceSets.named("release") { manifest.srcFile("src/retail/AndroidManifest.xml") }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -68,6 +84,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
 
     testImplementation(libs.junit)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.room.testing)
     // Room's migration JSON runtime uses serialization 1.8.1. AGP aligns the test

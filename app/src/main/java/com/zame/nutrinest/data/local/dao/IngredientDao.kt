@@ -32,6 +32,16 @@ data class CatalogPresentation(val ingredientId: Long, val nameEs: String?, val 
 interface IngredientDao {
 
     @Query("""
+        SELECT m.source_record_key
+        FROM ingredient_canonical_map m
+        JOIN ingredient_catalog_status s ON s.ingredient_id = m.ingredient_id
+        WHERE m.ingredient_id = :id AND m.source_namespace = 'BEDCA'
+          AND m.scope_key = 'global' AND m.source_head_slot = 1
+          AND s.state IN ('VISIBLE', 'SECONDARY')
+    """)
+    suspend fun retailBedcaRecordKey(id: Long): String?
+
+    @Query("""
         SELECT m.ingredient_id AS ingredientId,c.name_es AS nameEs,c.name_en AS nameEn,
           CASE s.state WHEN 'VISIBLE' THEN 0 WHEN 'SECONDARY' THEN 1
             WHEN 'REVIEW_REQUIRED' THEN 2 ELSE 3 END AS `rank`

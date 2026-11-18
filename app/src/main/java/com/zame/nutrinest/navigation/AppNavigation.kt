@@ -12,6 +12,7 @@ import com.zame.nutrinest.ui.help.HelpScreen
 import com.zame.nutrinest.ui.ingredients.compare.CompareIngredientsScreen
 import com.zame.nutrinest.ui.ingredients.detail.IngredientDetailScreen
 import com.zame.nutrinest.ui.ingredients.editor.IngredientEditorScreen
+import com.zame.nutrinest.ui.ingredients.retail.RetailPriceScreen
 import com.zame.nutrinest.ui.menu.WeeklyMenuScreen
 import com.zame.nutrinest.ui.menu.config.MenuConfigScreen
 import com.zame.nutrinest.ui.menu.detail.MealDetailScreen
@@ -45,6 +46,10 @@ sealed class Screen(val route: String) {
 
     data object IngredientDetail : Screen("ingredients/{ingredientId}") {
         fun of(id: Long) = "ingredients/$id"
+    }
+
+    data object IngredientRetail : Screen("ingredients/retail/{ingredientId}") {
+        fun of(id: Long) = "ingredients/retail/$id"
     }
 
     data object IngredientEditor : Screen("ingredients/editor?ingredientId={ingredientId}") {
@@ -148,10 +153,18 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             IngredientDetailScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { id -> navController.navigate(Screen.IngredientEditor.edit(id)) },
+                onRetail = { id -> navController.navigate(Screen.IngredientRetail.of(id)) },
                 onCompare = { id ->
                     navController.navigate(Screen.CompareIngredients.of(listOf(id)))
                 }
             )
+        }
+
+        composable(
+            route = Screen.IngredientRetail.route,
+            arguments = listOf(navArgument("ingredientId") { type = NavType.LongType })
+        ) {
+            RetailPriceScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

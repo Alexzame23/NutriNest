@@ -14,6 +14,9 @@
         android:roundIcon="@mipmap/nutrinest_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.NutriNest">
+        <meta-data
+            android:name="com.zame.nutrinest.RETAIL_PRICE_BASE_URL"
+            android:value="${retailPriceBaseUrl}" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
