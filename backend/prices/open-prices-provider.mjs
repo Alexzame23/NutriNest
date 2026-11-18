@@ -109,6 +109,7 @@ async function loadStores(file, locations) {
             id: `${SOURCE.id}.store.${recordKey}`, origin: { sourceId: SOURCE.id, recordKey },
             retailerId: configured.retailerId, name: configured.name,
             postalCode: typeof postalCode === 'string' && /^\d{5}$/.test(postalCode) ? postalCode : null,
+            osmRef: `${row.osm_type.toLowerCase()}/${row.osm_id}`,
         });
     });
     requireField(stores.size === locations.size, 'missing pilot store');
@@ -170,7 +171,8 @@ export class OpenPricesProvider extends PriceProvider {
         requireField(isLabel(userAgent) && /^[\x20-\x7e]{1,200}$/.test(userAgent),
             'backend User-Agent', 'INVALID_CONFIGURATION');
         const downloadOptions = { fetchImpl, userAgent, timeoutMs: 60_000, maxBytes: MAX_COMPRESSED, beforeRequest, now };
-        const planKey = createHash('sha256').update(JSON.stringify([plan.stores, plan.products])).digest('hex');
+        // Invalidate cached metadata built before the verified OSM reference was retained.
+        const planKey = createHash('sha256').update(JSON.stringify([2, plan.stores, plan.products])).digest('hex');
         const cache = previous?.planKey === planKey ? previous : null;
         const inputs = [];
 

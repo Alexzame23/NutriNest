@@ -22,11 +22,13 @@ import com.zame.nutrinest.ui.profiles.edit.ProfileEditorScreen
 import com.zame.nutrinest.ui.recipes.RecipesAndIngredientsScreen
 import com.zame.nutrinest.ui.recipes.create.CreateRecipeScreen
 import com.zame.nutrinest.ui.recipes.detail.RecipeDetailScreen
+import com.zame.nutrinest.ui.stores.SupermarketScreen
 import com.zame.nutrinest.util.WeekUtils
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Help : Screen("help")
+    data object Supermarkets : Screen("supermarkets")
 
     /** Recipes and Ingredients, as two tabs of a single destination. */
     data object RecipesAndIngredients : Screen("food?tab={tab}") {
@@ -90,12 +92,17 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 },
                 onWeeklyMenuClick = { navController.navigate(Screen.WeeklyMenu.route) },
                 onProfilesClick = { navController.navigate(Screen.Profiles.route) },
-                onHelpClick = { navController.navigate(Screen.Help.route) }
+                onHelpClick = { navController.navigate(Screen.Help.route) },
+                onSupermarketsClick = { navController.navigate(Screen.Supermarkets.route) }
             )
         }
 
         composable(Screen.Help.route) {
             HelpScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.Supermarkets.route) {
+            SupermarketScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

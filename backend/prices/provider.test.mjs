@@ -74,6 +74,7 @@ test('Open Prices joins approved exports and maps latest regular EUR prices with
     assert.ok(metadata.inputs[1].lastModified);
     const [store] = metadata.stores;
     assert.equal(store.postalCode, '08001');
+    assert.equal(store.osmRef, 'node/99101');
     assert.equal(store.origin.recordKey, '101');
     const entry = provider.getProduct('pack-v1');
     assert.equal(entry.package.gtin, '0036000291452');

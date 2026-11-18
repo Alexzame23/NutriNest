@@ -22,11 +22,13 @@ data class Store(
     val origin: ProviderRecord,
     val retailerId: CommercialId,
     val name: String,
-    val postalCode: String? = null
+    val postalCode: String? = null,
+    val osmRef: String? = null
 ) {
     init {
         require(name.isNotBlank())
         require(postalCode == null || postalCode.matches(Regex("[0-9]{5}")))
+        require(osmRef == null || osmRef.matches(Regex("(node|way|relation)/[1-9][0-9]{0,15}")))
     }
 }
 

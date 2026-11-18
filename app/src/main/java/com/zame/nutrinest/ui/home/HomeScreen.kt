@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -71,7 +72,8 @@ fun HomeScreen(
     onWeeklyMenuClick: () -> Unit,
     onProfilesClick: () -> Unit,
     onHelpClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSupermarketsClick: () -> Unit
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -123,6 +125,15 @@ fun HomeScreen(
                     subtitle = stringResource(R.string.home_weekly_menu_subtitle),
                     icon = Icons.Rounded.CalendarMonth,
                     onClick = onWeeklyMenuClick
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                HomeActionCard(
+                    title = stringResource(R.string.supermarkets_title),
+                    subtitle = stringResource(R.string.supermarkets_home_subtitle),
+                    icon = Icons.Rounded.Storefront,
+                    onClick = onSupermarketsClick
                 )
             }
         }
@@ -388,7 +399,8 @@ private fun HomeScreenPreviewLight() {
             onRecipesClick = {},
             onWeeklyMenuClick = {},
             onProfilesClick = {},
-            onHelpClick = {}
+            onHelpClick = {},
+            onSupermarketsClick = {}
         )
     }
 }

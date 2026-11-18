@@ -159,6 +159,10 @@ components:
           properties:
             retailerId: { $ref: '#/components/schemas/Id' }
             postalCode: { type: [string, 'null'], pattern: '^[0-9]{5}$' }
+            osmRef:
+              type: [string, 'null']
+              pattern: '^(node|way|relation)/[1-9][0-9]{0,15}$'
+              description: Verified OpenStreetMap object reference for the physical store.
     PriceZone:
       allOf:
         - $ref: '#/components/schemas/NamedRecord'

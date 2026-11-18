@@ -27,7 +27,8 @@ internal object SnapshotJson {
             },
             objects("retailers") { Retailer(id("id"), origin(), string("name")) },
             objects("stores") {
-                Store(id("id"), origin(), id("retailerId"), string("name"), optionalString("postalCode"))
+                Store(id("id"), origin(), id("retailerId"), string("name"),
+                    optionalString("postalCode"), optionalString("osmRef"))
             },
             objects("zones") { PriceZone(id("id"), origin(), id("retailerId"), string("name")) },
             objects("products") {
