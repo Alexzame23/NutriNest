@@ -4,7 +4,6 @@ import com.zame.nutrinest.domain.nutrition.MassBasis
 import com.zame.nutrinest.domain.nutrition.UnitDefinition
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.ZoneOffset
 
 object PriceComparisonEngine {
     private val thousand = BigDecimal("1000")
@@ -22,14 +21,17 @@ object PriceComparisonEngine {
 
     internal fun compareBatch(
         demands: Map<Long, PriceDemand>, snapshot: PriceSnapshot, policy: ComparisonPolicy,
-        prices: List<PriceObservation>, massContents: Map<CommercialId, List<VerifiedMassContent>>
+        prices: List<PriceObservation>, massContents: Map<CommercialId, List<VerifiedMassContent>>,
+        promotions: List<VerifiedPromotion> = emptyList(),
+        authorizedSubstitutions: Set<IngredientProductMatch> = emptySet()
     ): Map<Long, ComparisonResult> {
         val matches = snapshot.matches.groupBy { it.ingredientKey }
         val packs = snapshot.packages.associateBy { it.id }
         val observations = prices.groupBy { it.record.packageId }
         return demands.mapValues { (_, demand) ->
             compareIndexed(demand, snapshot, policy, matches[demand.ingredientKey].orEmpty(), packs,
-                observations, massContents[demand.ingredientKey].orEmpty(), emptyList(), emptyMap())
+                observations, massContents[demand.ingredientKey].orEmpty(), promotions, emptyMap(),
+                authorizedSubstitutions)
         }
     }
 
@@ -37,7 +39,8 @@ object PriceComparisonEngine {
         demand: PriceDemand, snapshot: PriceSnapshot?, policy: ComparisonPolicy,
         ingredientMatches: List<IngredientProductMatch>, packs: Map<CommercialId, ProductPackage>,
         prices: Map<CommercialId, List<PriceObservation>>, massContents: List<VerifiedMassContent>,
-        promotions: List<VerifiedPromotion>, weighedGrams: Map<PriceObservation, BigDecimal>
+        promotions: List<VerifiedPromotion>, weighedGrams: Map<PriceObservation, BigDecimal>,
+        authorizedSubstitutions: Set<IngredientProductMatch> = emptySet()
     ): ComparisonResult {
         fun unavailable(error: ComparisonError) = ComparisonResult(emptyList(), listOf(ExcludedPrice(error)))
         val quantity = demand.quantity
@@ -54,7 +57,7 @@ object PriceComparisonEngine {
             val observations = prices[id].orEmpty()
             val error = when {
                 match == null -> ComparisonError.AMBIGUOUS_MATCH
-                match.kind != MatchKind.EXACT -> ComparisonError.SUBSTITUTE
+                match.kind != MatchKind.EXACT && match !in authorizedSubstitutions -> ComparisonError.SUBSTITUTE
                 observations.isEmpty() -> ComparisonError.NO_PRICE
                 else -> null
             }
@@ -109,13 +112,11 @@ object PriceComparisonEngine {
                         EuroRatio(amount * required, capacity), null, null,
                         weight?.let { EuroRatio(amount * it, thousand).decimal(2) }, evidence, promo, weight)
                 } else {
-                    val count = required.divide(capacity, 0, RoundingMode.CEILING)
-                    val take = (promo?.take ?: 1).toBigDecimal()
-                    val paid = count.divideToIntegralValue(take) * (promo?.pay ?: 1).toBigDecimal() + count.remainder(take)
-                    val line = amount * paid
-                    val contents = count * capacity
+                    val count = required.divide(capacity, 0, RoundingMode.CEILING).toBigIntegerExact()
+                    val line = amount * payablePacks(count, promo).toBigDecimal()
+                    val contents = count.toBigDecimal() * capacity
                     options += ComparedPrice(match, pack, price, denominator, basis, EuroRatio(line * scale, contents),
-                        EuroRatio(line * required, contents), count.toBigIntegerExact(), price.money,
+                        EuroRatio(line * required, contents), count, price.money,
                         line.setScale(2, RoundingMode.HALF_UP), evidence, promo, null)
                 }
             }
@@ -126,7 +127,7 @@ object PriceComparisonEngine {
         return ComparisonResult(options.sortedWith(order), excluded)
     }
 
-    private fun baseAmount(demand: PriceDemand, unit: ContentUnit): BigDecimal? {
+    internal fun baseAmount(demand: PriceDemand, unit: ContentUnit): BigDecimal? {
         val q = demand.quantity
         val allowed = when (unit) {
             ContentUnit.G -> q.unit in listOf(UnitDefinition.GRAM, UnitDefinition.KILOGRAM, UnitDefinition.OUNCE, UnitDefinition.POUND)
@@ -138,7 +139,7 @@ object PriceComparisonEngine {
 
     private fun eligibility(price: PriceObservation, policy: ComparisonPolicy, terms: VerifiedPromotion?): ComparisonError? {
         val record = price.record
-        val observed = record.observedAt ?: record.observedOn.atStartOfDay(ZoneOffset.UTC).toInstant()
+        val observed = record.observedInstant
         if (record.scope == ObservationScope.Unknown) return ComparisonError.UNKNOWN_SCOPE
         if (observed > policy.now) return ComparisonError.FUTURE_PRICE
         if (observed <= policy.now.minus(policy.freshness)) return ComparisonError.STALE_PRICE

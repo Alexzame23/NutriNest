@@ -157,6 +157,10 @@ fun ShoppingListScreen(
     val grouped = remember(rows, spanish) { groupShoppingRows(rows, spanish) }
     val isCurrentWeek by viewModel.isCurrentWeek.collectAsStateWithLifecycle()
     val comparison by viewModel.comparison.state.collectAsStateWithLifecycle()
+    val basket by viewModel.comparison.basket.collectAsStateWithLifecycle()
+    val basketRequest = remember(comparison) { comparison.basketRequest() }
+    val basketResult = basket?.takeIf { it.request == basketRequest }?.result
+    val namesById = remember(rows, spanish) { rows.associate { it.source.item.id to it.name(spanish) } }
     val quoted = (comparison.status as? ShoppingComparisonStatus.Published)?.prices
 
     Scaffold(
@@ -234,6 +238,20 @@ fun ShoppingListScreen(
                 ) {
                     item(key = "commercial_comparison") {
                         ShoppingPriceControls(comparison, viewModel.comparison)
+                    }
+                    if (basketRequest != null) {
+                        item(key = "single_store_basket") {
+                            ShoppingBasketControls(basketRequest, basketResult, viewModel.comparison::selectRetailer)
+                        }
+                        basketResult?.alternatives?.forEach { alternative ->
+                            item(key = "basket_${alternative.retailer.id.value}") {
+                                ShoppingBasketAlternative(alternative, namesById)
+                            }
+                        }
+                    } else if (quoted?.basketCatalog?.retailers?.isEmpty() == true && comparison.eligibleCount > 0) {
+                        item(key = "single_store_basket") {
+                            Text(stringResource(R.string.shopping_basket_no_stores))
+                        }
                     }
                     grouped.forEach { (categoryKey, items) ->
                         item(key = "header_$categoryKey") {

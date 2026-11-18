@@ -8,7 +8,6 @@ import com.zame.nutrinest.domain.stores.DirectoryStore
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
-import java.time.ZoneOffset
 
 internal fun interface ShoppingPriceRepository {
     suspend fun compare(items: List<ShoppingPriceDemand>, postalCode: String, now: Instant): ShoppingPrices
@@ -22,8 +21,28 @@ internal sealed interface ShoppingPrices {
         val rows: Map<Long, ShoppingLinePrice>,
         val publishedAt: Instant,
         val expiresAt: Instant,
-        val simulated: Boolean
+        val simulated: Boolean,
+        val basketCatalog: ShoppingBasketCatalog? = null,
+        val pricedAt: Instant = publishedAt
     ) : ShoppingPrices
+}
+
+internal data class ShoppingBasketCatalog(
+    val snapshot: PriceSnapshot,
+    val stores: Set<CommercialId>,
+    val demands: Map<Long, PriceDemand?>,
+    val policy: ComparisonPolicy
+) {
+    val retailers = snapshot.retailers.filter { retailer ->
+        snapshot.stores.any { it.id in stores && it.retailerId == retailer.id }
+    }.sortedWith(compareBy<Retailer> { it.name }.thenBy { it.id.value })
+
+    private val changes = (snapshot.prices.map { it.record } + snapshot.availability.map { it.record })
+        .filter { (it.scope as? ObservationScope.AtStore)?.storeId in stores }
+        .flatMap { listOf(it.observedInstant, it.observedInstant.plus(policy.freshness)) }
+        .distinct().sorted()
+
+    fun nextChange(now: Instant): Instant = minOf(snapshot.expiresAt, changes.firstOrNull { it > now } ?: snapshot.expiresAt)
 }
 
 internal sealed interface ShoppingLinePrice {
@@ -55,12 +74,11 @@ internal class RegionalShoppingPriceRepository(
         }
         val snapshot = publication.snapshot
         val identities = keys(items.map { it.ingredientId }.toSet())
-        val demands = items.mapNotNull { item ->
-            identities[item.ingredientId]?.let { key ->
-                item.id to PriceDemand(key, Quantity(item.grams, UnitDefinition.GRAM, MassBasis.EDIBLE))
+        val demands = items.associate { item ->
+            item.id to identities[item.ingredientId]?.let { key ->
+                PriceDemand(key, Quantity(item.grams, UnitDefinition.GRAM, MassBasis.EDIBLE))
             }
-        }.toMap()
-        val packages = snapshot.packages.associateBy { it.id }
+        }
         val products = snapshot.products.associateBy { it.id }
         val retailers = snapshot.retailers.associateBy { it.id }
         val sources = snapshot.sources.associateBy { it.id }
@@ -68,22 +86,17 @@ internal class RegionalShoppingPriceRepository(
             val scope = quote.record.scope as? ObservationScope.AtStore
             scope != null && scope.storeId in publication.localStores
         }
-        val evidence = snapshot.matches.mapNotNull { match ->
-            val mass = match.edibleMass ?: return@mapNotNull null
-            val pack = packages.getValue(match.packageId)
-            val upperBound = pack.netContent?.takeIf { it.unit == ContentUnit.G }?.amount
-                ?: if (pack.weightMode == WeightMode.VARIABLE) BigDecimal("1000") else return@mapNotNull null
-            if (mass.grams > upperBound) return@mapNotNull null
-            VerifiedMassContent(pack, match, MassBasis.EDIBLE, mass.grams, mass.sourceRef)
-        }.groupBy { it.match.ingredientKey }
+        val evidence = snapshot.reviewedMassContents().groupBy { it.match.ingredientKey }
         val policy = ComparisonPolicy(now, ZoneId.of("Europe/Madrid"))
-        val compared = PriceComparisonEngine.compareBatch(demands, snapshot, policy, localPrices, evidence)
+        val compared = PriceComparisonEngine.compareBatch(demands.mapNotNull { (id, demand) ->
+            demand?.let { id to it }
+        }.toMap(), snapshot, policy, localPrices, evidence)
         val exactKeys = snapshot.matches.filter { it.kind == MatchKind.EXACT }.map { it.ingredientKey }.toSet()
         val rows = items.associate { item ->
             val comparison = compared[item.id]
             val options = comparison?.options.orEmpty().map { option ->
                 val record = option.observation.record
-                val observed = record.observedAt ?: record.observedOn.atStartOfDay(ZoneOffset.UTC).toInstant()
+                val observed = record.observedInstant
                 val scope = record.scope as ObservationScope.AtStore
                 ShoppingPriceOption(option, products.getValue(option.pack.productId),
                     retailers.getValue(record.retailerId), publication.localStores.getValue(scope.storeId),
@@ -96,6 +109,7 @@ internal class RegionalShoppingPriceRepository(
                 else -> ShoppingLinePrice.NoPrice
             }
         }
-        return ShoppingPrices.Published(rows, snapshot.generatedAt, snapshot.expiresAt, publication.simulated)
+        val catalog = ShoppingBasketCatalog(snapshot, publication.localStores.keys, demands, policy)
+        return ShoppingPrices.Published(rows, snapshot.generatedAt, snapshot.expiresAt, publication.simulated, catalog, now)
     }
 }

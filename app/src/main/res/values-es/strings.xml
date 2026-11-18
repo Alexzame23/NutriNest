@@ -700,4 +700,43 @@
     <string name="shopping_prices_checkout">Desembolso por %1$s envase(s) · %2$s</string>
     <string name="shopping_prices_weighed">El coste final depende del peso facturado.</string>
     <string name="shopping_prices_store">Cadena %1$s · Tienda %2$s</string>
+    <string name="shopping_basket_title">Cesta en un solo supermercado</string>
+    <string name="shopping_basket_select">Elige las cadenas que quieres comparar</string>
+    <string name="shopping_basket_select_one">Selecciona al menos una cadena.</string>
+    <string name="shopping_basket_loading">Calculando cestas…</string>
+    <string name="shopping_basket_winner">Cesta completa más barata · %1$s</string>
+    <string name="shopping_basket_no_complete">Ningún supermercado seleccionado cubre toda la lista.</string>
+    <string name="shopping_basket_ranking_pending">Hay combinaciones sin evaluar. No se puede determinar la cesta completa más barata.</string>
+    <string name="shopping_basket_order">Las cestas completas se ordenan por desembolso y las incompletas por cobertura.</string>
+    <string name="shopping_basket_no_stores">No hay tiendas verificadas en esta zona.</string>
+    <string name="shopping_basket_stock_notice">Importes estimados a partir de precios observados. Comprueba las existencias antes de comprar.</string>
+    <string name="shopping_basket_stock_unconfirmed">Algunos artículos tienen existencias desconocidas o limitadas.</string>
+    <plurals name="shopping_basket_complete">
+        <item quantity="one">Cobertura de precios completa · %1$d de %2$d artículo</item>
+        <item quantity="many">Cobertura de precios completa · %1$d de %2$d artículos</item>
+        <item quantity="other">Cobertura de precios completa · %1$d de %2$d artículos</item>
+    </plurals>
+    <plurals name="shopping_basket_incomplete">
+        <item quantity="one">Cesta incompleta · %1$d de %2$d artículo</item>
+        <item quantity="many">Cesta incompleta · %1$d de %2$d artículos</item>
+        <item quantity="other">Cesta incompleta · %1$d de %2$d artículos</item>
+    </plurals>
+    <string name="shopping_basket_checkout">Desembolso total estimado %1$s</string>
+    <string name="shopping_basket_partial_checkout">Desembolso parcial para los artículos cubiertos %1$s</string>
+    <string name="shopping_basket_proportional">Coste proporcional de las cantidades cubiertas %1$s</string>
+    <string name="shopping_basket_details">Ver detalle de la cesta</string>
+    <string name="shopping_basket_hide">Ocultar detalle de la cesta</string>
+    <string name="shopping_basket_missing">%1$s · %2$s</string>
+    <string name="shopping_basket_pack">%1$s × %2$s (%3$s por envase) · %4$s</string>
+    <string name="shopping_basket_grams">%1$s g</string>
+    <string name="shopping_basket_millilitres">%1$s ml</string>
+    <string name="shopping_basket_units">%1$s uds.</string>
+    <string name="shopping_basket_substitute">%1$s (sustituto autorizado)</string>
+    <string name="shopping_basket_ambiguous_equivalent">Equivalencias comerciales contradictorias</string>
+    <string name="shopping_basket_invalid_quantity">Cantidad no válida</string>
+    <string name="shopping_basket_no_price">Sin precio vigente en esta tienda</string>
+    <string name="shopping_basket_ambiguous_price">Precios observados contradictorios</string>
+    <string name="shopping_basket_promotion_unavailable">Promoción caducada o con condiciones sin confirmar</string>
+    <string name="shopping_basket_out_of_stock">Sin existencias según la observación</string>
+    <string name="shopping_basket_search_limit">No se pudo evaluar toda la combinación</string>
 </resources>

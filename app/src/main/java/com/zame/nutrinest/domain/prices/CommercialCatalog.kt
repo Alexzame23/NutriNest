@@ -3,6 +3,7 @@ package com.zame.nutrinest.domain.prices
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 @JvmInline
 value class CommercialId(val value: String) {
@@ -158,6 +159,8 @@ data class ObservationRecord(
     val confidence: Confidence
 ) {
     init { require(revision > 0) }
+    internal val observedInstant: Instant
+        get() = observedAt ?: observedOn.atStartOfDay(ZoneOffset.UTC).toInstant()
 }
 
 enum class Currency { EUR }

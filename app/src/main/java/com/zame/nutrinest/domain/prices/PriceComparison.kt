@@ -47,12 +47,30 @@ data class VerifiedMassContent(
     }
 }
 
+internal fun PriceSnapshot.reviewedMassContents(): List<VerifiedMassContent> {
+    val packs = packages.associateBy { it.id }
+    return matches.mapNotNull { match ->
+        val mass = match.edibleMass ?: return@mapNotNull null
+        val pack = packs.getValue(match.packageId)
+        val upperBound = pack.netContent?.takeIf { it.unit == ContentUnit.G }?.amount
+            ?: if (pack.weightMode == WeightMode.VARIABLE) BigDecimal("1000") else return@mapNotNull null
+        if (mass.grams > upperBound) return@mapNotNull null
+        VerifiedMassContent(pack, match, MassBasis.EDIBLE, mass.grams, mass.sourceRef)
+    }
+}
+
 /** The observation amount is the price of ONE paid sale unit. Groups repeat on this SKU only. */
 data class VerifiedPromotion(
     val observation: PriceObservation, val sourceRef: String, val take: Int = 1, val pay: Int = 1,
     val conditionsSatisfied: Boolean = false
 ) {
     init { require(sourceRef.isNotBlank() && take > 0 && pay in 1..take) }
+}
+
+internal fun payablePacks(count: BigInteger, promotion: VerifiedPromotion?): BigInteger {
+    if (promotion == null) return count
+    val (groups, remainder) = count.divideAndRemainder(promotion.take.toBigInteger())
+    return groups * promotion.pay.toBigInteger() + remainder
 }
 
 data class ComparisonPolicy(

@@ -37,6 +37,14 @@ class ShoppingPriceRepositoryTest {
         assertEquals(null, options[2].cost.checkoutEur)
         assertEquals(ShoppingLinePrice.NoPrice, result.rows[2L])
         assertEquals(ShoppingLinePrice.NoEquivalent, result.rows[3L])
+        val basket = requireNotNull(result.basketCatalog)
+        assertEquals(setOf(store.id), basket.stores)
+        assertEquals(listOf(store.retailerId), basket.retailers.map { it.id })
+        val optimized = SingleStoreBasketOptimizer.optimize(basket.demands, setOf(store.retailerId),
+            basket.snapshot.regionId, basket.stores, basket.snapshot, basket.policy)
+        assertEquals("3.00", optimized.alternatives.single().checkoutEur.toString())
+        assertEquals(1, optimized.alternatives.single().coveredCount)
+        assertEquals(null, optimized.winner)
         assertEquals(listOf(300.0, 300.0, 300.0), before.map { it.grams })
     }
 

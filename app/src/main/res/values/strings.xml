@@ -694,4 +694,41 @@
     <string name="shopping_prices_checkout">Checkout for %1$s pack(s) · %2$s</string>
     <string name="shopping_prices_weighed">Final cost depends on the billed weight.</string>
     <string name="shopping_prices_store">Chain %1$s · Store %2$s</string>
+    <string name="shopping_basket_title">Basket at one supermarket</string>
+    <string name="shopping_basket_select">Choose chains to compare</string>
+    <string name="shopping_basket_select_one">Select at least one chain.</string>
+    <string name="shopping_basket_loading">Calculating baskets…</string>
+    <string name="shopping_basket_winner">Lowest priced complete basket · %1$s</string>
+    <string name="shopping_basket_no_complete">None of the selected supermarkets covers the entire list.</string>
+    <string name="shopping_basket_ranking_pending">Some combinations could not be evaluated. A lowest priced complete basket is unavailable.</string>
+    <string name="shopping_basket_order">Complete baskets are ranked by checkout cost and incomplete baskets by coverage.</string>
+    <string name="shopping_basket_no_stores">No verified stores in this area.</string>
+    <string name="shopping_basket_stock_notice">Prices are estimates from observations. Check stock before shopping.</string>
+    <string name="shopping_basket_stock_unconfirmed">Some items have unknown or limited stock.</string>
+    <plurals name="shopping_basket_complete">
+        <item quantity="one">Complete price coverage · %1$d of %2$d item</item>
+        <item quantity="other">Complete price coverage · %1$d of %2$d items</item>
+    </plurals>
+    <plurals name="shopping_basket_incomplete">
+        <item quantity="one">Incomplete basket · %1$d of %2$d item</item>
+        <item quantity="other">Incomplete basket · %1$d of %2$d items</item>
+    </plurals>
+    <string name="shopping_basket_checkout">Estimated checkout total %1$s</string>
+    <string name="shopping_basket_partial_checkout">Checkout subtotal for covered items %1$s</string>
+    <string name="shopping_basket_proportional">Proportional cost of covered quantities %1$s</string>
+    <string name="shopping_basket_details">View basket details</string>
+    <string name="shopping_basket_hide">Hide basket details</string>
+    <string name="shopping_basket_missing">%1$s · %2$s</string>
+    <string name="shopping_basket_pack">%1$s × %2$s (%3$s per pack) · %4$s</string>
+    <string name="shopping_basket_grams">%1$s g</string>
+    <string name="shopping_basket_millilitres">%1$s mL</string>
+    <string name="shopping_basket_units">%1$s units</string>
+    <string name="shopping_basket_substitute">%1$s (approved substitute)</string>
+    <string name="shopping_basket_ambiguous_equivalent">Conflicting commercial matches</string>
+    <string name="shopping_basket_invalid_quantity">Invalid quantity</string>
+    <string name="shopping_basket_no_price">No current price at this store</string>
+    <string name="shopping_basket_ambiguous_price">Conflicting price observations</string>
+    <string name="shopping_basket_promotion_unavailable">Promotion expired or terms unconfirmed</string>
+    <string name="shopping_basket_out_of_stock">Reported out of stock</string>
+    <string name="shopping_basket_search_limit">Combination could not be fully evaluated</string>
 </resources>

@@ -3,15 +3,19 @@ package com.zame.nutrinest.ui.menu.shopping
 import androidx.lifecycle.SavedStateHandle
 import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.prices.*
+import com.zame.nutrinest.domain.prices.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -77,5 +81,44 @@ class ShoppingComparisonTest {
         runCurrent()
         assertEquals(ShoppingComparisonStatus.Unavailable(RetailBatchUnavailable.Offline), restarted.state.value.status)
         assertEquals(next, week.value.items)
+    }
+
+    @Test fun basketRecomputesForSelectedChainsAndUncheckedItemsFromTheSamePublication() = runTest {
+        val week = MutableStateFlow(ShoppingWeek(10, listOf(pending, bought)))
+        val source = PriceSource(CommercialId("source"), "Source", SourceKind.OPEN_DATA, "License", "Credit")
+        val chains = listOf("a", "b").map { name ->
+            Retailer(CommercialId(name), ProviderRecord(source.id, name), name)
+        }
+        val stores = chains.map {
+            Store(CommercialId("store.${it.id.value}"), it.origin, it.id, it.name)
+        }
+        val snapshot = PriceSnapshot(1, CommercialId("region"), 1, now, now.plusSeconds(3600),
+            listOf(source), chains, stores, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+        val catalog = ShoppingBasketCatalog(snapshot, stores.map { it.id }.toSet(),
+            mapOf(pending.id to null, bought.id to null), ComparisonPolicy(now, ZoneId.of("Europe/Madrid")))
+        var calls = 0
+        val model = ShoppingComparison(backgroundScope, SavedStateHandle(), week, ShoppingPriceRepository { batch, _, _ ->
+            calls++
+            ShoppingPrices.Published(batch.associate { it.id to ShoppingLinePrice.NoEquivalent },
+                now, snapshot.expiresAt, false, catalog)
+        }, clock, StandardTestDispatcher(testScheduler))
+        backgroundScope.launch { model.basket.collect {} }
+        model.changePostalCode("28012")
+        model.refresh()
+        runCurrent()
+        assertEquals(listOf(chains[0], chains[1]), model.basket.value?.result?.alternatives?.map { it.retailer })
+
+        model.selectRetailer(chains[0].id, false)
+        model.excludePurchased(true)
+        runCurrent()
+        val updated = model.basket.value?.result?.alternatives?.single()
+        assertEquals(chains[1], updated?.retailer)
+        assertEquals(listOf(pending.id), updated?.missing?.map { it.itemId })
+        assertEquals(1, calls)
+        assertEquals(listOf(pending, bought), week.value.items)
+        model.selectRetailer(chains[1].id, false)
+        runCurrent()
+        assertEquals(emptySet<CommercialId>(), model.state.value.basketRequest()?.retailers)
+        assertEquals(null, model.basket.value)
     }
 }
