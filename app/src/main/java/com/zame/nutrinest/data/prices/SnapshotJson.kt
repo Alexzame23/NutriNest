@@ -48,7 +48,9 @@ internal object SnapshotJson {
             objects("matches") {
                 IngredientProductMatch(
                     origin(), id("ingredientKey"), int("mappingVersion"), id("packageId"),
-                    enum("kind"), enum("confidence")
+                    enum("kind"), enum("confidence"), optionalObject("edibleMass")?.run {
+                        ReviewedEdibleMass(decimal("grams"), string("sourceRef"))
+                    }
                 )
             },
             objects("prices") {

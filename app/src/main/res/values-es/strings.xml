@@ -682,4 +682,22 @@
     <string name="retail_mapping_version">Revisión de la correspondencia %1$d</string>
     <string name="retail_exact_details">La correspondencia se aplica al producto y al formato. Consulta la etiqueta para comprobar alérgenos y requisitos dietéticos.</string>
     <string name="retail_alternative_details">La alternativa puede diferir en composición o preparación. Consulta la etiqueta para comprobar alérgenos y requisitos dietéticos.</string>
+    <string name="shopping_prices_title">Precios de la compra</string>
+    <string name="shopping_prices_exclude">Excluir comprados de la comparación</string>
+    <string name="shopping_prices_refresh">Actualizar precios</string>
+    <string name="shopping_prices_idle">Introduce un código postal y actualiza para comparar los precios de esta semana.</string>
+    <string name="shopping_prices_no_pending">No hay artículos seleccionados para comparar precios.</string>
+    <string name="shopping_prices_no_coverage">No hay una publicación de precios para esta zona.</string>
+    <string name="shopping_prices_coverage">Cobertura de %1$d de %2$d artículos</string>
+    <string name="shopping_prices_publication">Código postal %1$s · Publicado el %2$s</string>
+    <string name="shopping_prices_order">Primero el menor desembolso por envases. Después, venta al peso por coste estimado. Stock sin confirmar.</string>
+    <string name="shopping_prices_no_equivalent">Sin equivalente comercial verificado.</string>
+    <string name="shopping_prices_no_comparable">Sin precio vigente con peso comestible verificado para este artículo.</string>
+    <string name="shopping_prices_best">Mejor opción disponible</string>
+    <string name="shopping_prices_hide">Ocultar otras opciones</string>
+    <string name="shopping_prices_more">Ver otras opciones</string>
+    <string name="shopping_prices_proportional">Coste proporcional de la cantidad requerida %1$s</string>
+    <string name="shopping_prices_checkout">Desembolso por %1$s envase(s) · %2$s</string>
+    <string name="shopping_prices_weighed">El coste final depende del peso facturado.</string>
+    <string name="shopping_prices_store">Cadena %1$s · Tienda %2$s</string>
 </resources>

@@ -123,9 +123,21 @@ data class IngredientProductMatch(
     val mappingVersion: Int,
     val packageId: CommercialId,
     val kind: MatchKind,
-    val confidence: Confidence
+    val confidence: Confidence,
+    val edibleMass: ReviewedEdibleMass? = null
 ) {
-    init { require(mappingVersion > 0) }
+    init {
+        require(mappingVersion > 0)
+        require(edibleMass == null || kind == MatchKind.EXACT)
+    }
+}
+
+/** Reviewed edible grams per complete pack or per kilogram billed for variable weight. */
+data class ReviewedEdibleMass(val grams: BigDecimal, val sourceRef: String) {
+    init {
+        require(grams.signum() > 0 && grams < BigDecimal("1000000000") && grams.scale() in 0..3)
+        require(sourceRef.isNotBlank())
+    }
 }
 
 sealed interface ObservationScope {

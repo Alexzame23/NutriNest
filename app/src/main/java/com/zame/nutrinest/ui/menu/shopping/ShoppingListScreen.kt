@@ -39,7 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -50,6 +52,7 @@ import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.ShoppingItemWithIngredient
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.MenuRepository
+import com.zame.nutrinest.data.prices.ShoppingPriceRepository
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.menu.ShoppingQuantity
 import com.zame.nutrinest.ui.menu.formatNaturalQuantity
@@ -62,6 +65,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.Collator
@@ -77,19 +81,33 @@ internal data class ShoppingRow(
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ShoppingListViewModel(
+class ShoppingListViewModel internal constructor(
     private val repository: MenuRepository,
-    ingredientRepository: IngredientRepository
+    ingredientRepository: IngredientRepository,
+    priceRepository: ShoppingPriceRepository,
+    private val savedState: SavedStateHandle
 ) : ViewModel() {
 
-    private val viewingWeekStart = MutableStateFlow(WeekUtils.weekStartOf())
+    private val viewingWeekStart = MutableStateFlow(
+        if (savedState.get<Boolean>("shoppingNextWeek") == true) WeekUtils.nextWeekStart()
+        else WeekUtils.weekStartOf()
+    )
     val isCurrentWeek = viewingWeekStart
         .map { it == WeekUtils.weekStartOf() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), viewingWeekStart.value == WeekUtils.weekStartOf())
 
-    internal val rows = viewingWeekStart
-        .flatMapLatest { repository.observeShoppingItems(it) }
-        .combine(ingredientRepository.observeMenuIngredientCatalog()) { items, catalog ->
+    private val weeklyItems = viewingWeekStart.flatMapLatest { week ->
+        repository.observeShoppingItems(week).map { week to it }.onStart { emit(week to emptyList()) }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, viewingWeekStart.value to emptyList())
+
+    private val pricingWeek = combine(viewingWeekStart, weeklyItems) { week, (observedWeek, items) ->
+        ShoppingWeek(week, if (week == observedWeek) items.map { it.item } else emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, ShoppingWeek(viewingWeekStart.value, emptyList()))
+
+    internal val comparison = ShoppingComparison(viewModelScope, savedState, pricingWeek, priceRepository)
+
+    internal val rows = weeklyItems
+        .combine(ingredientRepository.observeMenuIngredientCatalog()) { (_, items), catalog ->
             items.map { row ->
                 ShoppingRow(
                     row,
@@ -101,8 +119,15 @@ class ShoppingListViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun showCurrentWeek() { viewingWeekStart.value = WeekUtils.weekStartOf() }
-    fun showNextWeek() { viewingWeekStart.value = WeekUtils.nextWeekStart() }
+    fun showCurrentWeek() = showWeek(WeekUtils.weekStartOf(), next = false)
+    fun showNextWeek() = showWeek(WeekUtils.nextWeekStart(), next = true)
+
+    private fun showWeek(week: Long, next: Boolean) {
+        if (viewingWeekStart.value == week) return
+        comparison.reset()
+        savedState["shoppingNextWeek"] = next
+        viewingWeekStart.value = week
+    }
 
     fun togglePurchased(item: ShoppingItemWithIngredient) {
         viewModelScope.launch {
@@ -114,7 +139,8 @@ class ShoppingListViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp
-                ShoppingListViewModel(app.container.menuRepository, app.container.ingredientRepository)
+                ShoppingListViewModel(app.container.menuRepository, app.container.ingredientRepository,
+                    app.container.shoppingPrices, createSavedStateHandle())
             }
         }
     }
@@ -130,6 +156,8 @@ fun ShoppingListScreen(
     val spanish = rememberIsSpanish()
     val grouped = remember(rows, spanish) { groupShoppingRows(rows, spanish) }
     val isCurrentWeek by viewModel.isCurrentWeek.collectAsStateWithLifecycle()
+    val comparison by viewModel.comparison.state.collectAsStateWithLifecycle()
+    val quoted = (comparison.status as? ShoppingComparisonStatus.Published)?.prices
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -204,6 +232,9 @@ fun ShoppingListScreen(
                     contentPadding = PaddingValues(bottom = 40.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    item(key = "commercial_comparison") {
+                        ShoppingPriceControls(comparison, viewModel.comparison)
+                    }
                     grouped.forEach { (categoryKey, items) ->
                         item(key = "header_$categoryKey") {
                             Text(
@@ -232,6 +263,9 @@ fun ShoppingListScreen(
                                     )
                                     ShoppingItemText(item, spanish, Modifier.weight(1f))
                                 }
+                            }
+                            quoted?.rows?.get(item.source.item.id)?.let { line ->
+                                ShoppingPriceLine(line)
                             }
                         }
                     }

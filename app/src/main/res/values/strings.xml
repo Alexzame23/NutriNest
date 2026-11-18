@@ -676,4 +676,22 @@
     <string name="retail_mapping_version">Match revision %1$d</string>
     <string name="retail_exact_details">The match applies to the product and format. Check the label for allergens and dietary requirements.</string>
     <string name="retail_alternative_details">The alternative may differ in composition or preparation. Check the label for allergens and dietary requirements.</string>
+    <string name="shopping_prices_title">Shopping prices</string>
+    <string name="shopping_prices_exclude">Exclude purchased items from prices</string>
+    <string name="shopping_prices_refresh">Update prices</string>
+    <string name="shopping_prices_idle">Enter a postal code and update to compare prices for this week.</string>
+    <string name="shopping_prices_no_pending">No items selected for price comparison.</string>
+    <string name="shopping_prices_no_coverage">No price publication for this area.</string>
+    <string name="shopping_prices_coverage">Coverage: %1$d of %2$d items</string>
+    <string name="shopping_prices_publication">Postal code %1$s · Published %2$s</string>
+    <string name="shopping_prices_order">Lowest pack checkout cost first, then items sold by weight by estimated cost. Stock is unconfirmed.</string>
+    <string name="shopping_prices_no_equivalent">No verified commercial equivalent.</string>
+    <string name="shopping_prices_no_comparable">No current price with verified edible weight for this item.</string>
+    <string name="shopping_prices_best">Best available option</string>
+    <string name="shopping_prices_hide">Hide other options</string>
+    <string name="shopping_prices_more">See other options</string>
+    <string name="shopping_prices_proportional">Proportional cost for the required amount %1$s</string>
+    <string name="shopping_prices_checkout">Checkout for %1$s pack(s) · %2$s</string>
+    <string name="shopping_prices_weighed">Final cost depends on the billed weight.</string>
+    <string name="shopping_prices_store">Chain %1$s · Store %2$s</string>
 </resources>

@@ -14,6 +14,30 @@ object PriceComparisonEngine {
         massContents: List<VerifiedMassContent> = emptyList(),
         promotions: List<VerifiedPromotion> = emptyList(),
         weighedGrams: Map<PriceObservation, BigDecimal> = emptyMap()
+    ): ComparisonResult = compareIndexed(
+        demand, snapshot, policy, snapshot?.matches.orEmpty().filter { it.ingredientKey == demand.ingredientKey },
+        snapshot?.packages.orEmpty().associateBy { it.id },
+        snapshot?.prices.orEmpty().groupBy { it.record.packageId }, massContents, promotions, weighedGrams
+    )
+
+    internal fun compareBatch(
+        demands: Map<Long, PriceDemand>, snapshot: PriceSnapshot, policy: ComparisonPolicy,
+        prices: List<PriceObservation>, massContents: Map<CommercialId, List<VerifiedMassContent>>
+    ): Map<Long, ComparisonResult> {
+        val matches = snapshot.matches.groupBy { it.ingredientKey }
+        val packs = snapshot.packages.associateBy { it.id }
+        val observations = prices.groupBy { it.record.packageId }
+        return demands.mapValues { (_, demand) ->
+            compareIndexed(demand, snapshot, policy, matches[demand.ingredientKey].orEmpty(), packs,
+                observations, massContents[demand.ingredientKey].orEmpty(), emptyList(), emptyMap())
+        }
+    }
+
+    private fun compareIndexed(
+        demand: PriceDemand, snapshot: PriceSnapshot?, policy: ComparisonPolicy,
+        ingredientMatches: List<IngredientProductMatch>, packs: Map<CommercialId, ProductPackage>,
+        prices: Map<CommercialId, List<PriceObservation>>, massContents: List<VerifiedMassContent>,
+        promotions: List<VerifiedPromotion>, weighedGrams: Map<PriceObservation, BigDecimal>
     ): ComparisonResult {
         fun unavailable(error: ComparisonError) = ComparisonResult(emptyList(), listOf(ExcludedPrice(error)))
         val quantity = demand.quantity
@@ -21,10 +45,8 @@ object PriceComparisonEngine {
         if (snapshot == null) return unavailable(ComparisonError.NO_SNAPSHOT)
         if (policy.now < snapshot.generatedAt || policy.now >= snapshot.expiresAt)
             return unavailable(ComparisonError.SNAPSHOT_NOT_CURRENT)
-        val matches = snapshot.matches.filter { it.ingredientKey == demand.ingredientKey }.groupBy { it.packageId }
+        val matches = ingredientMatches.groupBy { it.packageId }
         if (matches.isEmpty()) return unavailable(ComparisonError.NO_MATCH)
-        val packs = snapshot.packages.associateBy { it.id }
-        val prices = snapshot.prices.groupBy { it.record.packageId }
         val options = mutableListOf<ComparedPrice>()
         val excluded = mutableListOf<ExcludedPrice>()
         for ((id, mappings) in matches.entries.sortedBy { it.key.value }) {

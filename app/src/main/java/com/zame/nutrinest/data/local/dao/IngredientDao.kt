@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 data class TagValue(val tag: String, val value: Double)
 
 data class CatalogPresentation(val ingredientId: Long, val nameEs: String?, val nameEn: String?, val rank: Int)
+data class RetailBedcaKey(val ingredientId: Long, val recordKey: String)
 
 /**
  * Reads and writes for ingredients.
@@ -32,14 +33,14 @@ data class CatalogPresentation(val ingredientId: Long, val nameEs: String?, val 
 interface IngredientDao {
 
     @Query("""
-        SELECT m.source_record_key
+        SELECT m.ingredient_id AS ingredientId, m.source_record_key AS recordKey
         FROM ingredient_canonical_map m
         JOIN ingredient_catalog_status s ON s.ingredient_id = m.ingredient_id
-        WHERE m.ingredient_id = :id AND m.source_namespace = 'BEDCA'
+        WHERE m.ingredient_id IN (:ids) AND m.source_namespace = 'BEDCA'
           AND m.scope_key = 'global' AND m.source_head_slot = 1
           AND s.state IN ('VISIBLE', 'SECONDARY')
     """)
-    suspend fun retailBedcaRecordKey(id: Long): String?
+    suspend fun retailBedcaRecordKeys(ids: List<Long>): List<RetailBedcaKey>
 
     @Query("""
         SELECT m.ingredient_id AS ingredientId,c.name_es AS nameEs,c.name_en AS nameEn,

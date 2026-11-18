@@ -54,19 +54,13 @@ internal class RegionalRetailPriceRepository(
         val available = stores.findByArea(postalCode).map { it.entry }
         val region = available.map { it.area.regionId }.distinct().singleOrNull() ?: return RetailResult.NoCoverage
         val key = ingredientKey(ingredientId) ?: return RetailResult.NoMatches
-        val configuredProvider = provider ?: return RetailResult.NoCoverage
-        if (!hasNetwork()) return RetailResult.Offline
-        val publication = try {
-            configuredProvider.publication(region)
-        } catch (error: IOException) {
-            if (!hasNetwork()) return RetailResult.Offline
-            throw error
-        } ?: return RetailResult.NoCoverage
-        val snapshot = publication.snapshot
-        require(snapshot.regionId == region)
-        if (publication.simulated && !allowSimulated) return RetailResult.NoCoverage
-        if (now < snapshot.generatedAt) return RetailResult.NoCoverage
-        if (now >= snapshot.expiresAt) return RetailResult.Stale
+        val data = when (val result = load(available, region, now)) {
+            is RetailBatchPublication -> result
+            RetailBatchUnavailable.Offline -> return RetailResult.Offline
+            RetailBatchUnavailable.Stale -> return RetailResult.Stale
+            RetailBatchUnavailable.NoCoverage -> return RetailResult.NoCoverage
+        }
+        val snapshot = data.snapshot
 
         val matches = snapshot.matches.filter { it.ingredientKey == key }.groupBy { it.packageId }
         if (matches.isEmpty()) return RetailResult.NoMatches
@@ -74,11 +68,7 @@ internal class RegionalRetailPriceRepository(
         val retailers = snapshot.retailers.associateBy { it.id }
         val packages = snapshot.packages.associateBy { it.id }
         val sources = snapshot.sources.associateBy { it.id }
-        val localStores = snapshot.stores.mapNotNull { store ->
-            available.singleOrNull {
-                it.store.id == store.id || (store.osmRef != null && it.store.osmRef == store.osmRef)
-            }?.let { store.id to it }
-        }.toMap()
+        val localStores = data.localStores
 
         var stale = false
         var validUntil = snapshot.expiresAt
@@ -111,7 +101,46 @@ internal class RegionalRetailPriceRepository(
         }.sortedWith(compareBy<RetailOffer> { it.denominator }.thenBy { it.normalized }
             .thenBy { it.match.kind }.thenBy { it.pack.id.value }
             .thenBy { it.price.record.origin.sourceId.value }.thenBy { it.price.record.origin.recordKey })
-        if (offers.isNotEmpty()) return RetailResult.Offers(offers, validUntil, publication.simulated)
+        if (offers.isNotEmpty()) return RetailResult.Offers(offers, validUntil, data.simulated)
         return if (stale) RetailResult.Stale else RetailResult.NoCoverage
     }
+
+    suspend fun load(postalCode: String, now: Instant): RetailBatch {
+        if (!postalCode.matches(Regex("[0-9]{5}"))) return RetailBatchUnavailable.NoCoverage
+        val available = stores.findByArea(postalCode).map { it.entry }
+        val region = available.map { it.area.regionId }.distinct().singleOrNull()
+            ?: return RetailBatchUnavailable.NoCoverage
+        return load(available, region, now)
+    }
+
+    private suspend fun load(available: List<DirectoryStore>, region: CommercialId, now: Instant): RetailBatch {
+        val configuredProvider = provider ?: return RetailBatchUnavailable.NoCoverage
+        if (!hasNetwork()) return RetailBatchUnavailable.Offline
+        val publication = try {
+            configuredProvider.publication(region)
+        } catch (error: IOException) {
+            if (!hasNetwork()) return RetailBatchUnavailable.Offline
+            throw error
+        } ?: return RetailBatchUnavailable.NoCoverage
+        val snapshot = publication.snapshot
+        require(snapshot.regionId == region)
+        if (publication.simulated && !allowSimulated) return RetailBatchUnavailable.NoCoverage
+        if (now < snapshot.generatedAt) return RetailBatchUnavailable.NoCoverage
+        if (now >= snapshot.expiresAt) return RetailBatchUnavailable.Stale
+        val localStores = snapshot.stores.mapNotNull { store ->
+            available.singleOrNull {
+                it.store.id == store.id || (store.osmRef != null && it.store.osmRef == store.osmRef)
+            }?.let { store.id to it }
+        }.toMap()
+
+        return RetailBatchPublication(snapshot, localStores, publication.simulated)
+    }
 }
+
+internal sealed interface RetailBatch
+internal enum class RetailBatchUnavailable : RetailBatch { NoCoverage, Offline, Stale }
+internal data class RetailBatchPublication(
+    val snapshot: PriceSnapshot,
+    val localStores: Map<CommercialId, DirectoryStore>,
+    val simulated: Boolean
+) : RetailBatch

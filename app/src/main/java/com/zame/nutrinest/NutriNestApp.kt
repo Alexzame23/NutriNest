@@ -8,6 +8,7 @@ import com.zame.nutrinest.data.prices.PriceSnapshotReader
 import com.zame.nutrinest.data.prices.RoomPriceSnapshotCache
 import com.zame.nutrinest.data.prices.HttpsRetailPriceProvider
 import com.zame.nutrinest.data.prices.RegionalRetailPriceRepository
+import com.zame.nutrinest.data.prices.RegionalShoppingPriceRepository
 import com.zame.nutrinest.data.stores.PilotStoreDirectory
 import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
@@ -45,20 +46,27 @@ class AppContainer(app: Application) {
 
     val storeRepository: StoreRepository = PilotStoreDirectory.repository
 
+    private suspend fun retailKeys(ids: Set<Long>): Map<Long, CommercialId> =
+        ids.chunked(900).flatMap { database.ingredientDao().retailBedcaRecordKeys(it) }
+            .mapNotNull { row ->
+                row.recordKey.takeIf { it.matches(Regex("[0-9]{1,32}")) }
+                    ?.let { row.ingredientId to CommercialId("bedca.$it") }
+            }.toMap()
+
     internal val retailPrices by lazy {
         @Suppress("DEPRECATION")
         val baseUrl = app.packageManager.getApplicationInfo(app.packageName, PackageManager.GET_META_DATA)
             .metaData?.getString("com.zame.nutrinest.RETAIL_PRICE_BASE_URL").orEmpty().trim()
         RegionalRetailPriceRepository(
-            ingredientKey = { id ->
-                database.ingredientDao().retailBedcaRecordKey(id)
-                    ?.takeIf { it.matches(Regex("[0-9]{1,32}")) }
-                    ?.let { CommercialId("bedca.$it") }
-            },
+            ingredientKey = { id -> retailKeys(setOf(id))[id] },
             stores = storeRepository,
             provider = baseUrl.takeIf(String::isNotBlank)?.let(::HttpsRetailPriceProvider),
             hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null }
         )
+    }
+
+    internal val shoppingPrices by lazy {
+        RegionalShoppingPriceRepository(retailPrices::load, ::retailKeys)
     }
 }
 

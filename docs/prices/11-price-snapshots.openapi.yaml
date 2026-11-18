@@ -229,6 +229,21 @@ components:
         packageId: { $ref: '#/components/schemas/Id' }
         kind: { type: string, enum: [EXACT, ALTERNATIVE] }
         confidence: { $ref: '#/components/schemas/Confidence' }
+        edibleMass:
+          type: object
+          description: Reviewed edible mass for this exact match. Omit if the evidence is unavailable.
+          required: [grams, sourceRef]
+          properties:
+            grams:
+              type: string
+              pattern: '^(?!0(?:[.]0+)?$)(0|[1-9][0-9]{0,8})([.][0-9]{1,3})?$'
+              description: Edible grams per complete pack, or per billed kilogram for variable-weight products.
+            sourceRef: { $ref: '#/components/schemas/Label' }
+      if:
+        required: [edibleMass]
+      then:
+        properties:
+          kind: { const: EXACT }
     Scope:
       type: object
       required: [type]
