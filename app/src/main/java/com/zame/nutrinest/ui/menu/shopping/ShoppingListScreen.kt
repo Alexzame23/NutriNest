@@ -26,11 +26,15 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +57,8 @@ import com.zame.nutrinest.data.local.entity.ShoppingItemWithIngredient
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.MenuRepository
 import com.zame.nutrinest.data.prices.ShoppingPriceRepository
+import com.zame.nutrinest.data.stores.RetailerSelectionRepository
+import com.zame.nutrinest.domain.stores.StoreRepository
 import com.zame.nutrinest.ui.ingredients.rememberIsSpanish
 import com.zame.nutrinest.ui.menu.ShoppingQuantity
 import com.zame.nutrinest.ui.menu.formatNaturalQuantity
@@ -85,7 +91,9 @@ class ShoppingListViewModel internal constructor(
     private val repository: MenuRepository,
     ingredientRepository: IngredientRepository,
     priceRepository: ShoppingPriceRepository,
-    private val savedState: SavedStateHandle
+    private val savedState: SavedStateHandle,
+    selections: RetailerSelectionRepository,
+    directory: StoreRepository
 ) : ViewModel() {
 
     private val viewingWeekStart = MutableStateFlow(
@@ -104,7 +112,8 @@ class ShoppingListViewModel internal constructor(
         ShoppingWeek(week, if (week == observedWeek) items.map { it.item } else emptyList())
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ShoppingWeek(viewingWeekStart.value, emptyList()))
 
-    internal val comparison = ShoppingComparison(viewModelScope, savedState, pricingWeek, priceRepository)
+    internal val comparison = ShoppingComparison(viewModelScope, savedState, pricingWeek, priceRepository,
+        selections = selections, directory = directory)
 
     internal val rows = weeklyItems
         .combine(ingredientRepository.observeMenuIngredientCatalog()) { (_, items), catalog ->
@@ -140,7 +149,8 @@ class ShoppingListViewModel internal constructor(
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp
                 ShoppingListViewModel(app.container.menuRepository, app.container.ingredientRepository,
-                    app.container.shoppingPrices, createSavedStateHandle())
+                    app.container.shoppingPrices, createSavedStateHandle(),
+                    app.container.retailerSelectionRepository, app.container.storeRepository)
             }
         }
     }
@@ -162,6 +172,11 @@ fun ShoppingListScreen(
     val basketResult = basket?.takeIf { it.request == basketRequest }?.result
     val namesById = remember(rows, spanish) { rows.associate { it.source.item.id to it.name(spanish) } }
     val quoted = (comparison.status as? ShoppingComparisonStatus.Published)?.prices
+
+    var showPreferences by rememberSaveable { mutableStateOf(false) }
+    if (showPreferences) {
+        RetailerSelectionScreen(comparison, viewModel.comparison, onClose = { showPreferences = false })
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -205,6 +220,9 @@ fun ShoppingListScreen(
                     shape = SegmentedButtonDefaults.itemShape(1, 2)
                 ) { Text(stringResource(R.string.week_next)) }
             }
+            TextButton(onClick = { showPreferences = true }) {
+                Text(stringResource(R.string.retailer_preferences_title))
+            }
             Spacer(Modifier.height(12.dp))
 
             if (grouped.isEmpty()) {
@@ -241,7 +259,7 @@ fun ShoppingListScreen(
                     }
                     if (basketRequest != null) {
                         item(key = "single_store_basket") {
-                            ShoppingBasketControls(basketRequest, basketResult, viewModel.comparison::selectRetailer)
+                            ShoppingBasketControls(basketRequest, basketResult)
                         }
                         item(key = "multi_store_basket") {
                             MultiStoreBasketContent(basketRequest, namesById)

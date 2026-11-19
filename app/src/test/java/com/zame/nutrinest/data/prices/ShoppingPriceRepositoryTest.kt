@@ -1,6 +1,18 @@
 package com.zame.nutrinest.data.prices
 
+import androidx.lifecycle.SavedStateHandle
+import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.stores.PilotStoreDirectory
+import com.zame.nutrinest.data.stores.RetailerSelectionRepository
+import com.zame.nutrinest.ui.menu.shopping.ShoppingComparison
+import com.zame.nutrinest.ui.menu.shopping.ShoppingComparisonStatus
+import com.zame.nutrinest.ui.menu.shopping.ShoppingWeek
+import com.zame.nutrinest.ui.menu.shopping.basketRequest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runCurrent
+import java.time.Clock
+import java.time.ZoneOffset
 import com.zame.nutrinest.domain.prices.*
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -58,6 +70,40 @@ class ShoppingPriceRepositoryTest {
         val absent = RegionalShoppingPriceRepository({ _, _ -> RetailBatchUnavailable.NoCoverage }, keys)
         assertEquals(ShoppingPrices.Unavailable(RetailBatchUnavailable.NoCoverage),
             absent.compare(listOf(first), "28012", now))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun selectingUnpricedStoreImmediatelyRemovesThePricedStoreFromRowsAndCoverage() = runTest {
+        val directory = PilotStoreDirectory.repository
+        val unpriced = directory.knownStores().single { it.id != store.id }
+        val preferences = RetailerSelectionRepository()
+        val week = MutableStateFlow(ShoppingWeek(10, listOf(ShoppingItemEntity(1, 12, 10, 300.0))))
+        var loads = 0
+        val repository = RegionalShoppingPriceRepository(
+            load = { _, _ -> loads++; batch() },
+            keys = { ids -> ids.associateWith { CommercialId("bedca.$it") } }
+        )
+        val model = ShoppingComparison(backgroundScope, SavedStateHandle(), week, repository,
+            Clock.fixed(now, ZoneOffset.UTC), selections = preferences, directory = directory)
+        model.changePostalCode("28012")
+        model.refresh()
+        runCurrent()
+        assertEquals(1, model.state.value.coveredCount)
+        assertEquals(setOf(store.id), model.state.value.pricedStores)
+        assertEquals(setOf(store.id, unpriced.id), model.state.value.availableStores)
+        model.restrictStores(store.retailerId)
+        model.selectStore(store, false)
+        runCurrent()
+        val state = model.state.value
+        val publication = (state.status as ShoppingComparisonStatus.Published).prices
+        assertEquals(ShoppingLinePrice.NoPrice, publication.rows[first.id])
+        assertEquals(0, state.coveredCount)
+        assertEquals(emptySet<CommercialId>(), state.basketRequest()?.stores)
+        assertEquals(setOf(store.id), state.pricedStores)
+        model.resetPreferences()
+        runCurrent()
+        assertEquals(1, model.state.value.coveredCount)
+        assertEquals(1, loads)
     }
 
     private fun batch(stale: Boolean = false): RetailBatchPublication {

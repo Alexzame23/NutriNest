@@ -11,11 +11,14 @@ import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.data.prices.RetailHttpError
 import com.zame.nutrinest.data.prices.RetailPriceRepository
 import com.zame.nutrinest.data.prices.RetailResult
+import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.Duration
@@ -34,7 +37,8 @@ internal sealed interface RetailUiState {
 internal class RetailPriceViewModel(
     private val savedState: SavedStateHandle,
     private val repository: RetailPriceRepository,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    preferences: StateFlow<RetailerSelectionPreferences>? = null
 ) : ViewModel() {
     private val ingredientId = checkNotNull(savedState.get<Long>("ingredientId"))
     private val state = MutableStateFlow<RetailUiState>(RetailUiState.EnterArea)
@@ -45,6 +49,13 @@ internal class RetailPriceViewModel(
 
     init {
         if (lastPostalCode.isNotEmpty()) search(lastPostalCode)
+        if (preferences != null) {
+            viewModelScope.launch {
+                preferences.drop(1).collect {
+                    if (lastPostalCode.isNotEmpty()) search(lastPostalCode)
+                }
+            }
+        }
     }
 
     fun search(input: String) {
@@ -84,7 +95,8 @@ internal class RetailPriceViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp
-                RetailPriceViewModel(createSavedStateHandle(), app.container.retailPrices)
+                RetailPriceViewModel(createSavedStateHandle(), app.container.retailPrices,
+                    preferences = app.container.retailerSelectionRepository.preferences)
             }
         }
     }

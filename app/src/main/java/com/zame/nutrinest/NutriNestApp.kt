@@ -10,6 +10,7 @@ import com.zame.nutrinest.data.prices.HttpsRetailPriceProvider
 import com.zame.nutrinest.data.prices.RegionalRetailPriceRepository
 import com.zame.nutrinest.data.prices.RegionalShoppingPriceRepository
 import com.zame.nutrinest.data.stores.PilotStoreDirectory
+import com.zame.nutrinest.data.stores.RetailerSelectionRepository
 import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
 import com.zame.nutrinest.data.repository.LocalFoodReferenceRepository
@@ -44,6 +45,8 @@ class AppContainer(app: Application) {
 
     val priceSnapshots: PriceSnapshotReader = RoomPriceSnapshotCache(database)
 
+    internal val retailerSelectionRepository = RetailerSelectionRepository(app)
+
     val storeRepository: StoreRepository = PilotStoreDirectory.repository
 
     private suspend fun retailKeys(ids: Set<Long>): Map<Long, CommercialId> =
@@ -61,7 +64,8 @@ class AppContainer(app: Application) {
             ingredientKey = { id -> retailKeys(setOf(id))[id] },
             stores = storeRepository,
             provider = baseUrl.takeIf(String::isNotBlank)?.let(::HttpsRetailPriceProvider),
-            hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null }
+            hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null },
+            selection = { retailerSelectionRepository.preferences.value }
         )
     }
 

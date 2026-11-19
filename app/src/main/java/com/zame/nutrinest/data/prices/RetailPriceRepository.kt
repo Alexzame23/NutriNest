@@ -3,6 +3,7 @@ package com.zame.nutrinest.data.prices
 import com.zame.nutrinest.domain.prices.*
 import com.zame.nutrinest.domain.stores.DirectoryStore
 import com.zame.nutrinest.domain.stores.StoreRepository
+import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.Duration
@@ -47,7 +48,8 @@ internal class RegionalRetailPriceRepository(
     private val stores: StoreRepository,
     private val provider: RetailPriceProvider?,
     private val allowSimulated: Boolean = false,
-    private val hasNetwork: () -> Boolean = { true }
+    private val hasNetwork: () -> Boolean = { true },
+    private val selection: () -> RetailerSelectionPreferences = { RetailerSelectionPreferences() }
 ) : RetailPriceRepository {
     override suspend fun compare(ingredientId: Long, postalCode: String, now: Instant): RetailResult {
         if (!postalCode.matches(Regex("[0-9]{5}"))) return RetailResult.NoCoverage
@@ -69,6 +71,7 @@ internal class RegionalRetailPriceRepository(
         val packages = snapshot.packages.associateBy { it.id }
         val sources = snapshot.sources.associateBy { it.id }
         val localStores = data.localStores
+        val preferences = selection()
 
         var stale = false
         var validUntil = snapshot.expiresAt
@@ -76,6 +79,7 @@ internal class RegionalRetailPriceRepository(
             val record = price.record
             val scope = record.scope as? ObservationScope.AtStore ?: return@mapNotNull null
             val store = localStores[scope.storeId] ?: return@mapNotNull null
+            if (!preferences.includes(store.store)) return@mapNotNull null
             val match = matches[record.packageId]?.singleOrNull() ?: return@mapNotNull null
             if (price.kind != PriceKind.REGULAR) return@mapNotNull null
             val observed = record.observedAt ?: record.observedOn.atStartOfDay(ZoneOffset.UTC).toInstant()

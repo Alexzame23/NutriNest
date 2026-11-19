@@ -760,4 +760,12 @@
     <string name="multi_shop">%1$s · %2$s</string>
     <string name="multi_visit_cost">Coste de visita confirmado · %1$s</string>
     <string name="multi_product">%1$s × %2$s (%3$s) · %4$s</string>
+    <string name="retailer_preferences_title">Preferencias de supermercados</string>
+    <string name="retailer_preferences_all_stores">Todas las tiendas de la zona</string>
+    <string name="retailer_preferences_reset">Restablecer filtros</string>
+    <string name="retailer_preferences_done">Listo</string>
+    <string name="retailer_preferences_priced">Precios verificables para esta lista</string>
+    <string name="retailer_preferences_available">Disponible en la zona · sin precios verificados para esta lista</string>
+    <string name="retailer_preferences_unavailable">Sin tiendas conocidas en esta zona</string>
+    <string name="retailer_preferences_no_effective_stores">Ninguna tienda seleccionada tiene cobertura para esta comparación.</string>
 </resources>

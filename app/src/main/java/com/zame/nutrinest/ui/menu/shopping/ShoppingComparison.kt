@@ -9,6 +9,10 @@ import com.zame.nutrinest.data.prices.ShoppingPriceDemand
 import com.zame.nutrinest.data.prices.ShoppingPriceRepository
 import com.zame.nutrinest.data.prices.ShoppingPrices
 import com.zame.nutrinest.domain.prices.CommercialId
+import com.zame.nutrinest.domain.prices.Store
+import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
+import com.zame.nutrinest.domain.stores.StoreRepository
+import com.zame.nutrinest.data.stores.RetailerSelectionRepository
 import com.zame.nutrinest.domain.prices.SingleStoreBasketOptimizer
 import com.zame.nutrinest.domain.prices.SingleStoreBasketResult
 import kotlinx.coroutines.CancellationException
@@ -41,14 +45,19 @@ internal data class ShoppingComparisonUiState(
     val status: ShoppingComparisonStatus = ShoppingComparisonStatus.Idle,
     val eligibleCount: Int = 0,
     val coveredCount: Int = 0,
-    val selectedRetailers: Set<CommercialId>? = null
+    val preferences: RetailerSelectionPreferences = RetailerSelectionPreferences(),
+    val chainNames: Map<CommercialId, String> = emptyMap(),
+    val knownStores: List<Store> = emptyList(),
+    val availableStores: Set<CommercialId> = emptySet(),
+    val pricedStores: Set<CommercialId> = emptySet()
 )
 
 internal data class ShoppingBasketRequest(
     val catalog: ShoppingBasketCatalog,
     val itemIds: Set<Long>,
     val retailers: Set<CommercialId>,
-    val now: Instant
+    val now: Instant,
+    val stores: Set<CommercialId>
 )
 
 internal data class ShoppingBasketQuote(
@@ -59,10 +68,10 @@ internal data class ShoppingBasketQuote(
 internal fun ShoppingComparisonUiState.basketRequest(): ShoppingBasketRequest? {
     val prices = (status as? ShoppingComparisonStatus.Published)?.prices ?: return null
     val catalog = prices.basketCatalog ?: return null
-    val retailers = catalog.retailers.map { it.id }.toSet()
-    if (prices.rows.isEmpty() || retailers.isEmpty()) return null
-    return ShoppingBasketRequest(catalog, prices.rows.keys,
-        selectedRetailers?.intersect(retailers) ?: retailers, prices.pricedAt)
+    if (prices.rows.isEmpty() || catalog.retailers.isEmpty()) return null
+    val stores = catalog.selectedStoreIds(preferences)
+    val retailers = catalog.snapshot.stores.filter { it.id in stores }.map { it.retailerId }.toSet()
+    return ShoppingBasketRequest(catalog, prices.rows.keys, retailers, prices.pricedAt, stores)
 }
 
 internal sealed interface ShoppingComparisonStatus {
@@ -80,12 +89,14 @@ internal class ShoppingComparison(
     private val week: StateFlow<ShoppingWeek>,
     private val repository: ShoppingPriceRepository,
     private val clock: Clock = Clock.systemUTC(),
-    private val basketDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val basketDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val selections: RetailerSelectionRepository = RetailerSelectionRepository(),
+    private val directory: StoreRepository? = null
 ) {
     private val postalCode = MutableStateFlow(savedState.get<String>("shoppingPricePostal").orEmpty())
     private val excludePurchased = MutableStateFlow(savedState.get<Boolean>("shoppingPriceExclude") ?: false)
-    private val selectedRetailers = MutableStateFlow(savedState.get<ArrayList<String>>("shoppingPriceRetailers")
-        ?.map(::CommercialId)?.toSet())
+    private val knownStores = MutableStateFlow(directory?.knownStores().orEmpty())
+    private val chainNames = MutableStateFlow<Map<CommercialId, String>>(emptyMap())
     private val quote = MutableStateFlow<Quote?>(null)
     private var request: Job? = null
 
@@ -95,19 +106,38 @@ internal class ShoppingComparison(
     )
     private data class PriceBasis(val weekStart: Long, val items: List<ShoppingPriceDemand>)
 
-    val state = combine(week, postalCode, excludePurchased, quote, selectedRetailers) { current, postal, exclude, result, selected ->
+    private val comparison = combine(week, postalCode, excludePurchased, quote, selections.preferences) {
+            current, postal, exclude, result, preferences ->
         val eligible = current.items.filter { !exclude || !it.purchased }
         val status = result?.takeIf { it.basis == current.priceBasis() }?.status
             ?: ShoppingComparisonStatus.Idle
-        val visible = if (status is ShoppingComparisonStatus.Published) {
-            val ids = eligible.map { it.id }.toSet()
-            ShoppingComparisonStatus.Published(status.prices.copy(rows = status.prices.rows.filterKeys { it in ids }))
+        val ids = eligible.map { it.id }.toSet()
+        val prices = (status as? ShoppingComparisonStatus.Published)?.prices
+        val rows = prices?.rows.orEmpty().filterKeys { it in ids }
+        val pricedStores = rows.values.filterIsInstance<ShoppingLinePrice.Options>()
+            .flatMap { it.values }.map { it.store.store.id }.toSet()
+        val visible = if (prices != null) {
+            ShoppingComparisonStatus.Published(prices.copy(rows = rows.mapValues { (_, row) ->
+                if (row is ShoppingLinePrice.Options) {
+                    val options = row.values.filter { preferences.includes(it.store.store) }
+                    if (options.isEmpty()) ShoppingLinePrice.NoPrice else ShoppingLinePrice.Options(options)
+                } else row
+            }))
         } else status
         val covered = (visible as? ShoppingComparisonStatus.Published)?.prices?.rows?.values
             ?.count { it is ShoppingLinePrice.Options } ?: 0
-        ShoppingComparisonUiState(postal, exclude, visible, eligible.size, covered, selected)
+        ShoppingComparisonUiState(postal, exclude, visible, eligible.size, covered, preferences,
+            availableStores = directory?.findByArea(postal.trim()).orEmpty()
+                .map { it.entry.store.id }.toSet() + prices?.basketCatalog?.let { catalog ->
+                    catalog.stores.map { catalog.directoryStores[it]?.id ?: it }
+                }.orEmpty(),
+            pricedStores = pricedStores)
+    }
+
+    val state = combine(comparison, knownStores, chainNames) { current, stores, names ->
+        current.copy(knownStores = stores, chainNames = names)
     }.stateIn(scope, SharingStarted.Eagerly, ShoppingComparisonUiState(postalCode.value, excludePurchased.value,
-        selectedRetailers = selectedRetailers.value))
+        preferences = selections.preferences.value, knownStores = knownStores.value))
 
     val basket = state.map { it.basketRequest() }.distinctUntilChanged().mapLatest { request ->
         if (request == null || request.retailers.isEmpty()) return@mapLatest null
@@ -115,7 +145,7 @@ internal class ShoppingComparison(
             val catalog = request.catalog
             ShoppingBasketQuote(request, SingleStoreBasketOptimizer.optimize(
                 catalog.demands.filterKeys { it in request.itemIds }, request.retailers, catalog.snapshot.regionId,
-                catalog.stores, catalog.snapshot, catalog.policy.copy(now = request.now),
+                request.stores, catalog.snapshot, catalog.policy.copy(now = request.now),
                 checkCancellation = { ensureActive() }
             ))
         }
@@ -124,10 +154,6 @@ internal class ShoppingComparison(
     fun changePostalCode(value: String) {
         if (value == postalCode.value) return
         reset()
-        if (postalCode.value.trim() != value.trim()) {
-            selectedRetailers.value = null
-            savedState.remove<ArrayList<String>>("shoppingPriceRetailers")
-        }
         postalCode.value = value
         savedState["shoppingPricePostal"] = value
     }
@@ -138,13 +164,38 @@ internal class ShoppingComparison(
     }
 
     fun selectRetailer(id: CommercialId, selected: Boolean) {
-        val request = state.value.basketRequest() ?: return
-        val available = request.catalog.retailers.map { it.id }.toSet()
-        if (id !in available) return
-        val current = selectedRetailers.value?.intersect(available) ?: available
-        val choices = if (selected) current + id else current - id
-        selectedRetailers.value = choices.takeUnless { it == available }
-        savedState["shoppingPriceRetailers"] = selectedRetailers.value?.mapTo(ArrayList()) { it.value }
+        selections.update { preferences ->
+            val current = preferences.selectedRetailers ?: (chainNames.value.keys +
+                knownStores.value.map { it.retailerId } + preferences.selectedStores.keys)
+            preferences.copy(selectedRetailers = if (selected) current + id else current - id)
+        }
+    }
+
+    fun selectStore(store: Store, selected: Boolean) = selectStore(store.retailerId, store.id, selected)
+
+    fun removeStore(retailer: CommercialId, store: CommercialId) = selectStore(retailer, store, false)
+
+    private fun selectStore(retailer: CommercialId, store: CommercialId, selected: Boolean) {
+        selections.update { preferences ->
+            val stores = preferences.selectedStores[retailer].orEmpty()
+            val next = if (selected) stores + store else stores - store
+            preferences.copy(selectedStores = preferences.selectedStores + (retailer to next))
+        }
+    }
+
+    fun restrictStores(retailer: CommercialId) {
+        selections.update { preferences ->
+            val stores = knownStores.value.filter { it.retailerId == retailer }.map { it.id }.toSet()
+            preferences.copy(selectedStores = preferences.selectedStores + (retailer to stores))
+        }
+    }
+
+    fun allowAllStores(retailer: CommercialId) {
+        selections.update { it.copy(selectedStores = it.selectedStores - retailer) }
+    }
+
+    fun resetPreferences() {
+        selections.update { RetailerSelectionPreferences() }
     }
 
     fun reset() {
@@ -176,6 +227,18 @@ internal class ShoppingComparison(
                 is ShoppingPrices.Unavailable ->
                     quote.value = Quote(basis, ShoppingComparisonStatus.Unavailable(result.reason))
                 is ShoppingPrices.Published -> {
+                    result.basketCatalog?.let { catalog ->
+                        val names = catalog.retailers.associate { it.id to it.name }
+                        val localStores = catalog.snapshot.stores.filter { it.id in catalog.stores }
+                            .map { published ->
+                                val store = catalog.directoryStores[published.id] ?: published
+                                store to names.getValue(published.retailerId)
+                            }
+                        chainNames.value = chainNames.value + localStores.associate { (store, name) ->
+                            store.retailerId to name
+                        }
+                        knownStores.value = (knownStores.value + localStores.map { it.first }).distinctBy { it.id }
+                    }
                     var published: ShoppingPrices.Published = result
                     while (clock.instant() < published.expiresAt) {
                         val now = clock.instant()

@@ -5,6 +5,7 @@ import com.zame.nutrinest.domain.nutrition.Quantity
 import com.zame.nutrinest.domain.nutrition.UnitDefinition
 import com.zame.nutrinest.domain.prices.*
 import com.zame.nutrinest.domain.stores.DirectoryStore
+import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
@@ -31,8 +32,13 @@ internal data class ShoppingBasketCatalog(
     val snapshot: PriceSnapshot,
     val stores: Set<CommercialId>,
     val demands: Map<Long, PriceDemand?>,
-    val policy: ComparisonPolicy
+    val policy: ComparisonPolicy,
+    val directoryStores: Map<CommercialId, Store> = emptyMap()
 ) {
+    fun selectedStoreIds(preferences: RetailerSelectionPreferences): Set<CommercialId> =
+        snapshot.stores.filter { it.id in stores && preferences.includes(directoryStores[it.id] ?: it) }
+            .map { it.id }.toSet()
+
     val retailers = snapshot.retailers.filter { retailer ->
         snapshot.stores.any { it.id in stores && it.retailerId == retailer.id }
     }.sortedWith(compareBy<Retailer> { it.name }.thenBy { it.id.value })
@@ -109,7 +115,8 @@ internal class RegionalShoppingPriceRepository(
                 else -> ShoppingLinePrice.NoPrice
             }
         }
-        val catalog = ShoppingBasketCatalog(snapshot, publication.localStores.keys, demands, policy)
+        val catalog = ShoppingBasketCatalog(snapshot, publication.localStores.keys, demands, policy,
+            publication.localStores.mapValues { (_, entry) -> entry.store })
         return ShoppingPrices.Published(rows, snapshot.generatedAt, snapshot.expiresAt, publication.simulated, catalog, now)
     }
 }

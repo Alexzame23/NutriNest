@@ -3,6 +3,8 @@ package com.zame.nutrinest.ui.menu.shopping
 import androidx.lifecycle.SavedStateHandle
 import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.prices.*
+import com.zame.nutrinest.data.stores.RetailerSelectionRepository
+import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
 import com.zame.nutrinest.domain.prices.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -121,4 +123,59 @@ class ShoppingComparisonTest {
         assertEquals(emptySet<CommercialId>(), model.state.value.basketRequest()?.retailers)
         assertEquals(null, model.basket.value)
     }
+    @Test fun missingCoverageKeepsChainAndStoreChoicesUntilTheyReturnOrAreReset() = runTest {
+        val week = MutableStateFlow(ShoppingWeek(10, listOf(pending)))
+        val source = PriceSource(CommercialId("source"), "Source", SourceKind.OPEN_DATA, "License", "Credit")
+        val chains = listOf("a", "b", "c").map { name ->
+            Retailer(CommercialId(name), ProviderRecord(source.id, name), name)
+        }
+        val stores = chains.map { Store(CommercialId("store.${it.id.value}"), it.origin, it.id, it.name) }
+        val secondBranch = stores[0].copy(id = CommercialId("store.a2"), origin = ProviderRecord(source.id, "a2"), name = "A2")
+        val directoryId = CommercialId("directory.a")
+        val directoryStore = stores[0].copy(id = directoryId)
+        val snapshot = PriceSnapshot(1, CommercialId("region"), 1, now, now.plusSeconds(3600),
+            listOf(source), chains, stores + secondBranch, emptyList(), emptyList(), emptyList(),
+            emptyList(), emptyList(), emptyList())
+        val catalog = ShoppingBasketCatalog(snapshot, (stores + secondBranch).map { it.id }.toSet(),
+            mapOf(pending.id to null), ComparisonPolicy(now, ZoneId.of("Europe/Madrid")),
+            mapOf(stores[0].id to directoryStore))
+        val selected = RetailerSelectionPreferences(setOf(chains[0].id, chains[1].id),
+            mapOf(chains[0].id to setOf(directoryId)))
+        val preferences = RetailerSelectionRepository().apply { update { selected } }
+        var calls = 0
+        val model = ShoppingComparison(backgroundScope, SavedStateHandle(), week,
+            ShoppingPriceRepository { _, postal, _ ->
+                calls++
+                if (postal == "28012") ShoppingPrices.Published(
+                    mapOf(pending.id to ShoppingLinePrice.NoEquivalent), now, snapshot.expiresAt, false, catalog)
+                else ShoppingPrices.Unavailable(RetailBatchUnavailable.NoCoverage)
+            }, clock, StandardTestDispatcher(testScheduler), selections = preferences)
+        backgroundScope.launch { model.basket.collect {} }
+
+        model.changePostalCode("28012")
+        model.refresh()
+        runCurrent()
+        assertEquals(setOf(stores[0].id, stores[1].id), model.state.value.basketRequest()?.stores)
+
+        model.changePostalCode("28013")
+        model.refresh()
+        runCurrent()
+        assertEquals(ShoppingComparisonStatus.Unavailable(RetailBatchUnavailable.NoCoverage), model.state.value.status)
+        assertEquals(selected, model.state.value.preferences)
+        assertEquals(null, model.basket.value)
+
+        model.changePostalCode("28012")
+        model.refresh()
+        runCurrent()
+        assertEquals(setOf(stores[0].id, stores[1].id), model.state.value.basketRequest()?.stores)
+        model.selectRetailer(chains[0].id, false)
+        runCurrent()
+        assertEquals(setOf(stores[1].id), model.state.value.basketRequest()?.stores)
+        assertEquals(selected.selectedStores, model.state.value.preferences.selectedStores)
+        model.resetPreferences()
+        runCurrent()
+        assertEquals(catalog.stores, model.state.value.basketRequest()?.stores)
+        assertEquals(3, calls)
+    }
+
 }

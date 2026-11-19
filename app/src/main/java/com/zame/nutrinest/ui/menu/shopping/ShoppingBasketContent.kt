@@ -2,12 +2,9 @@ package com.zame.nutrinest.ui.menu.shopping
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -17,20 +14,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.domain.prices.BasketMissingReason
-import com.zame.nutrinest.domain.prices.CommercialId
 import com.zame.nutrinest.domain.prices.ContentUnit
 import com.zame.nutrinest.domain.prices.MatchKind
 import com.zame.nutrinest.domain.prices.SingleStoreBasket
@@ -41,29 +35,14 @@ import java.util.Currency
 @Composable
 internal fun ShoppingBasketControls(
     request: ShoppingBasketRequest,
-    result: SingleStoreBasketResult?,
-    onRetailerSelected: (CommercialId, Boolean) -> Unit
+    result: SingleStoreBasketResult?
 ) {
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(stringResource(R.string.shopping_basket_title), Modifier.semantics { heading() },
             style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.shopping_basket_select))
-        for (retailer in request.catalog.retailers) {
-            val selected = retailer.id in request.retailers
-            Row(
-                Modifier.fillMaxWidth().toggleable(selected, role = Role.Checkbox) {
-                    onRetailerSelected(retailer.id, it)
-                }.padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Checkbox(selected, onCheckedChange = null)
-                Text(retailer.name)
-            }
-        }
         val winner = result?.winner
         val summary = when {
-            request.retailers.isEmpty() -> stringResource(R.string.shopping_basket_select_one)
+            request.retailers.isEmpty() -> stringResource(R.string.retailer_preferences_no_effective_stores)
             result == null -> stringResource(R.string.shopping_basket_loading)
             result.rankingPending -> stringResource(R.string.shopping_basket_ranking_pending)
             winner == null -> stringResource(R.string.shopping_basket_no_complete)

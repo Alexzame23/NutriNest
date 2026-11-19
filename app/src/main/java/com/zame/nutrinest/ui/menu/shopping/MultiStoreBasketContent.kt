@@ -27,12 +27,11 @@ internal fun MultiStoreBasketContent(request: ShoppingBasketRequest, names: Map<
     val catalog = request.catalog
     val region = catalog.snapshot.regionId.value
     val stores = remember(request) { catalog.snapshot.stores.filter {
-        it.id in catalog.stores && it.retailerId in request.retailers
+        it.id in request.stores
     }.sortedBy { it.id.value } }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var maximum by rememberSaveable { mutableStateOf("2") }
     var travel by rememberSaveable { mutableStateOf(false) }
-    var excluded by rememberSaveable(region) { mutableStateOf(arrayListOf<String>()) }
     var fees by rememberSaveable(region) { mutableStateOf(Bundle()) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         TextButton(onClick = { expanded = !expanded }) { Text(stringResource(R.string.multi_title)) }
@@ -41,14 +40,10 @@ internal fun MultiStoreBasketContent(request: ShoppingBasketRequest, names: Map<
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             label = { Text(stringResource(R.string.multi_limit)) })
         Selection(stringResource(R.string.multi_travel), travel) { travel = it }
-        val selected = stores.filter { it.id.value !in excluded }
         val costs = mutableMapOf<CommercialId, VerifiedVisitCost>()
         var invalidFee = false
         for (store in stores) {
-            Selection(store.name, store in selected) { enabled ->
-                excluded = ArrayList(if (enabled) excluded - store.id.value else excluded + store.id.value)
-            }
-            if (travel && store in selected) {
+            if (travel) {
                 val value = fees.getString(store.id.value).orEmpty()
                 OutlinedTextField(value, { input -> fees = Bundle(fees).apply { putString(store.id.value, input) } },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -65,14 +60,14 @@ internal fun MultiStoreBasketContent(request: ShoppingBasketRequest, names: Map<
             }
         }
         val limit = maximum.toIntOrNull()
-        val ids = selected.map { it.id }.toSet()
-        key(request, ids, maximum, travel, fees) {
+        val ids = request.stores
+        key(region, maximum, travel, fees) {
             var run by rememberSaveable { mutableStateOf(false) }
             Button(onClick = { run = true }, enabled = !run && limit != null && limit > 0 &&
                 ids.isNotEmpty() && !invalidFee) {
                 Text(stringResource(if (travel) R.string.multi_confirm else R.string.multi_compare))
             }
-            if (run && limit != null) {
+            if (run && limit != null && ids.isNotEmpty() && !invalidFee) key(request) {
                 val result by produceState<MultiStoreBasketResult?>(null) {
                     value = withContext(Dispatchers.Default) {
                         MultiStoreBasketOptimizer.optimize(catalog.demands.filterKeys { it in request.itemIds },

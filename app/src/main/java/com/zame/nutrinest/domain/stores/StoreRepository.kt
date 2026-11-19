@@ -49,11 +49,14 @@ data class DirectoryStore(
 
 data class NearbyStore(val entry: DirectoryStore, val distanceKm: Double?)
 interface StoreRepository {
+    fun knownStores(): List<Store> = emptyList()
     fun findByArea(postalCodeOrMunicipality: String): List<NearbyStore>
     fun findNearby(origin: GeoPoint, radiusKm: Double): List<NearbyStore>
 }
 
 internal class LocalStoreRepository(private val entries: List<DirectoryStore>) : StoreRepository {
+    override fun knownStores(): List<Store> = entries.map { it.store }
+
     override fun findByArea(postalCodeOrMunicipality: String): List<NearbyStore> {
         val query = normalize(postalCodeOrMunicipality)
         val matches = entries.filter {

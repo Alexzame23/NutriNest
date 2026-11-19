@@ -752,4 +752,12 @@
     <string name="multi_shop">%1$s · %2$s</string>
     <string name="multi_visit_cost">Confirmed visit cost · %1$s</string>
     <string name="multi_product">%1$s × %2$s (%3$s) · %4$s</string>
+    <string name="retailer_preferences_title">Supermarket preferences</string>
+    <string name="retailer_preferences_all_stores">All local stores</string>
+    <string name="retailer_preferences_reset">Reset filters</string>
+    <string name="retailer_preferences_done">Done</string>
+    <string name="retailer_preferences_priced">Verifiable prices for this list</string>
+    <string name="retailer_preferences_available">Available in this area · no verified prices for this list</string>
+    <string name="retailer_preferences_unavailable">No known stores in this area</string>
+    <string name="retailer_preferences_no_effective_stores">No selected stores have coverage for this comparison.</string>
 </resources>

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.zame.nutrinest.data.prices.*
 import com.zame.nutrinest.data.stores.PilotStoreDirectory
+import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
 import com.zame.nutrinest.domain.prices.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -78,6 +79,26 @@ class RetailPriceViewModelTest {
         scenario(fixture, allowSimulated = true) {
             assertTrue((it.uiState.value as RetailUiState.Content).result.simulated)
         }
+    }
+
+    @Test fun ingredientOffersUseDirectoryIdentitiesForPublisherAliases() = runTest {
+        val directory = PilotStoreDirectory.repository
+        val branch = directory.findByArea("28012").first().entry.store
+        var preferences = RetailerSelectionPreferences(setOf(branch.retailerId),
+            mapOf(branch.retailerId to setOf(branch.id)))
+        val repository = RegionalRetailPriceRepository(
+            ingredientKey = { key },
+            stores = directory,
+            provider = RetailPriceProvider { RetailPublication(snapshot(), false) },
+            selection = { preferences }
+        )
+        val offers = repository.compare(42, "28012", now) as RetailResult.Offers
+        assertEquals(setOf(branch.id), offers.rows.map { it.store.store.id }.toSet())
+        preferences = preferences.copy(selectedRetailers = emptySet())
+        assertEquals(RetailResult.NoCoverage, repository.compare(42, "28012", now))
+        preferences = RetailerSelectionPreferences(setOf(branch.retailerId),
+            mapOf(branch.retailerId to setOf(CommercialId("missing-store"))))
+        assertEquals(RetailResult.NoCoverage, repository.compare(42, "28012", now))
     }
 
     private fun scenario(
