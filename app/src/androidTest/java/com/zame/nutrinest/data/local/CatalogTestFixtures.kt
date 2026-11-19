@@ -12,8 +12,12 @@ internal object CatalogTestFixtures {
         db.execSQL("INSERT INTO recipes (id,name,category,createdAt,isFavorite) VALUES (21,'Fixture recipe','Main Dish',123,1)")
         db.execSQL("INSERT INTO recipe_ingredients (recipeId,ingredientId,grams) VALUES (21,11,137.123456789)")
         db.execSQL("INSERT INTO recipe_steps (id,recipeId,position,text) VALUES (22,21,0,'Keep this exact step')")
-        db.execSQL("INSERT INTO profiles (id,name,dateOfBirth,sex,heightCm,weightKg,activityLevel,goal,formula,unitSystem,colorIndex,createdAt,weightLossRate) VALUES (31,'Fixture person',123,'FEMALE',163.7,61.2,'MODERATE','MAINTAIN','AUTO','METRIC',2,456,'MODERATE')")
+        if (version == 1) return
+        val rateColumn = if (version >= 3) ",weightLossRate" else ""
+        val rateValue = if (version >= 3) ",'MODERATE'" else ""
+        db.execSQL("INSERT INTO profiles (id,name,dateOfBirth,sex,heightCm,weightKg,activityLevel,goal,formula,unitSystem,colorIndex,createdAt$rateColumn) VALUES (31,'Fixture person',123,'FEMALE',163.7,61.2,'MODERATE','MAINTAIN','AUTO','METRIC',2,456$rateValue)")
         db.execSQL("INSERT INTO weight_entries (id,profileId,weightKg,recordedAt) VALUES (32,31,61.125,789)")
+        if (version < 4) return
         db.execSQL("INSERT INTO weekly_menus (id,weekStart,slotsSpec,createdAt) VALUES (41,1000,'LUNCH:1',123)")
         if (version >= 7) {
             db.execSQL("INSERT INTO planned_meals (id,menuId,dayOfWeek,slot,recipeId,isLocked,isCheatMeal,course,profileId,isFree) VALUES (42,41,0,'LUNCH',21,1,0,'MAIN',31,0)")
@@ -48,9 +52,11 @@ internal object CatalogTestFixtures {
     fun snapshot(
         db: SupportSQLiteDatabase,
         tables: List<String>,
-        projections: Map<String, String> = emptyMap()
+        projections: Map<String, String> = emptyMap(),
+        predicates: Map<String, String> = emptyMap()
     ): Map<String, List<String>> = tables.associateWith { table ->
-        db.query("SELECT ${projections[table] ?: "*"} FROM `$table`").use { c ->
+        val where = predicates[table]?.let { " WHERE $it" }.orEmpty()
+        db.query("SELECT ${projections[table] ?: "*"} FROM `$table`$where").use { c ->
             buildList { while (c.moveToNext()) add((0 until c.columnCount).joinToString("|") { i ->
                 val value = when (c.getType(i)) {
                     Cursor.FIELD_TYPE_NULL -> "NULL"

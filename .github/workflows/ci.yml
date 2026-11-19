@@ -28,6 +28,9 @@ jobs:
       - name: Migrations and shipped food database
         run: python3 tools/verify_migration.py
 
+      - name: Recover an interrupted profile-table migration and retry
+        run: python3 tools/verify_upgrade_interruption.py
+
       - name: DAO queries compile against the migrated schema
         run: python3 tools/check_dao_sql.py
 

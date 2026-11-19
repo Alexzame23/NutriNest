@@ -1,0 +1,19 @@
+[
+  [
+    "CREATE TABLE `ingredients` (\n        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL,\n        `foodType` TEXT NOT NULL, `kcal` REAL NOT NULL, `carbs` REAL NOT NULL,\n        `fats` REAL NOT NULL, `protein` REAL NOT NULL, `imagePath` TEXT,\n        `isCustom` INTEGER NOT NULL, `remoteId` TEXT)",
+    "CREATE TABLE `recipes` (\n        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL,\n        `category` TEXT NOT NULL, `folder` TEXT, `coverImagePath` TEXT,\n        `createdAt` INTEGER NOT NULL, `remoteId` TEXT, `isFavorite` INTEGER NOT NULL)",
+    "CREATE UNIQUE INDEX `index_recipes_name` ON `recipes` (`name`)",
+    "CREATE TABLE `recipe_ingredients` (\n        `recipeId` INTEGER NOT NULL, `ingredientId` INTEGER NOT NULL, `grams` REAL NOT NULL,\n        PRIMARY KEY(`recipeId`, `ingredientId`),\n        FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,\n        FOREIGN KEY(`ingredientId`) REFERENCES `ingredients`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT)",
+    "CREATE INDEX `index_recipe_ingredients_ingredientId` ON `recipe_ingredients` (`ingredientId`)",
+    "CREATE TABLE `recipe_steps` (\n        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `recipeId` INTEGER NOT NULL,\n        `position` INTEGER NOT NULL, `text` TEXT NOT NULL, `imagePath` TEXT,\n        FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+    "CREATE INDEX `index_recipe_steps_recipeId` ON `recipe_steps` (`recipeId`)"
+  ],
+  [
+    "CREATE TABLE IF NOT EXISTS `profiles` (\n                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n                        `name` TEXT NOT NULL,\n                        `dateOfBirth` INTEGER NOT NULL,\n                        `sex` TEXT NOT NULL,\n                        `heightCm` REAL NOT NULL,\n                        `weightKg` REAL NOT NULL,\n                        `bodyFatPercent` REAL,\n                        `activityLevel` TEXT NOT NULL,\n                        `goal` TEXT NOT NULL,\n                        `formula` TEXT NOT NULL,\n                        `unitSystem` TEXT NOT NULL,\n                        `dietaryPreferences` TEXT,\n                        `allergies` TEXT,\n                        `colorIndex` INTEGER NOT NULL,\n                        `createdAt` INTEGER NOT NULL,\n                        `remoteId` TEXT\n                    )",
+    "CREATE TABLE IF NOT EXISTS `weight_entries` (\n                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n                        `profileId` INTEGER NOT NULL,\n                        `weightKg` REAL NOT NULL,\n                        `recordedAt` INTEGER NOT NULL,\n                        FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)\n                            ON UPDATE NO ACTION ON DELETE CASCADE\n                    )",
+    "CREATE INDEX IF NOT EXISTS `index_weight_entries_profileId` ON `weight_entries` (`profileId`)"
+  ],
+  [
+    "ALTER TABLE `profiles` ADD COLUMN `weightLossRate` TEXT NOT NULL DEFAULT 'MODERATE'"
+  ]
+]

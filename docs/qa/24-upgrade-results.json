@@ -1,0 +1,91 @@
+{
+  "target": 11,
+  "device": "Medium_Phone_API_36.0 (Android 16)",
+  "instrumentedTests": 23,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "runnerSeconds": 149.687,
+  "upgrades": [
+    {
+      "seconds": 11.568,
+      "historicalRows": 5,
+      "ingredientsAfter": 925,
+      "criticalSha256": "4297c3ada721ad6969787bfd5f27e2eaa15d5e834e178fcc625d83b9a34e62e5",
+      "originalSha256": "b7e70be6a6d6aa8e127e58d863c47b492b85c447fd541920c3a3c1f4ea8434ad",
+      "from": 1
+    },
+    {
+      "seconds": 10.26,
+      "historicalRows": 7,
+      "ingredientsAfter": 925,
+      "criticalSha256": "bd3d3f7d9c5adcfac0385186096099723ef73914393b7008242e04c652012914",
+      "originalSha256": "0bb210a2092b67ca818be461fd37405e9bc570424dcb495c0845ab5b216259fc",
+      "from": 2
+    },
+    {
+      "seconds": 11.323,
+      "historicalRows": 7,
+      "ingredientsAfter": 925,
+      "criticalSha256": "42ea02777adff92e61f921be6a7faba6fdebe3e278f9aab8a5658f6e691ad19f",
+      "originalSha256": "9e258a165369528b8ae6d390d6044351352d493868d0cb09db16a962e9b08d03",
+      "from": 3
+    },
+    {
+      "seconds": 10.67,
+      "historicalRows": 11,
+      "ingredientsAfter": 925,
+      "criticalSha256": "0e32ba3bcac7bbe4880a41e54e503babb6867e63a84606d6e24d256d0bea4da6",
+      "originalSha256": "5fbabc5a14ba5eeb90103ba8ef96a153406e71e649025e3c94c5e610504d4deb",
+      "from": 4
+    },
+    {
+      "seconds": 10.469,
+      "historicalRows": 22,
+      "ingredientsAfter": 926,
+      "criticalSha256": "74affad044adc6fc79e73194071fa72d3c935ae880106b0cf70a00a6e73e8c32",
+      "originalSha256": "17290847c45e42f7f05d8b26b8d6baf991cfa64072e1f0fbf15057f2a0858d35",
+      "from": 5
+    },
+    {
+      "seconds": 11.143,
+      "historicalRows": 22,
+      "ingredientsAfter": 926,
+      "criticalSha256": "74affad044adc6fc79e73194071fa72d3c935ae880106b0cf70a00a6e73e8c32",
+      "originalSha256": "e8cde7a481c2868e308d02b75531c7ce8e5efe8d2d09670fcbbcb5d662cc96c0",
+      "from": 6
+    },
+    {
+      "seconds": 10.134,
+      "historicalRows": 24,
+      "ingredientsAfter": 926,
+      "criticalSha256": "fc5598179ebeb07bccff355ccac2f443a9c740fb285e6d07cdcdf43fe3fd5943",
+      "originalSha256": "ddd30cd62993d6754e60238b0dabe2bc9c1e7654346891903938170f67fc9ce2",
+      "from": 7
+    },
+    {
+      "seconds": 10.263,
+      "historicalRows": 24,
+      "ingredientsAfter": 926,
+      "criticalSha256": "1404e0921818b4ac19df26283e1acabcc4e0d55e13f6f8f71fd6953aac61c548",
+      "originalSha256": "b6e660486380d95c83f2ed316206d8566db105dc690fb0f1e94cbbf28cfbba48",
+      "from": 8
+    },
+    {
+      "seconds": 10.291,
+      "historicalRows": 28,
+      "ingredientsAfter": 926,
+      "criticalSha256": "a9fd1f8997e27da2dd418a2b7676ee978196f58ecf748425352f1ffe80227eab",
+      "originalSha256": "8777ca587192a90612fca327f0ec6debaaef9ef2a21d32569dd666f94ba79a4c",
+      "from": 9
+    },
+    {
+      "seconds": 10.539,
+      "historicalRows": 28,
+      "ingredientsAfter": 926,
+      "criticalSha256": "b5e1c500d8c605da328962289ac6ec98acb32d8a341c376295d16fbb457403c3",
+      "originalSha256": "1c72c9e1ba62641fb3f9e998d06a30e5febe5f2329d601fdab9ce7017ba506f9",
+      "from": 10
+    }
+  ]
+}
