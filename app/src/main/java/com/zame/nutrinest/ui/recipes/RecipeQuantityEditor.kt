@@ -3,8 +3,7 @@ package com.zame.nutrinest.ui.recipes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -86,8 +85,8 @@ internal fun RecipeQuantityFields(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (options.size > 1) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(options, key = { it.unit.key }) { measure ->
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEach { measure ->
                     FilterChip(
                         selected = editor.measure == measure,
                         enabled = editor.quantity != null,

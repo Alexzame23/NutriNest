@@ -44,8 +44,9 @@ internal class RetailPriceViewModel(
     private val state = MutableStateFlow<RetailUiState>(RetailUiState.EnterArea)
     val uiState = state.asStateFlow()
     private var request: Job? = null
+    private val initialArea = savedState.get<String>("postalCode").orEmpty()
 
-    val lastPostalCode: String get() = savedState.get<String>("retailPostalCode").orEmpty()
+    val lastPostalCode: String get() = savedState.get<String>("retailPostalCode") ?: initialArea
 
     init {
         if (lastPostalCode.isNotEmpty()) search(lastPostalCode)
@@ -60,6 +61,7 @@ internal class RetailPriceViewModel(
 
     fun search(input: String) {
         val postalCode = input.trim()
+        if (request?.isActive == true && state.value == RetailUiState.Loading && postalCode == lastPostalCode) return
         savedState["retailPostalCode"] = postalCode
         request?.cancel()
         state.value = RetailUiState.Loading

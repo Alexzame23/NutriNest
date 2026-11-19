@@ -98,7 +98,7 @@ fun IngredientDetailScreen(
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
     onCompare: (Long) -> Unit,
-    onRetail: (Long) -> Unit,
+    onRetail: ((Long) -> Unit)?,
     viewModel: IngredientDetailViewModel = viewModel(factory = IngredientDetailViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -244,7 +244,7 @@ fun IngredientDetailScreen(
         ) {
             item("header") { Header(state, spanish) }
             item("retail") {
-                TextButton(onClick = { onRetail(ingredient.id) }) {
+                if (onRetail != null) TextButton(onClick = { onRetail(ingredient.id) }) {
                     Text(stringResource(R.string.retail_title))
                 }
             }

@@ -30,7 +30,7 @@ import com.zame.nutrinest.domain.prices.MatchKind
 import com.zame.nutrinest.domain.prices.SingleStoreBasket
 import com.zame.nutrinest.domain.prices.SingleStoreBasketResult
 import java.text.NumberFormat
-import java.util.Currency
+import com.zame.nutrinest.ui.components.rememberEuroFormat
 
 @Composable
 internal fun ShoppingBasketControls(
@@ -60,9 +60,7 @@ internal fun ShoppingBasketControls(
 @Composable
 internal fun ShoppingBasketAlternative(basket: SingleStoreBasket, itemNames: Map<Long, String>) {
     val locale = LocalConfiguration.current.locales[0]
-    val money = remember(locale) {
-        NumberFormat.getCurrencyInstance(locale).apply { currency = Currency.getInstance("EUR") }
-    }
+    val money = rememberEuroFormat()
     val quantity = remember(locale) { NumberFormat.getNumberInstance(locale) }
     var expanded by rememberSaveable(basket.store?.id?.value) { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth()) {
@@ -75,7 +73,8 @@ internal fun ShoppingBasketAlternative(basket: SingleStoreBasket, itemNames: Map
             ))
             basket.checkoutEur?.let { checkout ->
                 Text(stringResource(if (basket.isComplete) R.string.shopping_basket_checkout
-                    else R.string.shopping_basket_partial_checkout, money.format(checkout)))
+                    else R.string.shopping_basket_partial_checkout, money.format(checkout)),
+                    style = MaterialTheme.typography.titleMedium)
             }
             basket.proportionalEur?.let { Text(stringResource(R.string.shopping_basket_proportional, money.format(it))) }
             if (basket.unconfirmedStockCount > 0) Text(stringResource(R.string.shopping_basket_stock_unconfirmed))

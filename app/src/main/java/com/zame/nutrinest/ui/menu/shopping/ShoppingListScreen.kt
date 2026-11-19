@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ShoppingCart
@@ -26,7 +27,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -39,6 +39,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -50,8 +53,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.zame.nutrinest.BuildConfig
 import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.R
+import com.zame.nutrinest.ui.components.PriceLink
 import com.zame.nutrinest.data.local.entity.IngredientCategories
 import com.zame.nutrinest.data.local.entity.ShoppingItemWithIngredient
 import com.zame.nutrinest.data.repository.IngredientRepository
@@ -160,6 +165,7 @@ class ShoppingListViewModel internal constructor(
 @Composable
 fun ShoppingListScreen(
     onBack: () -> Unit,
+    onRetail: (Long, String) -> Unit = { _, _ -> },
     viewModel: ShoppingListViewModel = viewModel(factory = ShoppingListViewModel.Factory)
 ) {
     val rows by viewModel.rows.collectAsStateWithLifecycle()
@@ -167,14 +173,16 @@ fun ShoppingListScreen(
     val grouped = remember(rows, spanish) { groupShoppingRows(rows, spanish) }
     val isCurrentWeek by viewModel.isCurrentWeek.collectAsStateWithLifecycle()
     val comparison by viewModel.comparison.state.collectAsStateWithLifecycle()
-    val basket by viewModel.comparison.basket.collectAsStateWithLifecycle()
+    val basket = if (BuildConfig.RETAIL_PRICES_ENABLED) {
+        viewModel.comparison.basket.collectAsStateWithLifecycle().value
+    } else null
     val basketRequest = remember(comparison) { comparison.basketRequest() }
     val basketResult = basket?.takeIf { it.request == basketRequest }?.result
     val namesById = remember(rows, spanish) { rows.associate { it.source.item.id to it.name(spanish) } }
     val quoted = (comparison.status as? ShoppingComparisonStatus.Published)?.prices
 
     var showPreferences by rememberSaveable { mutableStateOf(false) }
-    if (showPreferences) {
+    if (BuildConfig.RETAIL_PRICES_ENABLED && showPreferences) {
         RetailerSelectionScreen(comparison, viewModel.comparison, onClose = { showPreferences = false })
     }
 
@@ -202,58 +210,60 @@ fun ShoppingListScreen(
             )
         }
     ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 20.dp)
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = isCurrentWeek,
-                    onClick = viewModel::showCurrentWeek,
-                    shape = SegmentedButtonDefaults.itemShape(0, 2)
-                ) { Text(stringResource(R.string.week_current)) }
-                SegmentedButton(
-                    selected = !isCurrentWeek,
-                    onClick = viewModel::showNextWeek,
-                    shape = SegmentedButtonDefaults.itemShape(1, 2)
-                ) { Text(stringResource(R.string.week_next)) }
+            item(key = "week") {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = isCurrentWeek,
+                        onClick = viewModel::showCurrentWeek,
+                        shape = SegmentedButtonDefaults.itemShape(0, 2)
+                    ) { Text(stringResource(R.string.week_current)) }
+                    SegmentedButton(
+                        selected = !isCurrentWeek,
+                        onClick = viewModel::showNextWeek,
+                        shape = SegmentedButtonDefaults.itemShape(1, 2)
+                    ) { Text(stringResource(R.string.week_next)) }
+                }
             }
-            TextButton(onClick = { showPreferences = true }) {
-                Text(stringResource(R.string.retailer_preferences_title))
+            if (BuildConfig.RETAIL_PRICES_ENABLED) {
+                item(key = "preferences") {
+                    PriceLink(onClick = { showPreferences = true },
+                        label = stringResource(R.string.retailer_preferences_title))
+                }
             }
-            Spacer(Modifier.height(12.dp))
 
             if (grouped.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Rounded.ShoppingCart,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.height(56.dp)
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            stringResource(R.string.shopping_list_empty_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            stringResource(R.string.shopping_list_empty_body),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
+                item(key = "empty") {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Rounded.ShoppingCart,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.height(56.dp)
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                stringResource(R.string.shopping_list_empty_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                stringResource(R.string.shopping_list_empty_body),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
                     }
                 }
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = 40.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                if (BuildConfig.RETAIL_PRICES_ENABLED) {
                     item(key = "commercial_comparison") {
                         ShoppingPriceControls(comparison, viewModel.comparison)
                     }
@@ -274,37 +284,42 @@ fun ShoppingListScreen(
                             Text(stringResource(R.string.shopping_basket_no_stores))
                         }
                     }
-                    grouped.forEach { (categoryKey, items) ->
-                        item(key = "header_$categoryKey") {
-                            Text(
-                                IngredientCategories.shortName(categoryKey, spanish),
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+                }
+                grouped.forEach { (categoryKey, items) ->
+                    item(key = "header_$categoryKey") {
+                        Text(
+                            IngredientCategories.shortName(categoryKey, spanish),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.semantics { heading() }.padding(top = 10.dp, bottom = 2.dp)
+                        )
+                    }
+                    items(items.size, key = { i -> items[i].source.item.id }) { i ->
+                        val item = items[i]
+                        Card(
+                            shape = MaterialTheme.shapes.small,
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
                             )
-                        }
-                        items(items.size, key = { i -> items[i].source.item.id }) { i ->
-                            val item = items[i]
-                            Card(
-                                onClick = { viewModel.togglePurchased(item.source) },
-                                shape = MaterialTheme.shapes.small,
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surface
-                                )
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().toggleable(
+                                    value = item.source.item.purchased,
+                                    role = Role.Checkbox,
+                                    onValueChange = { viewModel.togglePurchased(item.source) }
+                                ).padding(horizontal = 8.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Checkbox(
-                                        checked = item.source.item.purchased,
-                                        onCheckedChange = { viewModel.togglePurchased(item.source) }
-                                    )
-                                    ShoppingItemText(item, spanish, Modifier.weight(1f))
-                                }
+                                Checkbox(
+                                    checked = item.source.item.purchased,
+                                    onCheckedChange = null
+                                )
+                                ShoppingItemText(item, spanish, Modifier.weight(1f))
                             }
-                            quoted?.rows?.get(item.source.item.id)?.let { line ->
-                                ShoppingPriceLine(line)
+                        }
+                        if (BuildConfig.RETAIL_PRICES_ENABLED) quoted?.rows?.get(item.source.item.id)?.let { line ->
+                            ShoppingPriceLine(line) {
+                                onRetail(item.source.item.ingredientId, comparison.postalCode.trim())
                             }
                         }
                     }

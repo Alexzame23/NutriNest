@@ -9,9 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -19,10 +17,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -38,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zame.nutrinest.R
+import com.zame.nutrinest.ui.components.PriceLink
 import com.zame.nutrinest.data.prices.RetailOffer
 import com.zame.nutrinest.domain.prices.ContentUnit
 import com.zame.nutrinest.domain.prices.MatchKind
@@ -46,17 +45,37 @@ import com.zame.nutrinest.domain.prices.SaleUnit
 import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.util.Currency
+import com.zame.nutrinest.domain.prices.Confidence
+import com.zame.nutrinest.ui.components.PriceAction
+import com.zame.nutrinest.ui.components.PriceLoading
+import com.zame.nutrinest.ui.components.PriceMetadata
+import com.zame.nutrinest.ui.components.rememberEuroFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RetailPriceScreen(
     onBack: () -> Unit,
-    model: RetailPriceViewModel = viewModel(factory = RetailPriceViewModel.Factory)
+    enabled: Boolean = true
 ) {
+    if (!enabled) {
+        RetailPriceContent(RetailUiState.EnterArea, "", onBack, {}, enabled = false)
+        return
+    }
+    val model: RetailPriceViewModel = viewModel(factory = RetailPriceViewModel.Factory)
     val state by model.uiState.collectAsStateWithLifecycle()
-    var postalCode by rememberSaveable { mutableStateOf(model.lastPostalCode) }
-    val current = state
+    RetailPriceContent(state, model.lastPostalCode, onBack, model::search)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun RetailPriceContent(
+    current: RetailUiState,
+    lastPostalCode: String,
+    onBack: () -> Unit,
+    onSearch: (String) -> Unit,
+    enabled: Boolean = true
+) {
+    var postalCode by rememberSaveable { mutableStateOf(lastPostalCode) }
     Scaffold(topBar = {
         TopAppBar(title = { Text(stringResource(R.string.retail_title)) }, navigationIcon = {
             IconButton(onClick = onBack) {
@@ -68,6 +87,10 @@ internal fun RetailPriceScreen(
             modifier = Modifier.padding(padding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (!enabled) {
+                item { Text(stringResource(R.string.retail_disabled)) }
+                return@LazyColumn
+            }
             item {
                 OutlinedTextField(
                     value = postalCode,
@@ -77,21 +100,30 @@ internal fun RetailPriceScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
-                Button(
-                    onClick = { model.search(postalCode) },
-                    enabled = postalCode.trim().matches(Regex("[0-9]{5}")) && current !is RetailUiState.Loading
-                ) { Text(stringResource(R.string.retail_search)) }
+                PriceAction(
+                    label = stringResource(when (current) {
+                        RetailUiState.EnterArea, RetailUiState.Loading -> R.string.retail_search
+                        is RetailUiState.Content -> R.string.shopping_prices_refresh
+                        else -> R.string.retail_retry
+                    }),
+                    enabled = postalCode.trim().matches(Regex("[0-9]{5}")) && current != RetailUiState.Loading,
+                    onClick = { onSearch(postalCode.trim()) }
+                )
             }
             if (current is RetailUiState.Content) {
                 item {
                     Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
                         if (current.result.simulated) Text(stringResource(R.string.retail_simulated))
-                        Text(stringResource(R.string.retail_results_area, model.lastPostalCode))
+                        Text(stringResource(R.string.retail_results_area, lastPostalCode))
                         Text(stringResource(R.string.retail_sort))
                         Text(stringResource(R.string.retail_warning))
                     }
                 }
-                items(current.result.rows) { OfferCard(it, current.result.simulated) }
+                items(current.result.rows, key = {
+                    "${it.price.record.origin.sourceId.value}:${it.price.record.origin.recordKey}"
+                }) { OfferCard(it, current.result.simulated) }
+            } else if (current == RetailUiState.Loading) {
+                item { PriceLoading() }
             } else {
                 item {
                     Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
@@ -104,7 +136,6 @@ internal fun RetailPriceScreen(
                             RetailUiState.Offline -> R.string.retail_offline
                             is RetailUiState.Error -> R.string.retail_error
                         }
-                        if (current == RetailUiState.Loading) CircularProgressIndicator()
                         Text(stringResource(message))
                     }
                 }
@@ -116,12 +147,10 @@ internal fun RetailPriceScreen(
 @Composable
 private fun OfferCard(offer: RetailOffer, simulated: Boolean) {
     val locale = LocalConfiguration.current.locales[0]
-    val money = NumberFormat.getCurrencyInstance(locale).apply {
-        currency = Currency.getInstance("EUR")
-        maximumFractionDigits = 4
-    }
-    val number = NumberFormat.getNumberInstance(locale)
-    val date = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    val money = rememberEuroFormat()
+    val rate = rememberEuroFormat(4)
+    val number = remember(locale) { NumberFormat.getNumberInstance(locale) }
+    val date = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
     val content = offer.pack.netContent
     val format = if (content == null) stringResource(R.string.retail_variable_weight) else {
         val unit = when (content.unit) {
@@ -146,20 +175,23 @@ private fun OfferCard(offer: RetailOffer, simulated: Boolean) {
             if (simulated) Text(stringResource(R.string.retail_simulated))
             Text(stringResource(R.string.retail_chain_brand, offer.retailer.name,
                 offer.product.brand?.takeIf { it.isNotBlank() } ?: stringResource(R.string.retail_unknown_brand)))
-            Text(format)
             Text(stringResource(
                 if (offer.price.per == SaleUnit.PACKAGE) R.string.retail_package_price else R.string.retail_weight_price,
                 money.format(offer.price.money.amount)
-            ))
-            Text(stringResource(R.string.retail_normalized, stringResource(normalized, money.format(offer.normalized.decimal(4)))))
-            Text(stringResource(R.string.retail_observed, date.format(offer.price.record.observedOn)))
+            ), style = MaterialTheme.typography.titleLarge)
+            Text(format)
+            PriceMetadata(stringResource(R.string.retail_normalized,
+                stringResource(normalized, rate.format(offer.normalized.decimal(4)))))
+            PriceMetadata(stringResource(R.string.retail_observed, date.format(offer.price.record.observedOn)))
+            if (offer.price.record.confidence != Confidence.HIGH) {
+                PriceMetadata(stringResource(R.string.retail_limited_evidence))
+            }
             Text(stringResource(R.string.retail_at_store, offer.store.store.name,
                 offer.store.area.postalCode, offer.store.area.municipality))
             Text(stringResource(if (offer.match.kind == MatchKind.EXACT) R.string.retail_exact else R.string.retail_alternative))
-            Text(stringResource(R.string.retail_source, offer.source.name, offer.source.attribution))
-            TextButton(onClick = { details = !details }) {
-                Text(stringResource(if (details) R.string.retail_hide_details else R.string.retail_details))
-            }
+            PriceMetadata(stringResource(R.string.retail_source, offer.source.name, offer.source.attribution))
+            PriceLink(onClick = { details = !details },
+                label = stringResource(if (details) R.string.retail_hide_details else R.string.retail_details))
             if (details) {
                 Text(stringResource(R.string.retail_mapping_version, offer.match.mappingVersion))
                 Text(stringResource(if (offer.match.kind == MatchKind.EXACT) R.string.retail_exact_details

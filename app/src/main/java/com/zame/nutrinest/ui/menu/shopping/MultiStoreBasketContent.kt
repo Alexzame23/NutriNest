@@ -9,18 +9,16 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
+import com.zame.nutrinest.ui.components.rememberEuroFormat
 import com.zame.nutrinest.domain.prices.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import java.text.NumberFormat
-import java.util.Currency
 
 @Composable
 internal fun MultiStoreBasketContent(request: ShoppingBasketRequest, names: Map<Long, String>) {
@@ -93,14 +91,14 @@ private fun Selection(label: String, checked: Boolean, change: (Boolean) -> Unit
 
 @Composable
 private fun MultiStoreSummary(result: MultiStoreBasketResult, names: Map<Long, String>) {
-    val locale = LocalConfiguration.current.locales[0]
-    val money = remember(locale) { NumberFormat.getCurrencyInstance(locale).apply { currency = Currency.getInstance("EUR") } }
+    val money = rememberEuroFormat()
     val plan = result.plan
     val covered = plan.lines.sumOf { it.itemIds.size }
     Text(stringResource(if (result.exact) R.string.multi_exact else R.string.multi_heuristic))
     if (plan.travelMode == TravelMode.MISSING_COSTS) Text(stringResource(R.string.multi_missing_costs))
     Text(stringResource(R.string.multi_coverage, covered, covered + plan.missing.size))
-    plan.checkoutEur?.let { Text(stringResource(R.string.multi_checkout, money.format(it))) }
+    plan.checkoutEur?.let { Text(stringResource(R.string.multi_checkout, money.format(it)),
+        style = MaterialTheme.typography.titleMedium) }
     plan.totalWithVisitsEur?.let { Text(stringResource(R.string.multi_total, money.format(it))) }
     if (result.singleStoreReference != null) {
         Text(stringResource(R.string.multi_reference, result.singleStoreReference.visits.single().store.name))

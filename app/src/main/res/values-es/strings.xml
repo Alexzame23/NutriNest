@@ -768,4 +768,9 @@
     <string name="retailer_preferences_available">Disponible en la zona · sin precios verificados para esta lista</string>
     <string name="retailer_preferences_unavailable">Sin tiendas conocidas en esta zona</string>
     <string name="retailer_preferences_no_effective_stores">Ninguna tienda seleccionada tiene cobertura para esta comparación.</string>
+    <string name="retail_slow">La consulta tarda más de lo previsto.</string>
+    <string name="retail_retry">Reintentar</string>
+    <string name="retail_disabled">Los precios comerciales están desactivados en esta versión.</string>
+    <string name="retail_open_detail">Detalle comercial</string>
+    <string name="retail_limited_evidence">Evidencia limitada para este precio</string>
 </resources>

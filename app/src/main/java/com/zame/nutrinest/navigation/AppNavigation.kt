@@ -1,6 +1,7 @@
 package com.zame.nutrinest.navigation
 
 import androidx.compose.runtime.Composable
+import com.zame.nutrinest.BuildConfig
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -48,8 +49,8 @@ sealed class Screen(val route: String) {
         fun of(id: Long) = "ingredients/$id"
     }
 
-    data object IngredientRetail : Screen("ingredients/retail/{ingredientId}") {
-        fun of(id: Long) = "ingredients/retail/$id"
+    data object IngredientRetail : Screen("ingredients/retail/{ingredientId}?postalCode={postalCode}") {
+        fun of(id: Long, postalCode: String = "") = "ingredients/retail/$id?postalCode=$postalCode"
     }
 
     data object IngredientEditor : Screen("ingredients/editor?ingredientId={ingredientId}") {
@@ -153,7 +154,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
             IngredientDetailScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { id -> navController.navigate(Screen.IngredientEditor.edit(id)) },
-                onRetail = { id -> navController.navigate(Screen.IngredientRetail.of(id)) },
+                onRetail = if (BuildConfig.RETAIL_PRICES_ENABLED) {
+                    { id -> navController.navigate(Screen.IngredientRetail.of(id)) }
+                } else null,
                 onCompare = { id ->
                     navController.navigate(Screen.CompareIngredients.of(listOf(id)))
                 }
@@ -162,9 +165,13 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
 
         composable(
             route = Screen.IngredientRetail.route,
-            arguments = listOf(navArgument("ingredientId") { type = NavType.LongType })
+            arguments = listOf(
+                navArgument("ingredientId") { type = NavType.LongType },
+                navArgument("postalCode") { type = NavType.StringType; defaultValue = "" }
+            )
         ) {
-            RetailPriceScreen(onBack = { navController.popBackStack() })
+            RetailPriceScreen(onBack = { navController.popBackStack() },
+                enabled = BuildConfig.RETAIL_PRICES_ENABLED)
         }
 
         composable(
@@ -261,7 +268,9 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
         }
 
         composable(Screen.ShoppingList.route) {
-            ShoppingListScreen(onBack = { navController.popBackStack() })
+            ShoppingListScreen(onBack = { navController.popBackStack() }, onRetail = { id, postalCode ->
+                navController.navigate(Screen.IngredientRetail.of(id, postalCode))
+            })
         }
 
         composable(Screen.Intake.route) {

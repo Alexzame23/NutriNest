@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val retailPricesEnabled = providers.gradleProperty("nutrinestRetailPricesEnabled")
+    .map { it.toBooleanStrict() }.orElse(true).get()
 val retailPriceBaseUrl = providers.gradleProperty("nutrinestRetailPriceBaseUrl").orElse("").get().trim()
 if (retailPriceBaseUrl.isNotEmpty()) {
     val url = URI(retailPriceBaseUrl)
@@ -30,6 +32,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        buildConfigField("boolean", "RETAIL_PRICES_ENABLED", retailPricesEnabled.toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["retailPriceBaseUrl"] = retailPriceBaseUrl
     }
@@ -51,6 +54,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     // The app has an in-app language switcher, so both bundled locales must
     // always be present instead of being split into on-demand resources.

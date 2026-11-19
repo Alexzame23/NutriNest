@@ -63,7 +63,8 @@ class AppContainer(app: Application) {
         RegionalRetailPriceRepository(
             ingredientKey = { id -> retailKeys(setOf(id))[id] },
             stores = storeRepository,
-            provider = baseUrl.takeIf(String::isNotBlank)?.let(::HttpsRetailPriceProvider),
+            provider = baseUrl.takeIf { BuildConfig.RETAIL_PRICES_ENABLED && it.isNotBlank() }
+                ?.let(::HttpsRetailPriceProvider),
             hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null },
             selection = { retailerSelectionRepository.preferences.value }
         )

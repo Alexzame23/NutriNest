@@ -760,4 +760,9 @@
     <string name="retailer_preferences_available">Available in this area · no verified prices for this list</string>
     <string name="retailer_preferences_unavailable">No known stores in this area</string>
     <string name="retailer_preferences_no_effective_stores">No selected stores have coverage for this comparison.</string>
+    <string name="retail_slow">This is taking longer than expected.</string>
+    <string name="retail_retry">Try again</string>
+    <string name="retail_disabled">Commercial prices are disabled in this version.</string>
+    <string name="retail_open_detail">Commercial details</string>
+    <string name="retail_limited_evidence">Limited evidence for this price</string>
 </resources>
