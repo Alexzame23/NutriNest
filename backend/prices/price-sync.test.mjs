@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { once } from 'node:events';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,7 +11,7 @@ import { OpenPricesProvider } from './open-prices-provider.mjs';
 import { PriceProvider } from './price-provider.mjs';
 import { cachedQuotes, syncPrices } from './price-sync.mjs';
 import { ProviderError } from './provider-error.mjs';
-import { priceResponse } from './sync-http.mjs';
+import { priceResponse, priceServer } from './sync-http.mjs';
 import { DAY, HOUR, syncPolicy } from './sync-policy.mjs';
 import { PriceSyncStore } from './sync-store.mjs';
 
@@ -225,6 +226,48 @@ test('exposes freshness, prevents expired conditional responses and omits missin
     assert.deepEqual(cachedQuotes(store.read(), policy, time).map(({ status, quote }) => [status, quote]),
         [['UNVERIFIED', null], ['UNVERIFIED', null]]);
     assert.equal(JSON.parse(get('/metrics').body).quotes.UNVERIFIED, 2);
+});
+
+test('serves the v1 publication over HTTP with exact bytes and rejects expired validators', async t => {
+    const policy = fakePolicy({ freshDays: 2, retainDays: 3 });
+    const store = openTestDatabase(t, policy).open();
+    let now = START;
+    await syncPrices(store, policy, { now: () => now });
+    const server = priceServer(store, policy);
+    t.mock.method(Date, 'now', () => now);
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    t.after(() => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
+    const region = `http://127.0.0.1:${server.address().port}/v1/price-regions/test-region`;
+    const request = (path, options) => fetch(region + path, { ...options, signal: AbortSignal.timeout(5000) });
+
+    const manifest = await request('/manifest');
+    assert.equal(manifest.status, 200);
+    assert.equal(manifest.headers.get('content-type'), 'application/json');
+    assert.equal(manifest.headers.get('x-nutrinest-price-data'), null);
+    const manifestTag = manifest.headers.get('etag');
+    assert.match(manifestTag, /^"[0-9a-f]{64}"$/);
+    const { revision, byteLength, sha256, expiresAt } = await manifest.json();
+    const snapshotPath = `/snapshots/${revision}`;
+    const snapshot = await request(snapshotPath);
+    assert.equal(snapshot.status, 200);
+    assert.equal(snapshot.headers.get('x-nutrinest-price-data'), null);
+    const snapshotTag = snapshot.headers.get('etag');
+    assert.equal(snapshotTag, `"${sha256}"`);
+    const bytes = Buffer.from(await snapshot.arrayBuffer());
+    assert.equal(bytes.length, byteLength);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), sha256);
+    assert.equal(JSON.parse(bytes).sources[0].id, 'fake-prices');
+
+    const cached = await request('/manifest', { headers: { 'If-None-Match': `W/${manifestTag}` } });
+    assert.equal(cached.status, 304);
+    assert.equal(await cached.text(), '');
+    const method = await request('/manifest', { method: 'POST' });
+    assert.equal(method.status, 405);
+    assert.equal(method.headers.get('allow'), 'GET');
+    now = Date.parse(expiresAt);
+    assert.equal((await request('/manifest', { headers: { 'If-None-Match': manifestTag } })).status, 404);
+    assert.equal((await request(snapshotPath, { headers: { 'If-None-Match': snapshotTag } })).status, 410);
 });
 
 test('a publication failure rolls back observation revisions, history and active cache', async t => {

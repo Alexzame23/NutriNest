@@ -52,6 +52,23 @@ class RetailPriceViewModelTest {
         }
     }
 
+    @Test fun visibleOffersExpireAtThePublicationDeadlineWithoutAnotherRequest() {
+        var requests = 0
+        scenario(RetailPriceProvider {
+            requests++
+            RetailPublication(snapshot().copy(expiresAt = now.plusSeconds(2)), false)
+        }) { model ->
+            assertTrue(model.uiState.value is RetailUiState.Content)
+            advanceTimeBy(1_999)
+            runCurrent()
+            assertTrue(model.uiState.value is RetailUiState.Content)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(RetailUiState.Stale, model.uiState.value)
+            assertEquals(1, requests)
+        }
+    }
+
     @Test fun absentMatchesAndCoverageHaveSeparateStates() {
         scenario(RetailPriceProvider { RetailPublication(snapshot().copy(matches = emptyList()), false) }) {
             assertEquals(RetailUiState.NoMatches, it.uiState.value)
@@ -70,6 +87,9 @@ class RetailPriceViewModelTest {
         }
         scenario(RetailPriceProvider { error("Unexpected request") }, online = false) {
             assertEquals(RetailUiState.Offline, it.uiState.value)
+        }
+        scenario(RetailPriceProvider { throw IllegalArgumentException("Malformed publisher response") }) {
+            assertEquals(RetailUiState.Error(), it.uiState.value)
         }
     }
 
@@ -106,7 +126,7 @@ class RetailPriceViewModelTest {
         online: Boolean = true,
         postalCode: String = "28012",
         allowSimulated: Boolean = false,
-        verify: (RetailPriceViewModel) -> Unit
+        verify: TestScope.(RetailPriceViewModel) -> Unit
     ) = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {

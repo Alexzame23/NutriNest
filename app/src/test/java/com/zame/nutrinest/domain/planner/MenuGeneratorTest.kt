@@ -1,8 +1,12 @@
 package com.zame.nutrinest.domain.planner
 
+import com.zame.nutrinest.data.local.entity.ActivityLevel
+import com.zame.nutrinest.data.local.entity.BiologicalSex
+import com.zame.nutrinest.data.local.entity.Goal
 import com.zame.nutrinest.data.local.entity.MealCourse
 import com.zame.nutrinest.data.local.entity.MealSlot
 import com.zame.nutrinest.data.local.entity.MenuScope
+import com.zame.nutrinest.data.local.entity.ProfileEntity
 import com.zame.nutrinest.domain.planner.PlannerFixtures.config
 import com.zame.nutrinest.domain.planner.PlannerFixtures.menu
 import com.zame.nutrinest.domain.planner.PlannerFixtures.plan
@@ -295,5 +299,33 @@ class MenuGeneratorTest {
             meal.portions.values.sum() * 500.0 // 1 g of ingredient per kcal here
         }
         assertEquals(grams, menu.shoppingTotals.values.sum(), 0.5)
+    }
+
+    @Test
+    fun `an unsafe locked recipe contributes neither meals nor shopping quantities`() {
+        val safe = PlannerFixtures.recipe(1)
+        val blocked = PlannerFixtures.recipe(2).let { recipe ->
+            val item = recipe.ingredients.single()
+            recipe.copy(ingredients = listOf(item.copy(ingredient = item.ingredient.copy(nameEsNorm = "almendra molida"))))
+        }
+        val profile = ProfileEntity(
+            id = 1, name = "Fixture", dateOfBirth = 0, sex = BiologicalSex.FEMALE,
+            heightCm = 170.0, weightKg = 70.0, activityLevel = ActivityLevel.LIGHT,
+            goal = Goal.MAINTAIN, allergies = "Alérgica a los frutos secos"
+        )
+        val plan = plan(1, shares = mapOf(MealSlot.LUNCH to 1f), dailyCalories = 1000)
+        val config = config(slotWeights = mapOf(MealSlot.LUNCH to 1f)) {
+            copy(maxRecipeRepeats = 7, locks = listOf(MealLock(setOf(0), MealSlot.LUNCH, blocked.recipe.id)))
+        }
+        val result = generator.generate(listOf(plan), listOf(blocked, safe), config, profiles = listOf(profile)).menu()
+        assertEquals(List(7) { safe.recipe.id }, result.meals.map { it.recipeId })
+        assertTrue(result.meals.none { it.isLocked })
+        assertEquals(setOf(1L), result.shoppingTotals.keys)
+        assertEquals(7000.0, result.shoppingTotals.getValue(1L), 1e-9)
+        assertEquals(GenerationResult.Failure(FailureReason.NOT_ENOUGH_RECIPES),
+            generator.generate(listOf(plan), listOf(blocked, safe), config.copy(maxRecipeRepeats = 6),
+                profiles = listOf(profile)))
+        assertEquals(GenerationResult.Failure(FailureReason.NO_MATCHING_RECIPES),
+            generator.generate(listOf(plan), listOf(blocked), config, profiles = listOf(profile)))
     }
 }

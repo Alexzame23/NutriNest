@@ -112,6 +112,40 @@ class PriceComparisonEngineTest {
         assertEquals(ComparisonError.EXPIRED_PROMOTION, error(snap.copy(prices = listOf(expired))))
     }
 
+    @Test fun ambiguousMappingsCannotPriceAnIngredientRegardlessOfMappingOrder() {
+        val competing = match.copy(origin = ProviderRecord(key, "competing"), mappingVersion = 2)
+        val unrelated = match.copy(origin = ProviderRecord(key, "unrelated"), ingredientKey = CommercialId("other"))
+        for (mappings in listOf(listOf(match, competing), listOf(competing, match))) {
+            val result = PriceComparisonEngine.compare(demand(), snap.copy(matches = mappings), policy)
+            assertTrue(result.options.isEmpty())
+            assertEquals(listOf(ExcludedPrice(ComparisonError.AMBIGUOUS_MATCH, pack.id)), result.excluded)
+        }
+        val result = PriceComparisonEngine.compare(demand(), snap.copy(matches = listOf(unrelated, match)), policy)
+        assertEquals(match, result.options.single().match)
+    }
+
+    @Test fun checkoutOnlyAddsAPackageAboveTheBoundaryAcrossSupportedSalesUnits() {
+        data class Case(val contentUnit: ContentUnit, val unit: UnitDefinition, val size: String, val boundary: Double)
+        val cases = listOf(
+            Case(ContentUnit.G, UnitDefinition.KILOGRAM, "500", 1.0),
+            Case(ContentUnit.ML, UnitDefinition.LITRE, "750", 1.5),
+            Case(ContentUnit.UNIT, UnitDefinition.count(key.value), "6", 12.0)
+        )
+        for ((contentUnit, unit, size, boundary) in cases) {
+            val snapshot = sample(contentUnit, size, "1.0050")
+            for ((amount, count, checkout) in listOf(
+                Triple(Math.nextDown(boundary), 2, "2.01"),
+                Triple(boundary, 2, "2.01"),
+                Triple(Math.nextUp(boundary), 3, "3.02")
+            )) {
+                val request = PriceDemand(key, Quantity(amount, unit, MassBasis.NET))
+                val option = PriceComparisonEngine.compare(request, snapshot, policy).options.single()
+                assertEquals(unit.key, count.toBigInteger(), option.packageCount)
+                assertEquals(unit.key, checkout, option.checkoutEur.toString())
+            }
+        }
+    }
+
     @Test fun drainedAndEdibleRequireTheirOwnEvidence() {
         val drained = VerifiedMassContent(pack, match, MassBasis.DRAINED, BigDecimal("200"), "simulated-label")
         fun compare(basis: MassBasis) = PriceComparisonEngine.compare(demand(basis = basis), snap, policy, listOf(drained))

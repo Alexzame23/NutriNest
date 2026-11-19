@@ -42,6 +42,14 @@ class RetailerSelectionRepositoryTest {
             assertFalse(reopened.preferences.value.includes(a, CommercialId("a.other")))
             assertFalse(reopened.preferences.value.includes(c, CommercialId("c.local")))
 
+            val noBranches = twoChains.copy(selectedStores = mapOf(a to emptySet()))
+            reopened.update { noBranches }
+            assertTrue(reopenedStorage.edit().commit())
+            val branchSelection = RetailerSelectionRepository(reopenedStorage).preferences.value
+            assertEquals(noBranches, branchSelection)
+            assertFalse(branchSelection.includes(a, branch))
+            assertTrue(branchSelection.includes(b, CommercialId("b.local")))
+
             val none = twoChains.copy(selectedRetailers = emptySet(), selectedStores = mapOf(b to emptySet()))
             reopened.update { none }
             assertTrue(reopenedStorage.edit().commit())

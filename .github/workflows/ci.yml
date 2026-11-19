@@ -31,6 +31,14 @@ jobs:
       - name: DAO queries compile against the migrated schema
         run: python3 tools/check_dao_sql.py
 
+      - name: Room export matches the migrated schema
+        run: python3 tools/check_room_schema.py
+
+      - name: Canonical rules and built-in recipe references
+        env:
+          PYTHONUTF8: '1'
+        run: python3 tools/verify_curated_catalog.py
+
       - name: Translations are complete and consistent
         run: python3 tools/check_strings.py
 
@@ -58,18 +66,12 @@ jobs:
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Assemble
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
 
-      # KSP writes app/schemas during the build above, so this is the first
-      # point at which Room's own view of the schema exists to compare against.
-      #
-      # Not blocking yet: the exported schemas are not checked in, so nobody
-      # has seen this check pass or fail on the existing migrations. Once
-      # app/schemas is committed and the run below is green, drop the
-      # continue-on-error and it starts guarding every future migration.
-      - name: Room would accept the migrated schema
-        continue-on-error: true
-        run: python3 tools/check_room_schema.py
+      - name: Room exports are up to date
+        run: |
+          git diff --exit-code -- app/schemas/
+          test -z "$(git ls-files --others --exclude-standard -- app/schemas/)"
 
       - name: Upload the exported Room schemas
         uses: actions/upload-artifact@v4
@@ -86,6 +88,5 @@ jobs:
           path: app/build/reports/tests/
           if-no-files-found: ignore
 
-# Not covered here: app/src/androidTest, which includes the migration test.
-# Those need an emulator, so they stay a local `./gradlew connectedDebugAndroidTest`
-# until someone decides the CI minutes are worth it.
+# Validate Room migrations, recipes, preferences, publisher consumption and UI
+# on an emulator with ./gradlew connectedDebugAndroidTest before a release.

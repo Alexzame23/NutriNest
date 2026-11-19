@@ -9,6 +9,26 @@ import org.junit.Test
 import java.util.Locale
 
 class FoodQuantityConversionsTest {
+    @Test fun `imperial mass uses exact standard factors and preserves the net basis`() {
+        val pound = Quantity(1.0, UnitDefinition.POUND, MassBasis.NET)
+        val grams = success(FoodQuantityConversions.convert(pound, UnitDefinition.GRAM))
+        assertEquals(Quantity(453.59237, UnitDefinition.GRAM, MassBasis.NET), grams.quantity)
+        assertEquals(16.0, amount(FoodQuantityConversions.convert(pound, UnitDefinition.OUNCE)), 1e-12)
+        assertTrue(grams.appliedFactors.isEmpty())
+    }
+
+    @Test fun `a household measure with both volume and weight evidence is ambiguous`() {
+        val cup = UnitDefinition.CUP
+        val volume = FoodConversionFactor.HouseholdVolume(7, cup, 240.0, evidence)
+        val mass = weight(unit = cup, grams = 216.0)
+        val quantity = Quantity(0.5, cup)
+        for (factors in listOf(listOf(volume, mass), listOf(mass, volume))) {
+            val context = IngredientConversionContext(7, factors)
+            error(ConversionError.AMBIGUOUS_FACTOR, FoodQuantityConversions.toGrams(quantity, context))
+            error(ConversionError.AMBIGUOUS_FACTOR,
+                FoodQuantityConversions.convert(quantity, UnitDefinition.MILLILITRE, context))
+        }
+    }
     // All food numbers below are synthetic FIXTURES, never reference weights/densities.
     private val evidence = ConversionEvidence(
         "fixture-evidence", "test fixture, not food reference data", "fixture-v1",

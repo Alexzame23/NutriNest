@@ -12,7 +12,10 @@ import javax.net.ssl.HttpsURLConnection
 internal class RetailHttpError(val status: Int) : Exception("HTTP $status")
 
 /** Only the configured NutriNest publisher is contacted. Redirects are rejected. */
-internal class HttpsRetailPriceProvider(baseUrl: String) : RetailPriceProvider {
+internal class HttpsRetailPriceProvider(
+    baseUrl: String,
+    private val openConnection: (URI) -> HttpsURLConnection = { it.toURL().openConnection() as HttpsURLConnection }
+) : RetailPriceProvider {
     private val base = URI(baseUrl.trimEnd('/')).apply {
         require(scheme == "https" && host != null && rawUserInfo == null &&
             rawQuery == null && rawFragment == null)
@@ -35,7 +38,7 @@ internal class HttpsRetailPriceProvider(baseUrl: String) : RetailPriceProvider {
     }
 
     private fun get(path: String, unavailable: Set<Int>): ByteArray? {
-        val connection = URI(base.toString() + path).toURL().openConnection() as HttpsURLConnection
+        val connection = openConnection(URI(base.toString() + path))
         try {
             connection.connectTimeout = 5_000
             connection.readTimeout = 5_000

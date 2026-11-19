@@ -1,7 +1,11 @@
 package com.zame.nutrinest.data.local
 
+import android.database.sqlite.SQLiteConstraintException
+import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.zame.nutrinest.data.local.entity.IngredientCategories
+import com.zame.nutrinest.data.local.entity.IngredientEntity
 import com.zame.nutrinest.data.local.entity.NutritionValues
 import com.zame.nutrinest.data.local.entity.RecipeEntity
 import com.zame.nutrinest.data.local.entity.RecipeIngredientInput
@@ -22,6 +26,37 @@ class RecipeNaturalQuantitiesTest {
     private val eggId = 1_000_758L
     private val milkId = 1_002_493L
     private val riceId = 1_000_904L
+
+    @Test fun failedIngredientInsertRollsBackRecipeAndRetryProducesExactNutritionAndCascade() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(context, NutriNestDatabase::class.java).build()
+        try {
+            val dao = database.recipeDao()
+            val ingredient = database.ingredientDao().insert(IngredientEntity(
+                name = "Synthetic ingredient", categoryKey = IngredientCategories.MISC,
+                nutrition = NutritionValues(kcal = 160.0, protein = 8.0, carbs = 20.0, fats = 4.0)
+            ))
+            val recipe = RecipeEntity(name = "Synthetic rollback recipe", category = "Main Dish")
+            val valid = RecipeIngredientInput(ingredient, 62.5)
+            val steps = listOf("Fixture step" to null)
+            val failure = runCatching {
+                dao.insertFullRecipe(recipe, listOf(valid, valid.copy(ingredientId = Long.MAX_VALUE)), steps)
+            }.exceptionOrNull()
+            assertTrue("Expected foreign key rejection, got $failure", failure is SQLiteConstraintException)
+            assertEquals(0, dao.countByName(recipe.name))
+            assertTrue(dao.observeNutritionTotals().first().isEmpty())
+
+            val id = dao.insertFullRecipe(recipe, listOf(valid), steps)
+            val expected = NutritionValues(kcal = 100.0, protein = 5.0, carbs = 12.5, fats = 2.5)
+            assertNutrition(expected, dao.observeNutritionTotals().first().single().nutrition)
+            assertNutrition(expected, dao.observeIngredientsOf(id).first().single().nutrition)
+            assertEquals("Fixture step", dao.observeRecipeWithSteps(id).first()!!.steps.single().text)
+            assertTrue(dao.deleteIfUnused(id))
+            assertTrue(dao.observeNutritionTotals().first().isEmpty())
+            assertTrue(dao.observeIngredientsOf(id).first().isEmpty())
+        } finally {
+            database.close()
+        }
+    }
 
     @Test fun catalogMeasuresPersistThroughEditsAndReopening() = runBlocking {
         context.deleteDatabase(name)

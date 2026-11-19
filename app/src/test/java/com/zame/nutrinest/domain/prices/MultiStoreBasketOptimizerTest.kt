@@ -96,6 +96,25 @@ class MultiStoreBasketOptimizerTest {
         assertNull(dispersed.netSavingsEur)
     }
 
+    @Test fun singleVisitAgreesWithSingleStoreCheckoutForAUniqueWinner() {
+        val offers = listOf(Offer(0, "a", 3, 110), Offer(0, "b", 2, 55),
+            Offer(1, "a", 5, 185), Offer(1, "b", 2, 79), Offer(2, "a", 5, 1))
+        val rows = mapOf(1L to demand("a", 3), 2L to demand("a", 2), 3L to demand("b", 3))
+        for (order in listOf(offers, offers.reversed())) {
+            val data = snapshot(3, order)
+            val single = checkNotNull(SingleStoreBasketOptimizer.optimize(rows,
+                data.retailers.map { it.id }.toSet(), region, data.stores.map { it.id }.toSet(), data,
+                ComparisonPolicy(now, ZoneOffset.UTC)).winner)
+            val multi = run(data, rows, 1)
+            assertTrue(multi.exact && multi.plan.complete)
+            assertEquals(id("s0"), single.store?.id)
+            assertEquals(single.store, multi.plan.visits.single().store)
+            assertEquals(single.lines, multi.plan.lines)
+            assertEquals("3.30", multi.plan.checkoutEur.toString())
+            assertEquals(single.checkoutEur, multi.plan.checkoutEur)
+        }
+    }
+
     @Test fun largeStoreSetsAreMarkedHeuristic() {
         val data = snapshot(10, (0..9).map { Offer(it,"a",1,it+1) })
         val result = run(data, mapOf(1L to demand("a", 2)), 10)
