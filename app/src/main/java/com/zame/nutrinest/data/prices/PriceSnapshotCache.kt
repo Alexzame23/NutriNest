@@ -6,6 +6,8 @@ import androidx.room.withTransaction
 import com.zame.nutrinest.data.local.NutriNestDatabase
 import com.zame.nutrinest.domain.prices.CommercialId
 import com.zame.nutrinest.domain.prices.PriceSnapshot
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.time.Instant
 
@@ -29,7 +31,7 @@ internal class RoomPriceSnapshotCache(private val database: NutriNestDatabase) :
         val cached = dao.find(regionId.value) ?: return null
         val payload = cached.payload ?: return null
         if (cached.expiresAtMillis <= now.toEpochMilli()) return null
-        return SnapshotJson.snapshot(payload)
+        return withContext(Dispatchers.Default) { SnapshotJson.snapshot(payload) }
     }
 
     /** Installs a complete, authenticated-transport snapshot or leaves the current cache intact. */

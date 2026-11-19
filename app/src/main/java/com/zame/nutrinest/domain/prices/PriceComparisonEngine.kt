@@ -23,12 +23,14 @@ object PriceComparisonEngine {
         demands: Map<Long, PriceDemand>, snapshot: PriceSnapshot, policy: ComparisonPolicy,
         prices: List<PriceObservation>, massContents: Map<CommercialId, List<VerifiedMassContent>>,
         promotions: List<VerifiedPromotion> = emptyList(),
-        authorizedSubstitutions: Set<IngredientProductMatch> = emptySet()
+        authorizedSubstitutions: Set<IngredientProductMatch> = emptySet(),
+        checkCancellation: () -> Unit = {}
     ): Map<Long, ComparisonResult> {
         val matches = snapshot.matches.groupBy { it.ingredientKey }
         val packs = snapshot.packages.associateBy { it.id }
         val observations = prices.groupBy { it.record.packageId }
         return demands.mapValues { (_, demand) ->
+            checkCancellation()
             compareIndexed(demand, snapshot, policy, matches[demand.ingredientKey].orEmpty(), packs,
                 observations, massContents[demand.ingredientKey].orEmpty(), promotions, emptyMap(),
                 authorizedSubstitutions)

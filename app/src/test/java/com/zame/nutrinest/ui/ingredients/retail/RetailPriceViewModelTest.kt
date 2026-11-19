@@ -135,7 +135,8 @@ class RetailPriceViewModelTest {
                 stores = PilotStoreDirectory.repository,
                 provider = provider,
                 allowSimulated = allowSimulated,
-                hasNetwork = { online }
+                hasNetwork = { online },
+                comparisonDispatcher = StandardTestDispatcher(testScheduler)
             )
             val model = RetailPriceViewModel(
                 SavedStateHandle(mapOf("ingredientId" to 42L)), repository, Clock.fixed(now, ZoneOffset.UTC)

@@ -129,12 +129,8 @@ class LocalMenuRepository(
         val slots = config.slotWeights.keys.sortedBy { it.ordinal }
         val plans = buildPlans(slots, config.slotWeights)
         val profiles = dao.getProfiles()
-        val ingredientsByRecipe = dao.getAllRecipeIngredients()
-            .groupBy { it.recipeId }
-            .mapValues { (_, rows) -> rows.map { it.ingredientWithQuantity() } }
-        val recipes = dao.getAllRecipes().map { recipe ->
-            PlannableRecipe(recipe, ingredientsByRecipe[recipe.id].orEmpty())
-        }
+        val recipeIngredients = dao.getAllRecipeIngredients()
+        val recipeRecords = dao.getAllRecipes()
 
         // Context for variety + leftovers: what last week used/bought.
         val previousWeek = WeekUtils.previousWeekStart(weekStart)
@@ -161,6 +157,11 @@ class LocalMenuRepository(
             }
 
         val result = withContext(Dispatchers.Default) {
+            val ingredientsByRecipe = recipeIngredients.groupBy { it.recipeId }
+                .mapValues { (_, rows) -> rows.map { it.ingredientWithQuantity() } }
+            val recipes = recipeRecords.map { recipe ->
+                PlannableRecipe(recipe, ingredientsByRecipe[recipe.id].orEmpty())
+            }
             generator.generate(
                 plans = plans,
                 recipes = recipes,

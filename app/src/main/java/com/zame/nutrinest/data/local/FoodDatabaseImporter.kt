@@ -89,10 +89,19 @@ object FoodDatabaseImporter {
 
     private fun copy(asset: SQLiteDatabase, db: SupportSQLiteDatabase, step: CopyStep, now: Long,
         inserted: MutableSet<Long>) {
+        val importingIngredients = step.label == "ingredients"
+        val existingIngredients = if (importingIngredients) {
+            db.query("SELECT id FROM ingredients WHERE id >= ?", arrayOf<Any>(IMPORTED_ID_OFFSET)).use { cursor ->
+                buildSet { while (cursor.moveToNext()) add(cursor.getLong(0)) }
+            }
+        } else emptySet()
         db.compileStatement(step.write).use { statement ->
             asset.rawQuery(step.read, step.readArgs(now)).use { cursor ->
                 while (cursor.moveToNext()) {
-                    if (skipExisting(db, step.label, cursor, inserted)) continue
+                    if (importingIngredients) {
+                        val id = cursor.getLong(0)
+                        if (id in existingIngredients || id in inserted) continue
+                    } else if (skipExisting(db, step.label, cursor, inserted)) continue
                     statement.clearBindings()
                     for (column in 0 until cursor.columnCount) {
                         when (cursor.getType(column)) {
@@ -103,23 +112,21 @@ object FoodDatabaseImporter {
                         }
                     }
                     statement.executeInsert()
-                    if (step.label == "ingredients") inserted += cursor.getLong(0)
+                    if (importingIngredients) inserted += cursor.getLong(0)
                 }
             }
         }
     }
 
     private fun skipExisting(db: SupportSQLiteDatabase, label: String, row: Cursor, inserted: Set<Long>): Boolean {
-        if (label in setOf("nutrients", "portions", "aliases", "quality issues")) return row.getLong(0) !in inserted
         val table = when (label) {
-            "ingredients" -> "ingredients"
+            "nutrients", "portions", "aliases", "quality issues" -> return row.getLong(0) !in inserted
             "categories" -> "ingredient_categories"
             "aisles" -> "shopping_aisles"
             "dataset metadata" -> "food_dataset_meta"
             "nutrient definitions" -> "nutrient_defs"
             else -> error("Unknown import step: $label")
         }
-        val key = when (label) { "ingredients" -> "id"; "nutrient definitions" -> "tag"; else -> "key" }
         if (label == "nutrient definitions") {
             db.query("SELECT tag,nameEn,nameEs,unit,nutrientGroup,isPrimary,sortOrder,nrv FROM nutrient_defs WHERE tag=?", arrayOf(row.getString(0))).use { existing ->
                 if (!existing.moveToFirst()) return false
@@ -132,7 +139,7 @@ object FoodDatabaseImporter {
                 return true
             }
         }
-        return db.query("SELECT 1 FROM `$table` WHERE `$key`=?", arrayOf(row.getString(0))).use { it.moveToFirst() }
+        return db.query("SELECT 1 FROM `$table` WHERE `key`=?", arrayOf(row.getString(0))).use { it.moveToFirst() }
     }
 
     private fun reserveUserIdRange(db: SupportSQLiteDatabase) {

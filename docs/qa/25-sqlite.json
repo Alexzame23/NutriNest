@@ -1,0 +1,152 @@
+{
+  "sqlite": "3.50.4",
+  "dataset": "2026.07.29",
+  "imported": {
+    "categories": [
+      12,
+      12
+    ],
+    "aisles": [
+      14,
+      14
+    ],
+    "nutrient definitions": [
+      81,
+      81
+    ],
+    "dataset metadata": [
+      18,
+      18
+    ],
+    "ingredients": [
+      923,
+      923
+    ],
+    "nutrients": [
+      31337,
+      31337
+    ],
+    "portions": [
+      1306,
+      1306
+    ],
+    "aliases": [
+      1163,
+      1163
+    ],
+    "quality issues": [
+      92,
+      92
+    ]
+  },
+  "queries": {
+    "search_aceite": {
+      "rows": 31,
+      "median_ms": 1.2632,
+      "plan": [
+        "SCAN ingredients",
+        "LIST SUBQUERY 1",
+        "SEARCH ingredient_catalog_status USING COVERING INDEX index_catalog_status_state (state=?)",
+        "CREATE BLOOM FILTER",
+        "LIST SUBQUERY 2",
+        "SCAN c",
+        "SEARCH m USING COVERING INDEX index_map_canonical_scope (canonical_id=?)",
+        "CREATE BLOOM FILTER",
+        "LIST SUBQUERY 3",
+        "SCAN ingredient_aliases",
+        "CREATE BLOOM FILTER"
+      ]
+    },
+    "search_puerco": {
+      "rows": 11,
+      "median_ms": 0.8134,
+      "plan": [
+        "SCAN ingredients",
+        "LIST SUBQUERY 1",
+        "SEARCH ingredient_catalog_status USING COVERING INDEX index_catalog_status_state (state=?)",
+        "CREATE BLOOM FILTER",
+        "LIST SUBQUERY 2",
+        "SCAN c",
+        "SEARCH m USING COVERING INDEX index_map_canonical_scope (canonical_id=?)",
+        "CREATE BLOOM FILTER",
+        "LIST SUBQUERY 3",
+        "SCAN ingredient_aliases",
+        "CREATE BLOOM FILTER"
+      ]
+    },
+    "search_zzzz": {
+      "rows": 0,
+      "median_ms": 1.191,
+      "plan": [
+        "SCAN ingredients",
+        "LIST SUBQUERY 1",
+        "SEARCH ingredient_catalog_status USING COVERING INDEX index_catalog_status_state (state=?)",
+        "CREATE BLOOM FILTER",
+        "LIST SUBQUERY 2",
+        "SCAN c",
+        "SEARCH m USING COVERING INDEX index_map_canonical_scope (canonical_id=?)",
+        "CREATE BLOOM FILTER",
+        "LIST SUBQUERY 3",
+        "SCAN ingredient_aliases",
+        "CREATE BLOOM FILTER"
+      ]
+    },
+    "canonical_lookup": {
+      "rows": 1,
+      "median_ms": 0.0087,
+      "plan": [
+        "SEARCH ingredient_canonical_map USING INTEGER PRIMARY KEY (rowid=?)"
+      ]
+    },
+    "nutrient_lookup": {
+      "rows": 29,
+      "median_ms": 0.1174,
+      "plan": [
+        "SEARCH n USING INDEX sqlite_autoindex_ingredient_nutrients_1 (ingredientId=?)",
+        "SEARCH d USING INDEX sqlite_autoindex_nutrient_defs_1 (tag=?)",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ]
+    },
+    "reference_lookup": {
+      "rows": 1,
+      "median_ms": 0.0051,
+      "plan": [
+        "SCAN CONSTANT ROW",
+        "SCALAR SUBQUERY 1",
+        "SEARCH recipe_ingredients USING COVERING INDEX index_recipe_ingredients_ingredientId (ingredientId=?)",
+        "SCALAR SUBQUERY 2",
+        "SEARCH shopping_items USING COVERING INDEX index_shopping_items_ingredientId (ingredientId=?)",
+        "SCALAR SUBQUERY 3",
+        "SEARCH ingredient_canonical_map USING INTEGER PRIMARY KEY (rowid=?)"
+      ]
+    },
+    "snapshot_lookup": {
+      "rows": 0,
+      "median_ms": 0.0024,
+      "plan": [
+        "SEARCH price_snapshot_cache USING INDEX sqlite_autoindex_price_snapshot_cache_1 (regionId=?)"
+      ]
+    },
+    "seeder_remote_id": {
+      "rows": 1,
+      "median_ms": 0.0155,
+      "plan": [
+        "SCAN recipes"
+      ]
+    },
+    "seeder_nocase_name": {
+      "rows": 1,
+      "median_ms": 0.0125,
+      "plan": [
+        "SCAN recipes USING COVERING INDEX index_recipes_name"
+      ]
+    },
+    "import_existing_ids": {
+      "rows": 923,
+      "median_ms": 0.3712,
+      "plan": [
+        "SEARCH ingredients USING INTEGER PRIMARY KEY (rowid>?)"
+      ]
+    }
+  }
+}

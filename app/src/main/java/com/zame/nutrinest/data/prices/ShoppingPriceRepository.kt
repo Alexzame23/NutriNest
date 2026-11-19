@@ -6,6 +6,10 @@ import com.zame.nutrinest.domain.nutrition.UnitDefinition
 import com.zame.nutrinest.domain.prices.*
 import com.zame.nutrinest.domain.stores.DirectoryStore
 import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.ZoneId
@@ -78,8 +82,15 @@ internal class RegionalShoppingPriceRepository(
             is RetailBatchUnavailable -> return ShoppingPrices.Unavailable(batch)
             is RetailBatchPublication -> batch
         }
-        val snapshot = publication.snapshot
         val identities = keys(items.map { it.ingredientId }.toSet())
+        return withContext(Dispatchers.Default) { compareLoaded(items, publication, identities, now) }
+    }
+
+    private fun CoroutineScope.compareLoaded(
+        items: List<ShoppingPriceDemand>, publication: RetailBatchPublication,
+        identities: Map<Long, CommercialId>, now: Instant
+    ): ShoppingPrices.Published {
+        val snapshot = publication.snapshot
         val demands = items.associate { item ->
             item.id to identities[item.ingredientId]?.let { key ->
                 PriceDemand(key, Quantity(item.grams, UnitDefinition.GRAM, MassBasis.EDIBLE))
@@ -96,7 +107,7 @@ internal class RegionalShoppingPriceRepository(
         val policy = ComparisonPolicy(now, ZoneId.of("Europe/Madrid"))
         val compared = PriceComparisonEngine.compareBatch(demands.mapNotNull { (id, demand) ->
             demand?.let { id to it }
-        }.toMap(), snapshot, policy, localPrices, evidence)
+        }.toMap(), snapshot, policy, localPrices, evidence, checkCancellation = { ensureActive() })
         val exactKeys = snapshot.matches.filter { it.kind == MatchKind.EXACT }.map { it.ingredientKey }.toSet()
         val rows = items.associate { item ->
             val comparison = compared[item.id]

@@ -5,6 +5,9 @@ import { DatabaseSync } from 'node:sqlite';
 export class PriceSyncStore {
     #db;
     #lock;
+    #findEvidence;
+    #putEvidence;
+    #insertHistory;
     #running = false;
 
     constructor(path, sourceId, regionId) {
@@ -23,6 +26,7 @@ export class PriceSyncStore {
                 CREATE TABLE IF NOT EXISTS price_history (
                     id INTEGER PRIMARY KEY, fetched_at INTEGER NOT NULL, observation TEXT NOT NULL
                 ) STRICT;
+                CREATE INDEX IF NOT EXISTS price_history_fetched_at_idx ON price_history(fetched_at);
                 CREATE TABLE IF NOT EXISTS publications (
                     revision INTEGER PRIMARY KEY, expires_at INTEGER NOT NULL,
                     contents_hash TEXT NOT NULL, manifest TEXT NOT NULL, snapshot TEXT
@@ -39,6 +43,9 @@ export class PriceSyncStore {
             if (row.source_id !== sourceId || row.region_id !== regionId) {
                 throw new Error('This database belongs to a different source or region');
             }
+            this.#findEvidence = this.#db.prepare('SELECT revision, digest FROM evidence WHERE record_key = ?');
+            this.#putEvidence = this.#db.prepare('INSERT OR REPLACE INTO evidence VALUES (?, ?, ?)');
+            this.#insertHistory = this.#db.prepare('INSERT INTO price_history (fetched_at, observation) VALUES (?, ?)');
             this.#lock = new DatabaseSync(path + '.worker-lock', { timeout: 0 });
         } catch (error) {
             this.#db.close();
@@ -86,17 +93,16 @@ export class PriceSyncStore {
     registerEvidence(price) {
         const key = price.record.origin.recordKey;
         const digest = createHash('sha256').update(JSON.stringify(price)).digest('hex');
-        const previous = this.#db.prepare('SELECT revision, digest FROM evidence WHERE record_key = ?').get(key);
+        const previous = this.#findEvidence.get(key);
         if (previous?.digest === digest) return previous.revision;
         const revision = (previous?.revision ?? 0) + 1;
         if (revision > 2147483647) throw new Error('Observation revision overflow');
-        this.#db.prepare('INSERT OR REPLACE INTO evidence VALUES (?, ?, ?)').run(key, revision, digest);
+        this.#putEvidence.run(key, revision, digest);
         return revision;
     }
 
     addHistory(fetchedAt, observation) {
-        this.#db.prepare('INSERT INTO price_history (fetched_at, observation) VALUES (?, ?)')
-            .run(fetchedAt, JSON.stringify(observation));
+        this.#insertHistory.run(fetchedAt, JSON.stringify(observation));
     }
 
     history() {

@@ -4,6 +4,9 @@ import com.zame.nutrinest.domain.prices.*
 import com.zame.nutrinest.domain.stores.DirectoryStore
 import com.zame.nutrinest.domain.stores.StoreRepository
 import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.math.BigDecimal
 import java.time.Duration
@@ -49,7 +52,8 @@ internal class RegionalRetailPriceRepository(
     private val provider: RetailPriceProvider?,
     private val allowSimulated: Boolean = false,
     private val hasNetwork: () -> Boolean = { true },
-    private val selection: () -> RetailerSelectionPreferences = { RetailerSelectionPreferences() }
+    private val selection: () -> RetailerSelectionPreferences = { RetailerSelectionPreferences() },
+    private val comparisonDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : RetailPriceRepository {
     override suspend fun compare(ingredientId: Long, postalCode: String, now: Instant): RetailResult {
         if (!postalCode.matches(Regex("[0-9]{5}"))) return RetailResult.NoCoverage
@@ -62,8 +66,11 @@ internal class RegionalRetailPriceRepository(
             RetailBatchUnavailable.Stale -> return RetailResult.Stale
             RetailBatchUnavailable.NoCoverage -> return RetailResult.NoCoverage
         }
-        val snapshot = data.snapshot
+        return withContext(comparisonDispatcher) { compareLoaded(data, key, now) }
+    }
 
+    private fun compareLoaded(data: RetailBatchPublication, key: CommercialId, now: Instant): RetailResult {
+        val snapshot = data.snapshot
         val matches = snapshot.matches.filter { it.ingredientKey == key }.groupBy { it.packageId }
         if (matches.isEmpty()) return RetailResult.NoMatches
         val products = snapshot.products.associateBy { it.id }

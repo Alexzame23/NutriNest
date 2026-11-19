@@ -105,7 +105,7 @@ object SingleStoreBasketOptimizer {
         val comparisons = PriceComparisonEngine.compareBatch(
             groupedDemands.mapValues { it.value.sample }, snapshot, policy, prices,
             (snapshot.reviewedMassContents() + additionalMassContents).distinct().groupBy { it.match.ingredientKey },
-            promotions, authorizedSubstitutions
+            promotions, authorizedSubstitutions, checkCancellation
         ).mapValues { (_, result) ->
             StoreComparisons(result.options.groupBy { it.observation.record.storeId },
                 result.excluded.groupBy { it.observation?.storeId })
@@ -116,6 +116,7 @@ object SingleStoreBasketOptimizer {
                 comparison.options[store.id].orEmpty().map { it.pack.id }.distinct()
             }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
         }
+        val storeOptions = mutableMapOf<Pair<Long, CommercialId>, StoreSkuOptions>()
         return PreparedBasket(stores) { subset, allowFallback ->
             checkCancellation()
             var limited = false
@@ -129,32 +130,13 @@ object SingleStoreBasketOptimizer {
                 val reasons = (comparison.excluded[null].orEmpty() + subset.flatMap { comparison.excluded[it.id].orEmpty() })
                     .map { it.error.basketReason() }.toMutableSet()
                 val skus = subset.flatMap { store ->
-                    comparison.options[store.id].orEmpty().groupBy { it.pack.id }.mapNotNull { (pack, offers) ->
-                        val state = stock[store.id to pack] ?: StockState.UNKNOWN
-                        val reason = when {
-                            pack in sharedByStore.getValue(store.id) -> BasketMissingReason.AMBIGUOUS_EQUIVALENT
-                            state == StockState.OUT_OF_STOCK -> BasketMissingReason.OUT_OF_STOCK
-                            offers.first().pack.weightMode == WeightMode.VARIABLE -> BasketMissingReason.WEIGHT_REQUIRED
-                            else -> null
+                    val options = storeOptions.getOrPut(id to store.id) {
+                        prepareStoreOptions(comparison.options[store.id].orEmpty(), sharedByStore.getValue(store.id)) {
+                            stock[store.id to it] ?: StockState.UNKNOWN
                         }
-                        if (reason != null) {
-                            reasons += reason
-                            return@mapNotNull null
-                        }
-                        val regular = offers.filter { it.promotion == null }
-                        val latest = regular.maxOfOrNull { it.observation.record.observedInstant }
-                        val current = regular.filter { it.observation.record.observedInstant == latest }
-                        val base = if (current.map { it.observation.money.amount.stripTrailingZeros() }.distinct().size > 1) {
-                            reasons += BasketMissingReason.AMBIGUOUS_PRICE
-                            null
-                        } else current.minWithOrNull(offerIdentity)
-                        val schedules = (listOfNotNull(base) + offers.filter { it.promotion != null })
-                            .sortedWith(offerIdentity)
-                        if (schedules.isEmpty()) return@mapNotNull null
-                        val sample = schedules.first()
-                        Sku(sample.massEvidence?.grams ?: requireNotNull(sample.pack.netContent).amount,
-                            state, schedules)
                     }
+                    reasons += options.reasons
+                    options.skus
                 }
                 val plan = if (skus.isEmpty()) null else try {
                     solve(group.amount, skus, checkCancellation)
@@ -183,6 +165,39 @@ object SingleStoreBasketOptimizer {
             BasketAllocation(lines, missing.sortedBy { it.itemId }, limited)
         }
     }
+
+    // The available formats and exclusions depend on the store, regardless of the subset being evaluated.
+    private fun prepareStoreOptions(
+        prices: List<ComparedPrice>, shared: Set<CommercialId>, stock: (CommercialId) -> StockState
+    ): StoreSkuOptions {
+        val reasons = mutableSetOf<BasketMissingReason>()
+        val skus = prices.groupBy { it.pack.id }.mapNotNull { (pack, offers) ->
+            val state = stock(pack)
+            val reason = when {
+                pack in shared -> BasketMissingReason.AMBIGUOUS_EQUIVALENT
+                state == StockState.OUT_OF_STOCK -> BasketMissingReason.OUT_OF_STOCK
+                offers.first().pack.weightMode == WeightMode.VARIABLE -> BasketMissingReason.WEIGHT_REQUIRED
+                else -> null
+            }
+            if (reason != null) {
+                reasons += reason
+                return@mapNotNull null
+            }
+            val regular = offers.filter { it.promotion == null }
+            val latest = regular.maxOfOrNull { it.observation.record.observedInstant }
+            val current = regular.filter { it.observation.record.observedInstant == latest }
+            val base = if (current.map { it.observation.money.amount.stripTrailingZeros() }.distinct().size > 1) {
+                reasons += BasketMissingReason.AMBIGUOUS_PRICE
+                null
+            } else current.minWithOrNull(offerIdentity)
+            val schedules = (listOfNotNull(base) + offers.filter { it.promotion != null }).sortedWith(offerIdentity)
+            val sample = schedules.firstOrNull() ?: return@mapNotNull null
+            Sku(sample.massEvidence?.grams ?: requireNotNull(sample.pack.netContent).amount, state, schedules)
+        }
+        return StoreSkuOptions(skus, reasons)
+    }
+
+    private data class StoreSkuOptions(val skus: List<Sku>, val reasons: Set<BasketMissingReason>)
 
     private data class DemandKey(val ingredient: CommercialId, val unit: ContentUnit, val basis: MassBasis?)
     private class DemandGroup(val sample: PriceDemand, val unit: ContentUnit) {
