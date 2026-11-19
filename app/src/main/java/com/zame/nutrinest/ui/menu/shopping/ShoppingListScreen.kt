@@ -243,6 +243,9 @@ fun ShoppingListScreen(
                         item(key = "single_store_basket") {
                             ShoppingBasketControls(basketRequest, basketResult, viewModel.comparison::selectRetailer)
                         }
+                        item(key = "multi_store_basket") {
+                            MultiStoreBasketContent(basketRequest, namesById)
+                        }
                         basketResult?.alternatives?.forEach { alternative ->
                             item(key = "basket_${alternative.retailer.id.value}") {
                                 ShoppingBasketAlternative(alternative, namesById)

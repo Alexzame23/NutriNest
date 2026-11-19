@@ -130,7 +130,7 @@ internal fun ShoppingBasketAlternative(basket: SingleStoreBasket, itemNames: Map
     }
 }
 
-private fun BasketMissingReason.label() = when (this) {
+internal fun BasketMissingReason.label() = when (this) {
     BasketMissingReason.NO_LOCAL_STORE -> R.string.shopping_basket_no_stores
     BasketMissingReason.NO_EQUIVALENT -> R.string.shopping_prices_no_equivalent
     BasketMissingReason.AMBIGUOUS_EQUIVALENT -> R.string.shopping_basket_ambiguous_equivalent

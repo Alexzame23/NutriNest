@@ -28,10 +28,49 @@ object SingleStoreBasketOptimizer {
         checkCancellation: () -> Unit = {}
     ): SingleStoreBasketResult {
         val retailers = snapshot.retailers.filter { it.id in selectedRetailers }
+        val prepared = prepare(demands, selectedRetailers, regionId, localStoreIds, snapshot, policy,
+            promotions, authorizedSubstitutions, additionalMassContents, checkCancellation)
+        var rankingPending = false
+        val alternatives = retailers.map { retailer ->
+            val local = prepared.stores.filter { it.retailerId == retailer.id }
+            if (local.isEmpty()) {
+                SingleStoreBasket(retailer, null, emptyList(),
+                    demands.keys.sorted().map { BasketMissingItem(it, setOf(BasketMissingReason.NO_LOCAL_STORE)) },
+                    null, null)
+            } else {
+                local.map { store ->
+                    val allocation = prepared.allocate(listOf(store), false)
+                    val lines = allocation.lines
+                    val missing = allocation.missing
+                    if (missing.isNotEmpty() && missing.all { BasketMissingReason.SEARCH_LIMIT in it.reasons }) {
+                        rankingPending = true
+                    }
+                    SingleStoreBasket(retailer, store, lines, missing.sortedBy { it.itemId },
+                        lines.takeIf { it.isNotEmpty() }?.sumOf { it.checkoutEur },
+                        lines.takeIf { it.isNotEmpty() }?.let(::proportionalTotal))
+                }.minWith(basketOrder)
+            }
+        }.sortedWith(basketOrder)
+        return SingleStoreBasketResult(alternatives,
+            alternatives.firstOrNull()?.takeIf { it.isComplete && !rankingPending }, rankingPending)
+    }
+
+    internal fun prepare(
+        demands: Map<Long, PriceDemand?>,
+        selectedRetailers: Set<CommercialId>,
+        regionId: CommercialId,
+        localStoreIds: Set<CommercialId>,
+        snapshot: PriceSnapshot,
+        policy: ComparisonPolicy,
+        promotions: List<VerifiedPromotion> = emptyList(),
+        authorizedSubstitutions: Set<IngredientProductMatch> = emptySet(),
+        additionalMassContents: List<VerifiedMassContent> = emptyList(),
+        checkCancellation: () -> Unit = {}
+    ): PreparedBasket {
         val stores = snapshot.stores.filter {
             regionId == snapshot.regionId && it.id in localStoreIds && it.retailerId in selectedRetailers
-        }.groupBy { it.retailerId }
-        val eligibleStores = stores.values.flatten().map { it.id }.toSet()
+        }.sortedBy { it.id.value }
+        val eligibleStores = stores.map { it.id }.toSet()
         val prices = snapshot.prices.filter { it.record.storeId in eligibleStores }
         val stock = snapshot.availability.filter {
             it.record.storeId in eligibleStores && it.record.observedInstant <= policy.now &&
@@ -72,88 +111,77 @@ object SingleStoreBasketOptimizer {
                 result.excluded.groupBy { it.observation?.storeId })
         }
         val products = snapshot.products.associateBy { it.id }
-        var rankingPending = false
-        val alternatives = retailers.map { retailer ->
-            val local = stores[retailer.id].orEmpty()
-            if (local.isEmpty()) {
-                SingleStoreBasket(retailer, null, emptyList(),
-                    demands.keys.sorted().map { BasketMissingItem(it, setOf(BasketMissingReason.NO_LOCAL_STORE)) },
-                    null, null)
-            } else {
-                local.map { store ->
-                    checkCancellation()
-                    val missing = unresolved.toMutableList()
-                    val lines = mutableListOf<BasketLine>()
-                    // The editorial rules require resolving rival canonicals for a SKU.
-                    // Exclude any such collision that survives in this store before allocating packs.
-                    val sharedPacks = comparisons.values.flatMap { comparison ->
-                        comparison.options[store.id].orEmpty().map { it.pack.id }.distinct()
-                    }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
-                    for ((id, group) in groupedDemands) {
-                        checkCancellation()
-                        val comparison = comparisons.getValue(id)
-                        val reasons = (comparison.excluded[null].orEmpty() + comparison.excluded[store.id].orEmpty())
-                            .map { it.error.basketReason() }.toMutableSet()
-                        val skus = comparison.options[store.id].orEmpty().groupBy { it.pack.id }.mapNotNull { (pack, offers) ->
-                            val state = stock[store.id to pack] ?: StockState.UNKNOWN
-                            val reason = when {
-                                pack in sharedPacks -> BasketMissingReason.AMBIGUOUS_EQUIVALENT
-                                state == StockState.OUT_OF_STOCK -> BasketMissingReason.OUT_OF_STOCK
-                                offers.first().pack.weightMode == WeightMode.VARIABLE -> BasketMissingReason.WEIGHT_REQUIRED
-                                else -> null
-                            }
-                            if (reason != null) {
-                                reasons += reason
-                                return@mapNotNull null
-                            }
-                            val regular = offers.filter { it.promotion == null }
-                            val latest = regular.maxOfOrNull { it.observation.record.observedInstant }
-                            val current = regular.filter { it.observation.record.observedInstant == latest }
-                            val base = if (current.map { it.observation.money.amount.stripTrailingZeros() }.distinct().size > 1) {
-                                reasons += BasketMissingReason.AMBIGUOUS_PRICE
-                                null
-                            } else current.minWithOrNull(offerIdentity)
-                            val schedules = (listOfNotNull(base) + offers.filter { it.promotion != null })
-                                .sortedWith(offerIdentity)
-                            if (schedules.isEmpty()) return@mapNotNull null
-                            val sample = schedules.first()
-                            Sku(sample.massEvidence?.grams ?: requireNotNull(sample.pack.netContent).amount,
-                                state, schedules)
+        val sharedByStore = stores.associate { store ->
+            store.id to comparisons.values.flatMap { comparison ->
+                comparison.options[store.id].orEmpty().map { it.pack.id }.distinct()
+            }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        }
+        return PreparedBasket(stores) { subset, allowFallback ->
+            checkCancellation()
+            var limited = false
+            val missing = unresolved.toMutableList()
+            val lines = mutableListOf<BasketLine>()
+            // The editorial rules require resolving rival canonicals for a SKU.
+            // Exclude any such collision that survives in this store before allocating packs.
+            for ((id, group) in groupedDemands) {
+                checkCancellation()
+                val comparison = comparisons.getValue(id)
+                val reasons = (comparison.excluded[null].orEmpty() + subset.flatMap { comparison.excluded[it.id].orEmpty() })
+                    .map { it.error.basketReason() }.toMutableSet()
+                val skus = subset.flatMap { store ->
+                    comparison.options[store.id].orEmpty().groupBy { it.pack.id }.mapNotNull { (pack, offers) ->
+                        val state = stock[store.id to pack] ?: StockState.UNKNOWN
+                        val reason = when {
+                            pack in sharedByStore.getValue(store.id) -> BasketMissingReason.AMBIGUOUS_EQUIVALENT
+                            state == StockState.OUT_OF_STOCK -> BasketMissingReason.OUT_OF_STOCK
+                            offers.first().pack.weightMode == WeightMode.VARIABLE -> BasketMissingReason.WEIGHT_REQUIRED
+                            else -> null
                         }
-                        val plan = if (skus.isEmpty()) null else try {
-                            solve(group.amount, skus, checkCancellation)
-                        } catch (_: SearchLimit) {
-                            reasons.clear()
-                            reasons += BasketMissingReason.SEARCH_LIMIT
+                        if (reason != null) {
+                            reasons += reason
+                            return@mapNotNull null
+                        }
+                        val regular = offers.filter { it.promotion == null }
+                        val latest = regular.maxOfOrNull { it.observation.record.observedInstant }
+                        val current = regular.filter { it.observation.record.observedInstant == latest }
+                        val base = if (current.map { it.observation.money.amount.stripTrailingZeros() }.distinct().size > 1) {
+                            reasons += BasketMissingReason.AMBIGUOUS_PRICE
                             null
-                        }
-                        if (plan == null) {
-                            missing += group.ids.map {
-                                BasketMissingItem(it, reasons.ifEmpty { setOf(BasketMissingReason.NO_PRICE) })
-                            }
-                        } else {
-                            val purchases = generateSequence(plan) { it.previous }.mapNotNull { it.purchase }
-                                .map { choice ->
-                                    val offer = choice.offer
-                                    BasketPurchase(products.getValue(offer.pack.productId), offer.pack, offer.match,
-                                        offer.observation, offer.promotion, choice.stock, choice.count,
-                                        choice.capacity, choice.checkout)
-                                }.sortedBy { it.pack.id.value }.toList()
-                            lines += BasketLine(group.ids, purchases, group.amount, plan.amount, group.unit, plan.checkout,
-                                EuroRatio(plan.raw * group.amount, plan.amount))
-                        }
+                        } else current.minWithOrNull(offerIdentity)
+                        val schedules = (listOfNotNull(base) + offers.filter { it.promotion != null })
+                            .sortedWith(offerIdentity)
+                        if (schedules.isEmpty()) return@mapNotNull null
+                        val sample = schedules.first()
+                        Sku(sample.massEvidence?.grams ?: requireNotNull(sample.pack.netContent).amount,
+                            state, schedules)
                     }
-                    if (missing.isNotEmpty() && missing.all { BasketMissingReason.SEARCH_LIMIT in it.reasons }) {
-                        rankingPending = true
+                }
+                val plan = if (skus.isEmpty()) null else try {
+                    solve(group.amount, skus, checkCancellation)
+                } catch (_: SearchLimit) {
+                    limited = true
+                    reasons.clear()
+                    reasons += BasketMissingReason.SEARCH_LIMIT
+                    if (allowFallback) bestSingleFormat(group.amount, skus) else null
+                }
+                if (plan == null) {
+                    missing += group.ids.map {
+                        BasketMissingItem(it, reasons.ifEmpty { setOf(BasketMissingReason.NO_PRICE) })
                     }
-                    SingleStoreBasket(retailer, store, lines, missing.sortedBy { it.itemId },
-                        lines.takeIf { it.isNotEmpty() }?.sumOf { it.checkoutEur },
-                        lines.takeIf { it.isNotEmpty() }?.let(::proportionalTotal))
-                }.minWith(basketOrder)
+                } else {
+                    val purchases = generateSequence(plan) { it.previous }.mapNotNull { it.purchase }
+                        .map { choice ->
+                            val offer = choice.offer
+                            BasketPurchase(products.getValue(offer.pack.productId), offer.pack, offer.match,
+                                offer.observation, offer.promotion, choice.stock, choice.count,
+                                choice.capacity, choice.checkout)
+                        }.sortedBy { it.pack.id.value }.toList()
+                    lines += BasketLine(group.ids, purchases, group.amount, plan.amount, group.unit, plan.checkout,
+                        EuroRatio(plan.raw * group.amount, plan.amount))
+                }
             }
-        }.sortedWith(basketOrder)
-        return SingleStoreBasketResult(alternatives,
-            alternatives.firstOrNull()?.takeIf { it.isComplete && !rankingPending }, rankingPending)
+            BasketAllocation(lines, missing.sortedBy { it.itemId }, limited)
+        }
     }
 
     private data class DemandKey(val ingredient: CommercialId, val unit: ContentUnit, val basis: MassBasis?)
@@ -243,6 +271,14 @@ object SingleStoreBasketOptimizer {
     private val planOrder = compareBy<Plan> { it.checkout }.thenBy { it.unconfirmed }
         .thenBy { it.substitutions }.thenBy { it.amount }.thenBy { it.packs }.thenBy { it.raw }
 
+    private fun bestSingleFormat(required: BigDecimal, skus: List<Sku>): Plan =
+        skus.minOfWith(planOrder) { sku ->
+            val minimum = required.divide(sku.capacity, 0, RoundingMode.CEILING).toBigIntegerExact()
+            sku.coveringCounts(minimum).minOfWith(planOrder) { count ->
+                Plan().add(sku.capacity * count.toBigDecimal(), sku.purchase(count))
+            }
+        }
+
     private class SearchLimit : RuntimeException()
 
     /** A stage picks one price schedule and a count for a single SKU. */
@@ -306,3 +342,7 @@ object SingleStoreBasketOptimizer {
         return numerator.toBigDecimal().divide(denominator.toBigDecimal(), 2, RoundingMode.HALF_UP)
     }
 }
+
+internal class PreparedBasket(val stores: List<Store>, val allocate: (List<Store>, Boolean) -> BasketAllocation)
+
+internal class BasketAllocation(val lines: List<BasketLine>, val missing: List<BasketMissingItem>, val limited: Boolean)

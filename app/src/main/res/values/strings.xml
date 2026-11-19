@@ -731,4 +731,25 @@
     <string name="shopping_basket_promotion_unavailable">Promotion expired or terms unconfirmed</string>
     <string name="shopping_basket_out_of_stock">Reported out of stock</string>
     <string name="shopping_basket_search_limit">Combination could not be fully evaluated</string>
+    <string name="multi_title">Split basket across stores</string>
+    <string name="multi_limit">Maximum stores to visit</string>
+    <string name="multi_travel">Include confirmed fixed visit costs</string>
+    <string name="multi_fee">Visit cost in EUR for %1$s</string>
+    <string name="multi_confirm">Confirm visit costs and compare</string>
+    <string name="multi_evidence">Cost source (ticket or published fare)</string>
+    <string name="multi_compare">Compare distribution</string>
+    <string name="multi_exact">Exact result for the selected constraints</string>
+    <string name="multi_heuristic">Heuristic result · optimum unproven</string>
+    <string name="multi_coverage">Coverage · %1$d/%2$d</string>
+    <string name="multi_checkout">Purchase subtotal for covered items · %1$s</string>
+    <string name="multi_total">Covered items and visits · %1$s</string>
+    <string name="multi_reference">Single-store reference · %1$s</string>
+    <string name="multi_gross">Gross savings on products · %1$s</string>
+    <string name="multi_net">Net savings including visits · %1$s</string>
+    <string name="multi_net_unknown">Net savings unavailable</string>
+    <string name="multi_missing_costs">Some visit costs are unknown. Stores are ranked by purchase cost.</string>
+    <string name="multi_no_reference">A complete single-store comparison is unavailable.</string>
+    <string name="multi_shop">%1$s · %2$s</string>
+    <string name="multi_visit_cost">Confirmed visit cost · %1$s</string>
+    <string name="multi_product">%1$s × %2$s (%3$s) · %4$s</string>
 </resources>

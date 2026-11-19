@@ -739,4 +739,25 @@
     <string name="shopping_basket_promotion_unavailable">Promoción caducada o con condiciones sin confirmar</string>
     <string name="shopping_basket_out_of_stock">Sin existencias según la observación</string>
     <string name="shopping_basket_search_limit">No se pudo evaluar toda la combinación</string>
+    <string name="multi_title">Repartir la cesta entre tiendas</string>
+    <string name="multi_limit">Máximo de tiendas que visitar</string>
+    <string name="multi_travel">Incluir costes fijos de visita confirmados</string>
+    <string name="multi_fee">Coste de la visita en EUR a %1$s</string>
+    <string name="multi_confirm">Confirmar costes de visita y comparar</string>
+    <string name="multi_evidence">Fuente del importe (ticket o tarifa publicada)</string>
+    <string name="multi_compare">Comparar reparto</string>
+    <string name="multi_exact">Resultado exacto para las restricciones seleccionadas</string>
+    <string name="multi_heuristic">Resultado heurístico · óptimo sin demostrar</string>
+    <string name="multi_coverage">Cobertura · %1$d/%2$d</string>
+    <string name="multi_checkout">Subtotal de compra de los artículos cubiertos · %1$s</string>
+    <string name="multi_total">Artículos cubiertos y visitas · %1$s</string>
+    <string name="multi_reference">Tienda de referencia · %1$s</string>
+    <string name="multi_gross">Ahorro bruto en productos · %1$s</string>
+    <string name="multi_net">Ahorro neto con visitas · %1$s</string>
+    <string name="multi_net_unknown">Ahorro neto sin determinar</string>
+    <string name="multi_missing_costs">Faltan costes de visita. El reparto se ordena por el importe de los productos.</string>
+    <string name="multi_no_reference">Falta una referencia comparable de cesta completa en una tienda.</string>
+    <string name="multi_shop">%1$s · %2$s</string>
+    <string name="multi_visit_cost">Coste de visita confirmado · %1$s</string>
+    <string name="multi_product">%1$s × %2$s (%3$s) · %4$s</string>
 </resources>
