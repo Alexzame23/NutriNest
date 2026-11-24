@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
+import { MatchingService } from './matching-service.mjs';
 
 /** A local volume shared by the worker and its readers on one host. */
 export class PriceSyncStore {
@@ -47,6 +48,7 @@ export class PriceSyncStore {
             this.#putEvidence = this.#db.prepare('INSERT OR REPLACE INTO evidence VALUES (?, ?, ?)');
             this.#insertHistory = this.#db.prepare('INSERT INTO price_history (fetched_at, observation) VALUES (?, ?)');
             this.#lock = new DatabaseSync(path + '.worker-lock', { timeout: 0 });
+            this.matching = new MatchingService(this.#db);
         } catch (error) {
             this.#db.close();
             throw error;

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { download } from './http-download.mjs';
-import { PriceProvider, fixedProduct, isDate, isId, isLabel, regularStorePrice } from './price-provider.mjs';
+import { PriceProvider, fixedProduct, gtinKey, isDate, isId, isLabel, regularStorePrice } from './price-provider.mjs';
 import { ProviderError, requireField } from './provider-error.mjs';
 
 // Server-side port of R2's Location query. Only reviewed packages at the configured OSM shop qualify.
@@ -15,7 +15,8 @@ export async function loadLocationPage(plan, { beforeRequest, now, userAgent, fe
     const sourceId = 'open-prices';
     const catalog = plan.products.map(row => fixedProduct(sourceId, row));
     const byCode = new Map(catalog.map(item => [item.package.gtin, item]));
-    requireField(byCode.size === catalog.length && new Set(catalog.map(item => item.product.id)).size === catalog.length,
+    requireField(catalog.every(item => gtinKey(item.package.gtin)) &&
+        byCode.size === catalog.length && new Set(catalog.map(item => item.product.id)).size === catalog.length,
         'duplicate reviewed product', 'INVALID_CONFIGURATION');
     const url = new URL('https://prices.openfoodfacts.org/api/v1/prices');
     url.search = new URLSearchParams({ location_id: shop.locationId, currency: 'EUR', order_by: '-date,-id', size: 10 });

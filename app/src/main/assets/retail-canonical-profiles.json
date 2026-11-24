@@ -1,0 +1,36 @@
+{
+  "revision": "practical-catalog-v1",
+  "sourceSha256": "66682591bb5ae18bd53f7b0d9f720718e3dd42abe81fc08a2d90e2141da90359",
+  "profiles": [
+    {
+      "canonicalIngredientId": "nn.yogurt.drinking.flavoured",
+      "conceptKey": "bedca:950",
+      "name": "Yogur líquido, aromatizado sabor s/e",
+      "catalogState": "VISIBLE",
+      "category": "DAIRY", "concept": "yogurt", "preparation": "fermented",
+      "composition": "flavoured", "form": "drink", "basis": "net", "unit": "G",
+      "diet": "standard-sweetened", "requiredComponents": ["milk", "cultures", "flavouring"],
+      "excludeAllergens": []
+    },
+    {
+      "canonicalIngredientId": "nn.yogurt.drinking.whole.strawberry-banana",
+      "conceptKey": "bedca:2538",
+      "name": "Yogur, líquido, entero, sabor fresa y plátano",
+      "catalogState": "VISIBLE",
+      "category": "DAIRY", "concept": "yogurt", "preparation": "fermented",
+      "composition": "flavoured", "form": "drink", "basis": "net", "unit": "G",
+      "diet": "standard-sweetened", "requiredComponents": ["milk", "cultures", "flavouring"],
+      "attributes": {"milkFat": "whole", "flavour": "strawberry-banana"}, "excludeAllergens": []
+    },
+    {
+      "canonicalIngredientId": "nn.yogurt.drinking.plain.sweetened",
+      "conceptKey": "bedca:1133",
+      "name": "Yogur líquido, natural, azucarado",
+      "catalogState": "VISIBLE",
+      "category": "DAIRY", "concept": "yogurt", "preparation": "fermented",
+      "composition": "plain", "form": "drink", "basis": "net", "unit": "G",
+      "diet": "standard-sweetened", "requiredComponents": ["milk", "cultures", "sugar"],
+      "excludeAllergens": []
+    }
+  ]
+}

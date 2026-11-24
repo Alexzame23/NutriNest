@@ -15,10 +15,10 @@ test('labelled decisions via the service, including abstentions', t => {
         const [result] = service.reconcile(comparison(row));
         const d = result.decision;
         const truth = row[2];
-        const expectedStatus = truth === 'NO_COMPATIBLE' ? 'REJECTED' :
-            ['PENDING', 'SUSTITUTO'].includes(truth) ? 'PENDING' : 'ACCEPTED';
+        const expectedStatus = truth === 'INCOMPATIBLE' ? 'REJECTED' :
+            ['PENDING', 'ALLOWED_SUBSTITUTE'].includes(truth) ? 'PENDING' : 'ACCEPTED';
         assert.equal(d.status, expectedStatus, row[1]);
-        assert.equal(d.kind, truth === 'PENDING' ? null : truth, row[1]);
+        assert.equal(d.kind, truth === 'PENDING' ? 'AMBIGUOUS' : truth, row[1]);
         assert.equal(service.acceptedMatches().length, Number(expectedStatus === 'ACCEPTED'));
         (matrix[truth] ??= {})[d.status] = (matrix[truth]?.[d.status] ?? 0) + 1;
         service.close();
@@ -90,7 +90,7 @@ test('duplicate GTIN across packages, brand conflict and invalid target cannot c
     assert.ok(s.reconcile(batch).every(r => r.decision.missing.includes('duplicateGtin')));
     batch.catalog.pop();
     batch.ingredients[0].target.brand = 'Marca B';
-    assert.equal(s.reconcile(batch)[0].decision.kind, 'NO_COMPATIBLE');
+    assert.equal(s.reconcile(batch)[0].decision.kind, 'INCOMPATIBLE');
     batch.ingredients[0].target.brand = 'Marca A';
     batch.ingredients[0].target.gtin = '00000000000000';
     assert.equal(s.reconcile(batch)[0].decision.status, 'PENDING');

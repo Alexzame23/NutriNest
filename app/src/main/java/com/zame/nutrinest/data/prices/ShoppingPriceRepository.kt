@@ -75,14 +75,17 @@ internal data class ShoppingPriceOption(
 
 internal class RegionalShoppingPriceRepository(
     private val load: suspend (String, Instant) -> RetailBatch,
-    private val keys: suspend (Set<Long>) -> Map<Long, CommercialId>
+    private val keys: suspend (Set<Long>) -> Map<Long, RetailIngredientKeys>
 ) : ShoppingPriceRepository {
     override suspend fun compare(items: List<ShoppingPriceDemand>, postalCode: String, now: Instant): ShoppingPrices {
         val publication = when (val batch = load(postalCode, now)) {
             is RetailBatchUnavailable -> return ShoppingPrices.Unavailable(batch)
             is RetailBatchPublication -> batch
         }
-        val identities = keys(items.map { it.ingredientId }.toSet())
+        val published = publication.snapshot.matches.mapNotNull { it.canonicalIngredientId }.toSet()
+        val identities = keys(items.map { it.ingredientId }.toSet()).mapNotNull { (id, keys) ->
+            keys.select(published)?.let { id to it }
+        }.toMap()
         return withContext(Dispatchers.Default) { compareLoaded(items, publication, identities, now) }
     }
 

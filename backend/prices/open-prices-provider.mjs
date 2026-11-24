@@ -84,7 +84,7 @@ function pilotConfiguration(plan) {
         for (const row of products) {
             const item = fixedProduct(SOURCE.id, row);
             const key = gtinKey(item.package.gtin);
-            check(!catalog.has(key), 'duplicate pilot GTIN');
+            check(key && !catalog.has(key), 'missing or duplicate pilot GTIN');
             catalog.set(key, item);
         }
     } catch (error) {

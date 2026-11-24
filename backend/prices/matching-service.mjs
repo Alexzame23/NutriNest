@@ -10,8 +10,10 @@ function uniqueIds(rows, key) {
 
 export class MatchingService {
     #db;
+    #ownsDatabase;
     constructor(path) {
-        this.#db = new DatabaseSync(path);
+        this.#ownsDatabase = !(path instanceof DatabaseSync);
+        this.#db = this.#ownsDatabase ? new DatabaseSync(path) : path;
         this.#db.exec(`PRAGMA busy_timeout=5000;
             CREATE TABLE IF NOT EXISTS match_revision (
                 ingredient TEXT NOT NULL, package TEXT NOT NULL, version INTEGER NOT NULL,
@@ -21,7 +23,7 @@ export class MatchingService {
             CREATE TRIGGER IF NOT EXISTS immutable_match_delete BEFORE DELETE ON match_revision
                 BEGIN SELECT RAISE(ABORT,'immutable revision'); END;`);
     }
-    close() { this.#db.close(); }
+    close() { if (this.#ownsDatabase) this.#db.close(); }
     history(ingredient, pack) {
         return this.#db.prepare('SELECT event FROM match_revision WHERE ingredient=? AND package=? ORDER BY version')
             .all(ingredient, pack).map(row => JSON.parse(row.event));
@@ -35,11 +37,17 @@ export class MatchingService {
         return this.current().filter(row => row.decision.status === 'ACCEPTED').map(row => ({
             origin: { sourceId: 'nutrinest-editorial', recordKey: digest([row.ingredientKey, row.packageId]) },
             ingredientKey: row.ingredientKey, packageId: row.packageId, mappingVersion: row.version,
-            kind: row.decision.kind === 'SUSTITUTO' ? 'ALTERNATIVE' : 'EXACT',
+            ...(row.canonicalIngredientId && {
+                ingredientKey: row.canonicalIngredientId, canonicalIngredientId: row.canonicalIngredientId,
+                commercialProductId: row.evidence.item.product.id, classification: row.classification,
+                evidenceDigest: row.fingerprint,
+            }),
+            kind: ['ALLOWED_SUBSTITUTE', 'SUSTITUTO'].includes(row.decision.kind) ? 'ALTERNATIVE' : 'EXACT',
             confidence: row.review || row.decision.score >= 90 ? 'HIGH' : 'MEDIUM',
         }));
     }
     #transaction(action) {
+        if (this.#db.isTransaction) return action();
         this.#db.exec('BEGIN IMMEDIATE');
         try {
             const result = action();
@@ -52,6 +60,9 @@ export class MatchingService {
     }
     #append(data, previous) {
         const event = { ...data, version: (previous?.version ?? 0) + 1, at: new Date().toISOString() };
+        const d = event.decision;
+        event.classification = d.status === 'PENDING' && d.kind !== 'ALLOWED_SUBSTITUTE' ? 'AMBIGUOUS' : d.kind;
+        event.confidence = d.status === 'ACCEPTED' ? (event.review || d.score >= 90 ? 'HIGH' : 'MEDIUM') : 'LOW';
         this.#db.prepare('INSERT INTO match_revision VALUES (?,?,?,?)')
             .run(event.ingredientKey, event.packageId, event.version, json(event));
         return event;
@@ -60,9 +71,13 @@ export class MatchingService {
     /** Replace the entire editorial scope of this database from one consistent input batch. */
     reconcile({ ingredients, catalog, threshold = 80 }) {
         if (!Number.isInteger(threshold) || threshold < 0 || threshold > 100) throw Error('Invalid threshold');
-        uniqueIds(ingredients, i => i.key);
+        uniqueIds(ingredients, i => i.key ?? i.canonicalIngredientId);
+        uniqueIds(ingredients.filter(i => i.canonicalIngredientId != null), i => i.canonicalIngredientId);
+        if (ingredients.some(i => i.canonicalIngredientId != null &&
+            (gtinKey(i.canonicalIngredientId) || i.canonicalIngredientId.startsWith('bedca.'))))
+            throw Error('Expected a canonical ingredient identity');
         uniqueIds(catalog, row => row.package.id);
-        const gtins = new Set(), duplicateGtins = new Set();
+        const gtins = new Set(), duplicateGtins = new Set(), skus = new Set(), duplicateSkus = new Set();
         for (const { product, package: pack } of catalog) {
             if (!isId(product.id) || pack.productId !== product.id || !isLabel(product.name) ||
                 ![product, pack].every(x => isId(x.origin?.sourceId) && isLabel(x.origin?.recordKey)))
@@ -70,14 +85,21 @@ export class MatchingService {
             const gtin = gtinKey(pack.gtin);
             if (gtin && gtins.has(gtin)) duplicateGtins.add(gtin);
             gtins.add(gtin);
+            if (pack.retailerSku != null) {
+                if (!isId(pack.retailerSku.retailerId) || !isLabel(pack.retailerSku.value)) throw Error('Invalid retailer SKU');
+                const sku = json([pack.retailerSku.retailerId, pack.retailerSku.value]);
+                if (skus.has(sku)) duplicateSkus.add(sku);
+                skus.add(sku);
+            }
         }
         const batch = [];
         for (const item of catalog) {
             const rows = ingredients.filter(i => candidate(i, item)).map(i => ({
-                ingredientKey: i.key, packageId: item.package.id, rulesVersion,
+                ingredientKey: i.key ?? i.canonicalIngredientId, canonicalIngredientId: i.canonicalIngredientId ?? i.canonicalId,
+                packageId: item.package.id, rulesVersion,
                 evidence: { ingredient: i, item }, decision: assess(i, item, threshold),
             }));
-            const possible = rows.filter(row => row.decision.kind !== 'NO_COMPATIBLE' && row.decision.kind !== 'SUSTITUTO');
+            const possible = rows.filter(row => !['INCOMPATIBLE', 'ALLOWED_SUBSTITUTE'].includes(row.decision.kind));
             const competing = possible.map(row => [row.ingredientKey, digest(row.evidence.ingredient)]).sort();
             for (const row of rows) {
                 if (possible.length > 1 && possible.includes(row)) {
@@ -87,6 +109,11 @@ export class MatchingService {
                 }
                 if (row.decision.status !== 'REJECTED' && duplicateGtins.has(gtinKey(item.package.gtin))) {
                     row.decision.missing.push('duplicateGtin');
+                    row.decision.status = 'PENDING';
+                }
+                const sku = item.package.retailerSku;
+                if (row.decision.status !== 'REJECTED' && sku && duplicateSkus.has(json([sku.retailerId, sku.value]))) {
+                    row.decision.missing.push('duplicateRetailerSku');
                     row.decision.status = 'PENDING';
                 }
             }
@@ -123,7 +150,7 @@ export class MatchingService {
             const old = this.history(ingredientKey, packageId).at(-1);
             if (!old || old.version !== version || old.decision.status === 'WITHDRAWN') throw Error('Stale review');
             const d = old.decision;
-            if (status === 'ACCEPTED' && (!d.kind || d.kind === 'NO_COMPATIBLE' ||
+            if (status === 'ACCEPTED' && (!d.kind || ['INCOMPATIBLE', 'AMBIGUOUS', 'NO_COMPATIBLE'].includes(d.kind) ||
                 d.missing.some(r => !['competingIngredients', 'recheckReview'].includes(r)))) throw Error('Evidence required');
             if (status === 'ACCEPTED' && this.current().some(r => r.packageId === packageId &&
                 r.ingredientKey !== ingredientKey && r.decision.status !== 'REJECTED' && r.decision.status !== 'WITHDRAWN'))

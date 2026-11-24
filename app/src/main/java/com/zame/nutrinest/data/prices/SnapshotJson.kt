@@ -35,14 +35,19 @@ internal object SnapshotJson {
                 CommercialProduct(
                     id("id"), origin(), string("name"), optionalString("brand"),
                     optionalString("variant"), obj("attributes").strings()
-                )
+                ).also { product ->
+                    optionalString("commercialProductId")?.let { require(it == product.commercialProductId.value) }
+                    optionalString("providerProductId")?.let { require(it == product.providerProductId) }
+                }
             },
             objects("packages") {
                 ProductPackage(
                     id("id"), origin(), id("productId"), optionalString("gtin")?.let(::Gtin),
                     enum("weightMode"), enum("saleUnit"), optionalObject("netContent")?.run {
                         NetContent(decimal("amount"), enum("unit"))
-                    }, optionalInt("unitsPerPackage")
+                    }, optionalInt("unitsPerPackage"), optionalObject("retailerSku")?.run {
+                        RetailerSku(id("retailerId"), string("value"))
+                    }
                 )
             },
             objects("matches") {
@@ -50,7 +55,9 @@ internal object SnapshotJson {
                     origin(), id("ingredientKey"), int("mappingVersion"), id("packageId"),
                     enum("kind"), enum("confidence"), optionalObject("edibleMass")?.run {
                         ReviewedEdibleMass(decimal("grams"), string("sourceRef"))
-                    }
+                    }, optionalString("canonicalIngredientId")?.let(::CommercialId),
+                    optionalString("commercialProductId")?.let(::CommercialId),
+                    optionalString("classification")?.let(MatchClassification::valueOf), optionalString("evidenceDigest")
                 )
             },
             objects("prices") {

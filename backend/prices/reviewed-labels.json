@@ -1,0 +1,15 @@
+[
+  {
+    "providerId": "open-prices",
+    "providerProductId": "8435257073279",
+    "labelDigest": "6dc7148a563103b4c52211bbc7af0dbb492040f3cf13560221cff5313c1858ac",
+    "sourceRef": "https://www.yoguresnestle.es/nestle/yogures-liquidos/yogur-liquido-fresa-platano-semidesnatado",
+    "ingredientSource": "https://supermercado.eroski.es/es/productdetail/26922831-yogur-liquido-sabor-fresa-platano-nestle-botella-900-g/",
+    "gtinSource": "https://supermediterraneo.es/supermercado/familia/postresnestle/9841-NESTLEYOGURBEBERFRESA-PLATANO900ML-8435257073279.html",
+    "reviewDate": "2026-11-24", "reviewed": true,
+    "category": "DAIRY", "concept": "yogurt", "preparation": "fermented",
+    "composition": "flavoured", "form": "drink", "basis": "net", "diet": "standard-sweetened",
+    "attributes": {"milkFat": "semi-skimmed", "flavour": "strawberry-banana"},
+    "ingredients": ["milk", "sugar", "cream", "strawberry-juice", "banana-juice", "flavouring", "skim-milk-powder", "cultures"]
+  }
+]

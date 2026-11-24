@@ -4,6 +4,7 @@ import { loadLocationPage } from './open-prices-location.mjs';
 import { ProviderError, requireField } from './provider-error.mjs';
 import { DAY, hasRights, priceStatus, priceTime } from './sync-policy.mjs';
 import { updatePublication } from './sync-publication.mjs';
+import { matchingRevision } from './retail-matching.mjs';
 
 const quoteKey = (storeId, packageId) => `${storeId}:${packageId}`;
 const keyOf = price => quoteKey(price.record.scope.storeId, price.record.packageId);
@@ -126,8 +127,12 @@ export function syncPrices(store, policy, { now = Date.now, load = options => lo
         if (!hasRights(policy, started)) return { status: 'DISABLED' };
         if (state.nextAt > started) {
             if (state.metadata && state.scopeKey === policy.scopeKey && state.lastSuccessAt + policy.snapshotMs > started &&
-                store.publication()?.expires_at <= started) {
-                store.transaction(() => updatePublication(store, state, policy, started));
+                (state.matchingRevision !== matchingRevision || store.publication()?.expires_at <= started)) {
+                store.transaction(() => {
+                    updatePublication(store, state, policy, started);
+                    state.matchingRevision = matchingRevision;
+                    store.save(state);
+                });
             }
             return { status: 'NOT_DUE', nextAt: state.nextAt };
         }
@@ -178,6 +183,7 @@ export function syncPrices(store, policy, { now = Date.now, load = options => lo
                 state.cycleAt = null;
                 state.attempts = 0;
                 updatePublication(store, state, policy, completed);
+                state.matchingRevision = matchingRevision;
                 store.retainHistory(completed - policy.historyMs);
                 store.save(state);
             });

@@ -23,7 +23,9 @@ import com.zame.nutrinest.data.repository.ProfileRepository
 import com.zame.nutrinest.data.repository.RecipeRepository
 import com.zame.nutrinest.notifications.MenuReminderWorker
 import com.zame.nutrinest.domain.stores.StoreRepository
-import com.zame.nutrinest.domain.prices.CommercialId
+import com.zame.nutrinest.data.prices.RetailCanonicalBindings
+import com.zame.nutrinest.data.prices.RetailIngredientKeys
+import org.json.JSONObject
 
 class AppContainer(app: Application, private val database: NutriNestDatabase = NutriNestDatabase.get(app)) {
     val ingredientRepository: IngredientRepository =
@@ -48,12 +50,15 @@ class AppContainer(app: Application, private val database: NutriNestDatabase = N
 
     val storeRepository: StoreRepository = PilotStoreDirectory.repository
 
-    private suspend fun retailKeys(ids: Set<Long>): Map<Long, CommercialId> =
-        ids.chunked(900).flatMap { database.ingredientDao().retailBedcaRecordKeys(it) }
-            .mapNotNull { row ->
-                row.recordKey.takeIf { it.matches(Regex("[0-9]{1,32}")) }
-                    ?.let { row.ingredientId to CommercialId("bedca.$it") }
-            }.toMap()
+    private val retailBindings by lazy {
+        app.assets.open("retail-canonical-profiles.json").bufferedReader().use {
+            RetailCanonicalBindings(JSONObject(it.readText()))
+        }
+    }
+
+    private suspend fun retailKeys(ids: Set<Long>): Map<Long, RetailIngredientKeys> =
+        ids.chunked(900).flatMap { database.ingredientDao().retailCanonicalRows(it) }
+            .mapNotNull { row -> retailBindings.resolve(row)?.let { row.ingredientId to it } }.toMap()
 
     internal val retailPrices by lazy {
         @Suppress("DEPRECATION")

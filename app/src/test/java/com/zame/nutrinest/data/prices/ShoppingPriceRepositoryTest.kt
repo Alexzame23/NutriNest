@@ -35,7 +35,7 @@ class ShoppingPriceRepositoryTest {
         val repository = RegionalShoppingPriceRepository(
             load = { cp, _ -> assertEquals("28012", cp); loads++; batch() },
             keys = { ids -> keyReads++; assertEquals(setOf(10L, 11L, 12L), ids)
-                ids.associateWith { CommercialId("bedca.$it") } }
+                ids.associateWith { RetailIngredientKeys(CommercialId("bedca.$it")) } }
         )
         val before = listOf(first, second, third)
         val result = repository.compare(before, "28012", now) as ShoppingPrices.Published
@@ -61,8 +61,8 @@ class ShoppingPriceRepositoryTest {
     }
 
     @Test fun ignoresStaleObservationsAndSeparatesEmptyRegionalCoverage() = runTest {
-        val keys: suspend (Set<Long>) -> Map<Long, CommercialId> = { ids ->
-            ids.associateWith { CommercialId("bedca.$it") }
+        val keys: suspend (Set<Long>) -> Map<Long, RetailIngredientKeys> = { ids ->
+            ids.associateWith { RetailIngredientKeys(CommercialId("bedca.$it")) }
         }
         val stale = RegionalShoppingPriceRepository({ _, _ -> batch(stale = true) }, keys)
         val result = stale.compare(listOf(first), "28012", now) as ShoppingPrices.Published
@@ -81,7 +81,7 @@ class ShoppingPriceRepositoryTest {
         var loads = 0
         val repository = RegionalShoppingPriceRepository(
             load = { _, _ -> loads++; batch() },
-            keys = { ids -> ids.associateWith { CommercialId("bedca.$it") } }
+            keys = { ids -> ids.associateWith { RetailIngredientKeys(CommercialId("bedca.$it")) } }
         )
         val model = ShoppingComparison(backgroundScope, SavedStateHandle(), week, repository,
             Clock.fixed(now, ZoneOffset.UTC), selections = preferences, directory = directory)

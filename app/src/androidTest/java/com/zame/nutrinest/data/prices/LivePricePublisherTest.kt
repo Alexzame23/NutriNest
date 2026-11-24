@@ -1,6 +1,5 @@
 package com.zame.nutrinest.data.prices
 
-import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zame.nutrinest.AppContainer
@@ -25,7 +24,7 @@ class LivePricePublisherTest {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as NutriNestApp
         val region = CommercialId("es-madrid-28012")
         val name = "live-publisher-${UUID.randomUUID()}.db"
-        fun open() = Room.databaseBuilder(app, NutriNestDatabase::class.java, name).build()
+        fun open() = NutriNestDatabase.build(app, name)
         try {
             val db = open()
             val downloaded = try {
@@ -34,11 +33,21 @@ class LivePricePublisherTest {
                 val batch = container.retailPrices.load("28012", Instant.now()) as RetailBatchPublication
                 assertFalse(batch.simulated)
                 assertTrue(batch.localStores.isNotEmpty())
+                val sql = db.openHelper.readableDatabase
+                fun localId(concept: String) = sql.query("""
+                    SELECT m.ingredient_id FROM ingredient_canonical_map m JOIN canonical_ingredients c
+                    ON c.canonical_id=m.canonical_id WHERE c.concept_key=? AND c.scope_key='global'
+                """, arrayOf(concept)).use { check(it.moveToFirst()); it.getLong(0) }
+                val offers = container.retailPrices.compare(localId("bedca:950"), "28012", Instant.now()) as RetailResult.Offers
+                val offer = offers.rows.single { it.price.record.origin.recordKey == "357963" }
+                assertEquals("nn.yogurt.drinking.flavoured", offer.match.canonicalIngredientId?.value)
+                assertEquals("CULINARY_EQUIVALENT", offer.match.classification?.name)
+                assertEquals(RetailResult.NoMatches, container.retailPrices.compare(localId("bedca:2538"), "28012", Instant.now()))
                 batch.snapshot
             } finally {
                 db.close()
             }
-            assertEquals("open-prices", downloaded.sources.single().id.value)
+            assertEquals(setOf("open-prices", "nutrinest-editorial"), downloaded.sources.map { it.id.value }.toSet())
             assertTrue(downloaded.prices.isNotEmpty())
             assertTrue(downloaded.prices.all { it.record.origin.sourceId.value == "open-prices" })
             val reopened = open()

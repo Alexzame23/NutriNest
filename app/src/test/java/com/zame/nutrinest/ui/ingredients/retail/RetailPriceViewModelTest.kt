@@ -107,7 +107,7 @@ class RetailPriceViewModelTest {
         var preferences = RetailerSelectionPreferences(setOf(branch.retailerId),
             mapOf(branch.retailerId to setOf(branch.id)))
         val repository = RegionalRetailPriceRepository(
-            ingredientKey = { key },
+            ingredientKey = { RetailIngredientKeys(key) },
             stores = directory,
             provider = RetailPriceProvider { RetailPublication(snapshot(), false) },
             selection = { preferences }
@@ -131,7 +131,7 @@ class RetailPriceViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RegionalRetailPriceRepository(
-                ingredientKey = { id -> assertEquals(42L, id); key },
+                ingredientKey = { id -> assertEquals(42L, id); RetailIngredientKeys(key) },
                 stores = PilotStoreDirectory.repository,
                 provider = provider,
                 allowSimulated = allowSimulated,

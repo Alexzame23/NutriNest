@@ -1,0 +1,12 @@
+{
+  "snapshotSha256": "18412f437f92a54e84b49ea210e412b0480888ab0cf23e5c0a34a30490caffb9",
+  "observations": ["357963"],
+  "familiesPresent": ["yogur"],
+  "familiesAbsent": ["leche", "arroz", "huevos", "pasta", "aceite", "tomate", "pollo"],
+  "comparisons": [
+    {"recordKey": "357963", "evidence": "reviewed-label", "canonicalIngredientId": "nn.yogurt.drinking.flavoured", "expected": "CULINARY_EQUIVALENT"},
+    {"recordKey": "357963", "evidence": "reviewed-label", "canonicalIngredientId": "nn.yogurt.drinking.whole.strawberry-banana", "expected": "INCOMPATIBLE"},
+    {"recordKey": "357963", "evidence": "reviewed-label", "canonicalIngredientId": "nn.yogurt.drinking.plain.sweetened", "expected": "INCOMPATIBLE"},
+    {"recordKey": "357963", "evidence": "snapshot-only", "canonicalIngredientId": "nn.yogurt.drinking.whole.strawberry-banana", "expected": "AMBIGUOUS"}
+  ]
+}

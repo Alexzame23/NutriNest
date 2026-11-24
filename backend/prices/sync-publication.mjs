@@ -1,16 +1,21 @@
 import { createHash } from 'node:crypto';
 import { hasRights, priceStatus, priceTime } from './sync-policy.mjs';
+import { editorialSource, matchingCoverage, retailMatchingBatch } from './retail-matching.mjs';
 
 const sha256 = data => createHash('sha256').update(data).digest('hex');
 
 export function updatePublication(store, state, policy, now) {
     const { source, retailers, stores } = state.metadata;
     const current = state.quotes.filter(quote => priceStatus(quote, policy, now) === 'CURRENT');
+    const rows = store.matching.reconcile(retailMatchingBatch(state.catalog));
+    const matches = store.matching.acceptedMatches();
     const content = {
-        sources: [source], retailers, stores, zones: [],
-        products: state.catalog.map(entry => entry.product),
+        sources: matches.length ? [source, editorialSource] : [source], retailers, stores, zones: [],
+        products: state.catalog.map(({ product }) => ({
+            ...product, commercialProductId: product.id, providerProductId: product.origin.recordKey,
+        })),
         packages: state.catalog.map(entry => entry.package),
-        matches: [], availability: [], prices: current.map(({ price, fetchedAt }) => ({
+        matches, availability: [], prices: current.map(({ price, fetchedAt }) => ({
             ...price, record: { ...price.record, fetchedAt },
         })),
         dataKind: state.metadata.simulated ? 'simulated' :
@@ -22,6 +27,7 @@ export function updatePublication(store, state, policy, now) {
             storesWithPrices: new Set(current.map(q => q.price.record.scope.storeId)).size,
             packagesWithPrices: new Set(current.map(q => q.price.record.packageId)).size,
             plannedStores: stores.length, plannedPackages: state.catalog.length,
+            matching: matchingCoverage(current.map(q => q.price), rows),
         },
     };
     const contentsHash = sha256(JSON.stringify({ scopeKey: state.scopeKey, content }));

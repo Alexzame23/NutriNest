@@ -135,6 +135,10 @@ components:
                 packagesWithPrices: { type: integer, minimum: 0 }
                 plannedStores: { type: integer, minimum: 0 }
                 plannedPackages: { type: integer, minimum: 0 }
+                matching:
+                  type: object
+                  required: [received, candidates, accepted, ambiguous, incompatible, noCandidate]
+                  additionalProperties: { type: integer, minimum: 0 }
             sources: { type: array, items: { $ref: '#/components/schemas/PriceSource' } }
             retailers: { type: array, items: { $ref: '#/components/schemas/Retailer' } }
             stores: { type: array, items: { $ref: '#/components/schemas/Store' } }
@@ -194,6 +198,12 @@ components:
           required: [attributes]
           properties:
             brand: { type: [string, 'null'] }
+            commercialProductId:
+              $ref: '#/components/schemas/Id'
+              description: Same stable commercial identity as id.
+            providerProductId:
+              type: string
+              description: Product origin.recordKey within origin.sourceId.
             variant: { type: [string, 'null'] }
             attributes:
               type: object
@@ -216,6 +226,12 @@ components:
         id: { $ref: '#/components/schemas/Id' }
         origin: { $ref: '#/components/schemas/Origin' }
         productId: { $ref: '#/components/schemas/Id' }
+        retailerSku:
+          type: object
+          required: [retailerId, value]
+          properties:
+            retailerId: { $ref: '#/components/schemas/Id' }
+            value: { $ref: '#/components/schemas/Label' }
         gtin:
           type: [string, 'null']
           pattern: '^(?=.*[1-9])(?:[0-9]{8}|[0-9]{12,14})$'
@@ -243,6 +259,10 @@ components:
           $ref: '#/components/schemas/Id'
           description: Versioned editorial key shared with clients. No local database identifiers.
         mappingVersion: { $ref: '#/components/schemas/PositiveInt' }
+        canonicalIngredientId: { $ref: '#/components/schemas/Id' }
+        commercialProductId: { $ref: '#/components/schemas/Id' }
+        classification: { type: string, enum: [EXACT_SKU, CULINARY_EQUIVALENT, ALLOWED_SUBSTITUTE] }
+        evidenceDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
         packageId: { $ref: '#/components/schemas/Id' }
         kind: { type: string, enum: [EXACT, ALTERNATIVE] }
         confidence: { $ref: '#/components/schemas/Confidence' }
@@ -261,6 +281,16 @@ components:
       then:
         properties:
           kind: { const: EXACT }
+      dependentRequired:
+        canonicalIngredientId: [classification, commercialProductId, evidenceDigest]
+        classification: [canonicalIngredientId, commercialProductId, evidenceDigest]
+        commercialProductId: [canonicalIngredientId, classification, evidenceDigest]
+        evidenceDigest: [canonicalIngredientId, classification, commercialProductId]
+      allOf:
+        - if: { required: [classification], properties: { classification: { const: ALLOWED_SUBSTITUTE } } }
+          then: { properties: { kind: { const: ALTERNATIVE } } }
+        - if: { required: [classification], properties: { classification: { enum: [EXACT_SKU, CULINARY_EQUIVALENT] } } }
+          then: { properties: { kind: { const: EXACT } } }
     Scope:
       type: object
       required: [type]

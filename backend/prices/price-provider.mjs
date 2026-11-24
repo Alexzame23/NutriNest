@@ -21,7 +21,9 @@ export function gtinKey(value) {
 export function fixedProduct(sourceId, row) {
     const { externalId, gtin, name, brand = null, netContent, unitsPerPackage } = row ?? {};
     requireField(isId(externalId) && sourceId.length + externalId.length + 9 <= 128, 'product.externalId');
-    requireField(gtinKey(gtin) && isLabel(name) && (brand === null || isLabel(brand)), 'product identity');
+    requireField((gtin == null || gtinKey(gtin)) && isLabel(name) && (brand === null || isLabel(brand)), 'product identity');
+    const sku = row.retailerSku;
+    requireField(sku == null || (isId(sku.retailerId) && isLabel(sku.value)), 'retailer SKU');
     const { amount, unit } = netContent ?? {};
     requireField(isAmount(amount) && Number(amount) > 0 && !/\.\d{4}$/.test(amount), 'netContent.amount');
     requireField(['G', 'ML', 'UNIT'].includes(unit) &&
@@ -33,7 +35,8 @@ export function fixedProduct(sourceId, row) {
         product: { id: productId, origin: { sourceId, recordKey: externalId }, name, brand, attributes: {} },
         package: {
             id: `${sourceId}.pack.${externalId}`, origin: { sourceId, recordKey: externalId },
-            productId, gtin, weightMode: 'FIXED', saleUnit: 'PACKAGE', netContent: { amount, unit }, unitsPerPackage,
+            productId, gtin: gtin ?? null, ...(sku == null ? {} : { retailerSku: { retailerId: sku.retailerId, value: sku.value } }),
+            weightMode: 'FIXED', saleUnit: 'PACKAGE', netContent: { amount, unit }, unitsPerPackage,
         },
     };
 }

@@ -47,7 +47,7 @@ private val freshness = Duration.ofDays(30)
 private val thousand = BigDecimal("1000")
 
 internal class RegionalRetailPriceRepository(
-    private val ingredientKey: suspend (Long) -> CommercialId?,
+    private val ingredientKey: suspend (Long) -> RetailIngredientKeys?,
     private val stores: StoreRepository,
     private val provider: RetailPriceProvider?,
     private val allowSimulated: Boolean = false,
@@ -66,7 +66,9 @@ internal class RegionalRetailPriceRepository(
             RetailBatchUnavailable.Stale -> return RetailResult.Stale
             RetailBatchUnavailable.NoCoverage -> return RetailResult.NoCoverage
         }
-        return withContext(comparisonDispatcher) { compareLoaded(data, key, now) }
+        val selected = key.select(data.snapshot.matches.mapNotNull { it.canonicalIngredientId }.toSet())
+            ?: return RetailResult.NoMatches
+        return withContext(comparisonDispatcher) { compareLoaded(data, selected, now) }
     }
 
     private fun compareLoaded(data: RetailBatchPublication, key: CommercialId, now: Instant): RetailResult {

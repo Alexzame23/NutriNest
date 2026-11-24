@@ -1,7 +1,7 @@
 import { labelDigest } from './matching-evidence.mjs';
 import { gtinKey, isAmount, isLabel } from './price-provider.mjs';
 
-export const rulesVersion = 'verified-food-1';
+export const rulesVersion = 'verified-food-2';
 const normalize = name => (name ?? '').normalize('NFD').replace(/\p{M}/gu, '')
     .toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const known = value => isLabel(value) && !['UNKNOWN', 'UNSPECIFIED', 'PROVISIONAL', 'AMBIGUOUS']
@@ -13,6 +13,8 @@ export function candidate(i, { product, package: pack, facts = {} }) {
     return normalize(i.name).split(' ').some(word => word.length > 1 && tokens.has(word))
         || (known(i.category) && i.category === facts.category)
         || (known(i.concept) && i.concept === facts.concept)
+        || (known(i.target?.retailerSku?.value) && i.target.retailerSku.value === pack.retailerSku?.value &&
+            i.target.retailerSku.retailerId === pack.retailerSku.retailerId)
         || (gtinKey(i.target?.gtin) && gtinKey(i.target.gtin) === gtinKey(pack.gtin));
 }
 
@@ -23,12 +25,20 @@ export function assess(i, { product, package: pack, facts = {} }, threshold) {
         else if (left !== right) conflicts.push(field);
         else signals.push(field);
     }
-    if (!isLabel(i.canonicalId) || !isLabel(i.revision) || i.reviewed !== true || !['VISIBLE', 'SECONDARY'].includes(i.catalogState)) missing.push('canonicalReview');
+    if (!known(i.canonicalIngredientId ?? i.canonicalId) || !isLabel(i.revision) || i.reviewed !== true || !['VISIBLE', 'SECONDARY'].includes(i.catalogState)) missing.push('canonicalReview');
     if (!isLabel(facts.sourceRef) || facts.reviewed !== true || facts.labelDigest !== labelDigest({ product, package: pack })) missing.push('labelReview');
     for (const field of ['category', 'concept', 'preparation', 'composition', 'form', 'basis', 'diet']) {
         compare(field, i[field], facts[field]);
     }
-    if (!list(i.ingredients) || !i.ingredients.length || !list(facts.ingredients) || !facts.ingredients.length) {
+    for (const [field, value] of Object.entries(i.attributes ?? {})) {
+        compare('attribute.' + field, value, facts.attributes?.[field]);
+    }
+    if (Array.isArray(i.requiredComponents) && !i.target && i.ingredients == null) {
+        if (!list(i.requiredComponents) || !i.requiredComponents.length || !list(facts.ingredients) || !facts.ingredients.length)
+            missing.push('ingredients');
+        else if (i.requiredComponents.every(component => facts.ingredients.includes(component))) signals.push('ingredients');
+        else conflicts.push('ingredients');
+    } else if (!list(i.ingredients) || !i.ingredients.length || !list(facts.ingredients) || !facts.ingredients.length) {
         missing.push('ingredients');
     } else {
         compare('ingredients', JSON.stringify(i.ingredients), JSON.stringify(facts.ingredients));
@@ -54,9 +64,15 @@ export function assess(i, { product, package: pack, facts = {} }, threshold) {
     if (pack.gtin != null && !gtinKey(pack.gtin)) missing.push('invalidGtin');
     if (i.target != null) {
         const target = i.target;
-        if (!gtinKey(target.gtin) || !gtinKey(pack.gtin)) missing.push('targetGtin');
-        else if (gtinKey(target.gtin) !== gtinKey(pack.gtin)) conflicts.push('targetGtin');
-        else signals.push('targetGtin');
+        if (target.gtin != null || target.retailerSku == null) {
+            if (!gtinKey(target.gtin) || !gtinKey(pack.gtin)) missing.push('targetGtin');
+            else if (gtinKey(target.gtin) !== gtinKey(pack.gtin)) conflicts.push('targetGtin');
+            else signals.push('targetGtin');
+        }
+        if (target.retailerSku != null) {
+            compare('retailer', target.retailerSku.retailerId, pack.retailerSku?.retailerId);
+            compare('retailerSku', target.retailerSku.value, pack.retailerSku?.value);
+        }
         if (!fixed || !isAmount(target.amount) || !Number.isSafeInteger(target.unitsPerPackage)) missing.push('targetPack');
         else if (Number(target.amount) !== Number(net.amount) || target.unitsPerPackage !== pack.unitsPerPackage)
             conflicts.push('targetPack');
@@ -67,9 +83,9 @@ export function assess(i, { product, package: pack, facts = {} }, threshold) {
     const substitute = conflicts.includes('concept') && conflicts.every(r => ['concept', 'ingredients'].includes(r)) &&
         list(i.substituteConcepts) && i.substituteConcepts.includes(facts.concept);
     const unreliable = missing.includes('canonicalReview') || missing.includes('labelReview');
-    const kind = unreliable ? null : conflicts.length ? (substitute ? 'SUSTITUTO' : 'NO_COMPATIBLE')
-        : missing.length ? null : i.target ? 'MISMO_PRODUCTO' : 'EQUIVALENTE';
-    const status = kind === 'NO_COMPATIBLE' ? 'REJECTED'
-        : !kind || substitute || score < threshold ? 'PENDING' : 'ACCEPTED';
+    const kind = unreliable ? 'AMBIGUOUS' : conflicts.length ? (substitute ? 'ALLOWED_SUBSTITUTE' : 'INCOMPATIBLE')
+        : missing.length ? 'AMBIGUOUS' : i.target ? 'EXACT_SKU' : 'CULINARY_EQUIVALENT';
+    const status = kind === 'INCOMPATIBLE' ? 'REJECTED'
+        : kind === 'AMBIGUOUS' || substitute || score < threshold ? 'PENDING' : 'ACCEPTED';
     return { kind, status, score, threshold, signals, sameName, missing, conflicts };
 }

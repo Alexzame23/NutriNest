@@ -50,6 +50,8 @@ data class CommercialProduct(
     val variant: String? = null,
     val attributes: Map<String, String> = emptyMap()
 ) {
+    val commercialProductId: CommercialId get() = id
+    val providerProductId: String get() = origin.recordKey
     init {
         require(name.isNotBlank())
         require(attributes.keys.none(String::isBlank))
@@ -74,6 +76,10 @@ enum class ContentUnit { G, ML, UNIT }
 enum class SaleUnit { PACKAGE, KG }
 enum class WeightMode { FIXED, VARIABLE }
 
+data class RetailerSku(val retailerId: CommercialId, val value: String) {
+    init { require(value.isNotBlank()) }
+}
+
 /** Declared total net content of the sellable pack, including all its inner units. */
 data class NetContent(val amount: BigDecimal, val unit: ContentUnit) {
     init {
@@ -90,7 +96,8 @@ data class ProductPackage(
     val weightMode: WeightMode,
     val saleUnit: SaleUnit,
     val netContent: NetContent?,
-    val unitsPerPackage: Int?
+    val unitsPerPackage: Int?,
+    val retailerSku: RetailerSku? = null
 ) {
     init {
         when (weightMode) {
@@ -117,6 +124,7 @@ data class PriceSource(
 /** Confidence is an evidence classification; source authorization is a separate decision. */
 enum class Confidence { LOW, MEDIUM, HIGH }
 enum class MatchKind { EXACT, ALTERNATIVE }
+enum class MatchClassification { EXACT_SKU, CULINARY_EQUIVALENT, ALLOWED_SUBSTITUTE, AMBIGUOUS, INCOMPATIBLE }
 
 data class IngredientProductMatch(
     val origin: ProviderRecord,
@@ -125,11 +133,24 @@ data class IngredientProductMatch(
     val packageId: CommercialId,
     val kind: MatchKind,
     val confidence: Confidence,
-    val edibleMass: ReviewedEdibleMass? = null
+    val edibleMass: ReviewedEdibleMass? = null,
+    val canonicalIngredientId: CommercialId? = null,
+    val commercialProductId: CommercialId? = null,
+    val classification: MatchClassification? = null,
+    val evidenceDigest: String? = null
 ) {
     init {
         require(mappingVersion > 0)
         require(edibleMass == null || kind == MatchKind.EXACT)
+        if (listOf(canonicalIngredientId, commercialProductId, classification, evidenceDigest).any { it != null }) {
+            require(canonicalIngredientId == ingredientKey && commercialProductId != null)
+            require(evidenceDigest?.matches(Regex("[0-9a-f]{64}")) == true)
+            require(when (classification) {
+                MatchClassification.EXACT_SKU, MatchClassification.CULINARY_EQUIVALENT -> kind == MatchKind.EXACT
+                MatchClassification.ALLOWED_SUBSTITUTE -> kind == MatchKind.ALTERNATIVE
+                else -> false
+            })
+        }
     }
 }
 

@@ -62,10 +62,14 @@ data class PriceSnapshot(
         require(stores.all { it.retailerId in retailerIds })
         require(zones.all { it.retailerId in retailerIds })
         require(packages.all { it.productId in productIds })
-        require(matches.all { it.packageId in packagesById })
+        require(packages.all { it.retailerSku == null || it.retailerSku.retailerId in retailerIds })
+        require(matches.all { it.packageId in packagesById &&
+            (it.commercialProductId == null || it.commercialProductId == packagesById[it.packageId]?.productId) })
+        matches.filter { it.classification != null }.uniqueBy { it.packageId }
 
         fun checkObservation(record: ObservationRecord) {
             require(record.retailerId in retailerIds && record.packageId in packagesById)
+            packagesById.getValue(record.packageId).retailerSku?.let { require(it.retailerId == record.retailerId) }
             val retailer = record.retailerId
             when (val scope = record.scope) {
                 is ObservationScope.AtStore -> require(storesById[scope.storeId]?.retailerId == retailer)
