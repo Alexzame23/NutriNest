@@ -45,17 +45,22 @@ internal class RoomPriceSnapshotCache(private val database: NutriNestDatabase) :
         require(snapshot.regionId == manifest.regionId && snapshot.revision == manifest.revision &&
             snapshot.contractVersion == manifest.contractVersion &&
             snapshot.generatedAt == manifest.generatedAt && snapshot.expiresAt == manifest.expiresAt)
-        val expiresAtMillis = manifest.expiresAt.toEpochMilli()
+        return installVerified(snapshot, bytes, hash, now)
+    }
+
+    /** Caller has validated these exact bytes against the manifest over HTTPS. */
+    internal suspend fun installVerified(snapshot: PriceSnapshot, bytes: ByteArray, hash: String, now: Instant): Boolean {
+        val expiresAtMillis = snapshot.expiresAt.toEpochMilli()
         if (expiresAtMillis <= now.toEpochMilli()) return false
         return database.withTransaction {
-            val cached = dao.find(manifest.regionId.value)
-            if (cached != null && cached.revision >= manifest.revision) {
-                require(cached.revision != manifest.revision || cached.sha256 == hash) {
+            val cached = dao.find(snapshot.regionId.value)
+            if (cached != null && cached.revision >= snapshot.revision) {
+                require(cached.revision != snapshot.revision || cached.sha256 == hash) {
                     "A price snapshot revision cannot change its contents"
                 }
                 return@withTransaction false
             }
-            dao.put(CachedPriceSnapshot(manifest.regionId.value, manifest.revision, expiresAtMillis, hash, bytes))
+            dao.put(CachedPriceSnapshot(snapshot.regionId.value, snapshot.revision, expiresAtMillis, hash, bytes))
             true
         }
     }

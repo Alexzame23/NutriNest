@@ -25,9 +25,7 @@ import com.zame.nutrinest.notifications.MenuReminderWorker
 import com.zame.nutrinest.domain.stores.StoreRepository
 import com.zame.nutrinest.domain.prices.CommercialId
 
-class AppContainer(app: Application) {
-    private val database = NutriNestDatabase.get(app)
-
+class AppContainer(app: Application, private val database: NutriNestDatabase = NutriNestDatabase.get(app)) {
     val ingredientRepository: IngredientRepository =
         LocalIngredientRepository(database)
 
@@ -43,7 +41,8 @@ class AppContainer(app: Application) {
     val menuRepository: MenuRepository =
         LocalMenuRepository(database)
 
-    val priceSnapshots: PriceSnapshotReader = RoomPriceSnapshotCache(database)
+    private val priceCache = RoomPriceSnapshotCache(database)
+    val priceSnapshots: PriceSnapshotReader = priceCache
 
     internal val retailerSelectionRepository = RetailerSelectionRepository(app)
 
@@ -64,7 +63,7 @@ class AppContainer(app: Application) {
             ingredientKey = { id -> retailKeys(setOf(id))[id] },
             stores = storeRepository,
             provider = baseUrl.takeIf { BuildConfig.RETAIL_PRICES_ENABLED && it.isNotBlank() }
-                ?.let(::HttpsRetailPriceProvider),
+                ?.let { HttpsRetailPriceProvider(it, priceCache) },
             hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null },
             selection = { retailerSelectionRepository.preferences.value }
         )

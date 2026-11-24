@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
 import { FakePriceProvider } from './fake-price-provider.mjs';
 import { OpenPricesProvider } from './open-prices-provider.mjs';
+import { loadLocationPage } from './open-prices-location.mjs';
 import { PriceProvider } from './price-provider.mjs';
 import { cachedQuotes, syncPrices } from './price-sync.mjs';
 import { ProviderError } from './provider-error.mjs';
@@ -197,6 +198,46 @@ test('revalidates official exports independently and preserves cached normalized
     assert.equal(store.history().length, 1);
 });
 
+test('R2 location page binds the reviewed product and store and keeps injected data simulated', async t => {
+    const config = JSON.parse(readFileSync(new URL('./madrid-pilot.json', import.meta.url)));
+    const policy = syncPolicy(config, userAgent);
+    const store = openTestDatabase(t, policy).open();
+    const [shop] = config.plan.stores;
+    const [pack] = config.plan.products;
+    const row = {
+        id: 1, location_id: shop.locationId, type: 'PRODUCT', product_code: pack.gtin,
+        currency: 'EUR', date: '2026-11-17', price: '1.230', price_is_discounted: false,
+        duplicate_of: null, price_per: null, proof_id: 100,
+        product: { code: pack.gtin, product_name: pack.name, brands: pack.brand,
+            product_quantity: 900, product_quantity_unit: 'g' },
+        location: { id: shop.locationId, type: 'OSM', osm_type: shop.osmType, osm_id: shop.osmId,
+            osm_tag_key: 'shop', osm_brand: shop.retailerName, osm_address_country_code: 'ES',
+            osm_address_postcode: shop.postalCode },
+    };
+    let time = START;
+    const load = ({ beforeRequest }) => loadLocationPage({
+        ...config.plan, from: '2026-11-01', through: '2026-11-30',
+    }, { userAgent, now: () => time, beforeRequest, fetchImpl: async url => {
+        assert.equal(new URL(url).searchParams.get('location_id'), String(shop.locationId));
+        return Response.json({ page: 1, total: 2, items: [row, { ...row, id: 2, price_is_discounted: true }] });
+    } });
+    assert.equal((await syncPrices(store, policy, { now: () => time, load })).status, 'SUCCEEDED');
+    const previous = store.publication();
+    const snapshot = JSON.parse(previous.snapshot);
+    assert.equal(snapshot.prices.length, 1);
+    assert.equal(snapshot.prices[0].amount, '1.230');
+    assert.equal(snapshot.prices[0].record.proofId, 100);
+    assert.equal(snapshot.prices[0].record.observedAt, null);
+    assert.equal(snapshot.dataKind, 'simulated');
+    row.location.osm_id++;
+    time += DAY;
+    assert.equal((await syncPrices(store, policy, { now: () => time, load })).error, 'MALFORMED_RESPONSE');
+    assert.deepEqual(store.publication(), previous);
+    assert.equal(priceResponse(store, policy, {
+        method: 'GET', path: '/v1/price-regions/' + policy.regionId + '/manifest',
+    }, time).headers['X-NutriNest-Price-Data'], 'simulated');
+});
+
 test('exposes freshness, prevents expired conditional responses and omits missing prices from v1', async t => {
     const policy = fakePolicy({ freshDays: 2, retainDays: 3, cadenceHours: 1 });
     const store = openTestDatabase(t, policy).open();
@@ -244,23 +285,26 @@ test('serves the v1 publication over HTTP with exact bytes and rejects expired v
     const manifest = await request('/manifest');
     assert.equal(manifest.status, 200);
     assert.equal(manifest.headers.get('content-type'), 'application/json');
-    assert.equal(manifest.headers.get('x-nutrinest-price-data'), null);
+    assert.equal(manifest.headers.get('x-nutrinest-price-data'), 'simulated');
     const manifestTag = manifest.headers.get('etag');
     assert.match(manifestTag, /^"[0-9a-f]{64}"$/);
     const { revision, byteLength, sha256, expiresAt } = await manifest.json();
     const snapshotPath = `/snapshots/${revision}`;
     const snapshot = await request(snapshotPath);
     assert.equal(snapshot.status, 200);
-    assert.equal(snapshot.headers.get('x-nutrinest-price-data'), null);
+    assert.equal(snapshot.headers.get('x-nutrinest-price-data'), 'simulated');
     const snapshotTag = snapshot.headers.get('etag');
     assert.equal(snapshotTag, `"${sha256}"`);
     const bytes = Buffer.from(await snapshot.arrayBuffer());
     assert.equal(bytes.length, byteLength);
     assert.equal(createHash('sha256').update(bytes).digest('hex'), sha256);
     assert.equal(JSON.parse(bytes).sources[0].id, 'fake-prices');
+    assert.equal(JSON.parse(bytes).coverage.observations, 2);
+    assert.equal(Date.parse(JSON.parse(bytes).prices[0].record.fetchedAt), START);
 
     const cached = await request('/manifest', { headers: { 'If-None-Match': `W/${manifestTag}` } });
     assert.equal(cached.status, 304);
+    assert.equal(cached.headers.get('x-nutrinest-price-data'), 'simulated');
     assert.equal(await cached.text(), '');
     const method = await request('/manifest', { method: 'POST' });
     assert.equal(method.status, 405);

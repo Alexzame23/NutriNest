@@ -1,5 +1,6 @@
 import { FakePriceProvider } from './fake-price-provider.mjs';
 import { OpenPricesProvider } from './open-prices-provider.mjs';
+import { loadLocationPage } from './open-prices-location.mjs';
 import { ProviderError, requireField } from './provider-error.mjs';
 import { DAY, hasRights, priceStatus, priceTime } from './sync-policy.mjs';
 import { updatePublication } from './sync-publication.mjs';
@@ -97,7 +98,8 @@ function nextAfterFailure(state, policy, now, retryable, retryAt = 0) {
 
 function loadScheduledProvider(policy, { now, cycleAt, previous, beforeRequest }) {
     if (policy.source === 'fake') return FakePriceProvider.load();
-    return OpenPricesProvider.load({
+    const load = policy.plan.transport === 'location-api' ? loadLocationPage : OpenPricesProvider.load;
+    return load({
         ...policy.plan,
         from: date(cycleAt - policy.retainMs + DAY).slice(0, 10),
         through: date(cycleAt).slice(0, 10),

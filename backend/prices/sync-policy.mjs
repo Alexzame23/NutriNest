@@ -24,6 +24,7 @@ export function syncPolicy(config, userAgent) {
         check(config.approvedPilot === true && zonedExpiry && Number.isFinite(rightsUntil) &&
             Array.isArray(config.plan?.stores) && Array.isArray(config.plan?.products), 'approved internal pilot plan and expiry');
         check(isLabel(userAgent) && /^[\x20-\x7e]{1,200}$/.test(userAgent), 'backend User-Agent');
+        check([undefined, 'location-api'].includes(config.plan.transport), 'Open Prices transport');
     }
     return {
         source, sourceId: source === 'fake' ? 'fake-prices' : source, regionId, enabled, rightsUntil,

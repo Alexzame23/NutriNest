@@ -1,0 +1,22 @@
+{
+  "source": "open-prices",
+  "regionId": "es-madrid-28012",
+  "approvedPilot": true,
+  "rightsUntil": "2026-12-31T23:59:59Z",
+  "dbPath": "madrid.sqlite",
+  "port": 8787,
+  "tls": { "key": "localhost.key", "cert": "localhost.pem" },
+  "plan": {
+    "transport": "location-api",
+    "stores": [{
+      "locationId": 7394, "osmId": 6918727592, "osmType": "NODE",
+      "postalCode": "28012", "name": "Carrefour Market Tirso de Molina",
+      "retailerKey": "carrefour", "retailerName": "Carrefour Market"
+    }],
+    "products": [{
+      "externalId": "8435257073279", "gtin": "8435257073279",
+      "name": "Nestlé bebido fresa y platano", "brand": "Nestlé",
+      "netContent": { "amount": "900", "unit": "G" }, "unitsPerPackage": 1
+    }]
+  }
+}

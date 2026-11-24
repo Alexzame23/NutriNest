@@ -16,6 +16,7 @@ paths:
           description: Current publication. Clients revalidate on each synchronization.
           headers:
             ETag: { $ref: '#/components/headers/ETag' }
+            X-NutriNest-Price-Data: { $ref: '#/components/headers/PriceData' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Manifest' }
@@ -39,6 +40,7 @@ paths:
           description: UTF-8 JSON. Validate length and SHA-256 after decompression, before installation.
           headers:
             ETag: { $ref: '#/components/headers/ETag' }
+            X-NutriNest-Price-Data: { $ref: '#/components/headers/PriceData' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Snapshot' }
@@ -59,6 +61,9 @@ components:
       in: header
       schema: { type: string }
   headers:
+    PriceData:
+      description: Attestation of these published bytes. Android requires live on both GETs.
+      schema: { type: string, enum: [live, simulated, unverified] }
     ETag:
       description: Validator for this HTTP representation. A 304 does not renew snapshot expiry.
       schema: { type: string }
@@ -67,6 +72,7 @@ components:
       description: Representation unchanged
       headers:
         ETag: { $ref: '#/components/headers/ETag' }
+        X-NutriNest-Price-Data: { $ref: '#/components/headers/PriceData' }
     Retry:
       description: Temporarily unavailable or rate limited
       headers:
@@ -118,6 +124,17 @@ components:
         - type: object
           required: [sources, retailers, stores, zones, products, packages, matches, prices, availability]
           properties:
+            dataKind: { type: string, enum: [live, simulated, unverified] }
+            coverage:
+              type: object
+              required: [regionId, observations, storesWithPrices, packagesWithPrices, plannedStores, plannedPackages]
+              properties:
+                regionId: { $ref: '#/components/schemas/Id' }
+                observations: { type: integer, minimum: 0 }
+                storesWithPrices: { type: integer, minimum: 0 }
+                packagesWithPrices: { type: integer, minimum: 0 }
+                plannedStores: { type: integer, minimum: 0 }
+                plannedPackages: { type: integer, minimum: 0 }
             sources: { type: array, items: { $ref: '#/components/schemas/PriceSource' } }
             retailers: { type: array, items: { $ref: '#/components/schemas/Retailer' } }
             stores: { type: array, items: { $ref: '#/components/schemas/Store' } }
@@ -277,6 +294,8 @@ components:
         scope: { $ref: '#/components/schemas/Scope' }
         observedOn: { type: string, format: date }
         observedAt: { type: [string, 'null'], format: date-time }
+        fetchedAt: { type: string, format: date-time }
+        proofId: { type: integer, minimum: 1 }
         confidence: { $ref: '#/components/schemas/Confidence' }
     PriceObservation:
       type: object

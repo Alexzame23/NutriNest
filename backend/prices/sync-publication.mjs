@@ -10,7 +10,19 @@ export function updatePublication(store, state, policy, now) {
         sources: [source], retailers, stores, zones: [],
         products: state.catalog.map(entry => entry.product),
         packages: state.catalog.map(entry => entry.package),
-        matches: [], availability: [], prices: current.map(quote => quote.price),
+        matches: [], availability: [], prices: current.map(({ price, fetchedAt }) => ({
+            ...price, record: { ...price.record, fetchedAt },
+        })),
+        dataKind: state.metadata.simulated ? 'simulated' :
+            state.metadata.simulated === false && source.id === 'open-prices' &&
+                state.metadata.verifiedLocationPage === true && current.length > 0
+                ? 'live' : 'unverified',
+        coverage: {
+            regionId: policy.regionId, observations: current.length,
+            storesWithPrices: new Set(current.map(q => q.price.record.scope.storeId)).size,
+            packagesWithPrices: new Set(current.map(q => q.price.record.packageId)).size,
+            plannedStores: stores.length, plannedPackages: state.catalog.length,
+        },
     };
     const contentsHash = sha256(JSON.stringify({ scopeKey: state.scopeKey, content }));
     const expiresAt = Math.min(state.lastSuccessAt + policy.snapshotMs, policy.rightsUntil,
@@ -51,5 +63,5 @@ export function readPublication(store, policy, now, revision) {
         return { status: revision === undefined ? 404 : 410 };
     }
     const body = revision === undefined ? item.manifest : item.snapshot;
-    return { status: 200, body, etag: `"${sha256(body)}"` };
+    return { status: 200, body, dataKind: snapshot.dataKind ?? 'unverified', etag: `"${sha256(body)}"` };
 }

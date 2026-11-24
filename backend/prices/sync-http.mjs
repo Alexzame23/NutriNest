@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createServer as createTlsServer } from 'node:https';
 import { cachedQuotes } from './price-sync.mjs';
 import { readPublication } from './sync-publication.mjs';
 import { DAY, hasRights } from './sync-policy.mjs';
@@ -40,14 +41,15 @@ export function priceResponse(store, policy, { method, path, ifNoneMatch }, now)
     if (response.status !== 200) return { status: response.status, headers: { 'Cache-Control': 'no-store' } };
     const headers = {
         ETag: response.etag, 'Cache-Control': 'private, no-cache', 'Content-Type': 'application/json',
+        'X-NutriNest-Price-Data': response.dataKind,
     };
     const validators = ifNoneMatch?.split(',').map(tag => tag.trim().replace(/^W\//, '')) ?? [];
     if (validators.includes('*') || validators.includes(response.etag)) return { status: 304, headers };
     return { status: 200, headers, body: response.body };
 }
 
-export function priceServer(store, policy) {
-    return createServer((request, response) => {
+export function priceServer(store, policy, tls) {
+    const handle = (request, response) => {
         let result;
         try {
             result = priceResponse(store, policy, {
@@ -60,5 +62,6 @@ export function priceServer(store, policy) {
         }
         response.writeHead(result.status, result.headers ?? {});
         response.end(result.body);
-    });
+    };
+    return tls ? createTlsServer(tls, handle) : createServer(handle);
 }

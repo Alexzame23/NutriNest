@@ -48,6 +48,14 @@ android {
         sourceSets.named("debug") { manifest.srcFile("src/retail/AndroidManifest.xml") }
         sourceSets.named("release") { manifest.srcFile("src/retail/AndroidManifest.xml") }
     }
+    providers.gradleProperty("nutrinestLocalPublisherRes").orNull?.let { localRes ->
+        require(URI(retailPriceBaseUrl).host == "localhost")
+        sourceSets.named("debug") {
+            manifest.srcFile("src/localPublisher/AndroidManifest.xml")
+            res.srcDir("src/localPublisher/res")
+            res.srcDir(localRes)
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

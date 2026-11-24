@@ -31,7 +31,11 @@ async function main([configPath, mode, ...extra]) {
         return;
     }
 
-    const server = priceServer(store, policy);
+    const tls = config.tls && {
+        key: await readFile(resolve(dirname(configPath), config.tls.key)),
+        cert: await readFile(resolve(dirname(configPath), config.tls.cert)),
+    };
+    const server = priceServer(store, policy, tls);
     let timer;
     let work;
     let stopped = false;
