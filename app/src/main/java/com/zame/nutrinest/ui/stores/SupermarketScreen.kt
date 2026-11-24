@@ -54,10 +54,17 @@ import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.BuildConfig
 import com.zame.nutrinest.data.prices.PriceDiagnostics
+import com.zame.nutrinest.data.prices.RetailBatchPublication
+import com.zame.nutrinest.data.prices.RetailBatchUnavailable
+import com.zame.nutrinest.data.prices.isRetailNetworkFailure
+import com.zame.nutrinest.domain.stores.GeoCoverage
+import com.zame.nutrinest.ui.components.RetailPriceStatus
+import com.zame.nutrinest.ui.components.RetailRefreshNotice
+import com.zame.nutrinest.ui.components.RetailStatusMessage
+import com.zame.nutrinest.ui.components.presentation
 import com.zame.nutrinest.data.stores.ApproximateLocation
 import com.zame.nutrinest.domain.prices.CommercialId
 import com.zame.nutrinest.domain.prices.ObservationScope
-import com.zame.nutrinest.domain.prices.PriceSnapshot
 import com.zame.nutrinest.domain.stores.NearbyStore
 import com.zame.nutrinest.domain.stores.ScopedPriceCoverage
 import com.zame.nutrinest.domain.stores.StorePriceCoverage
@@ -70,10 +77,12 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 
 
@@ -92,7 +101,9 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
     var radius by remember { mutableStateOf(5) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var radiusAvailable by remember { mutableStateOf(container.geoResolver.hasGeolocatedStores()) }
-    var lookupFailed by remember { mutableStateOf(false) }
+    var manualFromCache by remember { mutableStateOf(false) }
+    var directoryFailure by remember { mutableStateOf<RetailPriceStatus?>(null) }
+    var searching by remember { mutableStateOf(false) }
     var manualResults by remember { mutableStateOf<List<NearbyStore>?>(null) }
     var nearbyResults by remember { mutableStateOf<List<NearbyStore>?>(null) }
     var selectedId by remember { mutableStateOf<CommercialId?>(null) }
@@ -123,15 +134,17 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
         true
     } catch (e: CancellationException) {
         throw e
-    } catch (_: Exception) {
-        lookupFailed = true
+    } catch (error: Exception) {
+        directoryFailure = if (error.isRetailNetworkFailure()) RetailPriceStatus.NetworkError
+            else RetailPriceStatus.ProviderError
         false
     }
 
     fun locate() {
         searchJob?.cancel()
+        searching = false
         manualResults = null
-        lookupFailed = false
+        directoryFailure = null
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
         clearNearby()
         locationMessage = R.string.supermarkets_location_loading
@@ -142,7 +155,7 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
                 locationMessage = if (point == null) R.string.supermarkets_location_unavailable else null
                 if (point != null && refreshDirectory() && location.hasPermission() && !radiusAvailable) {
                     locationMessage = R.string.geo_no_coordinates
-                } else if (point != null && radiusAvailable && !lookupFailed && location.hasPermission()) {
+                } else if (point != null && radiusAvailable && directoryFailure == null && location.hasPermission()) {
                     selectedId = null
                     nearbyResults = container.storeRepository.findNearby(point, radius.toDouble()).also {
                         PriceDiagnostics.log { "stage=discovery.radius before=${container.storeRepository.knownStores().size} after=${it.size}" }
@@ -179,32 +192,60 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
 
     val results = nearbyResults ?: manualResults
     val selected = results?.firstOrNull { it.entry.store.id == selectedId }?.entry
-    val regionId = selected?.area?.regionId
-    var snapshot by remember { mutableStateOf<PriceSnapshot?>(null) }
-    LaunchedEffect(lifecycle, selected) {
-        snapshot = null
-        if (regionId == null) return@LaunchedEffect
+    var revisionRequest by remember(selected) { mutableStateOf(0) }
+    var publication by remember(selected) { mutableStateOf<RetailBatchPublication?>(null) }
+    var priceStatus by remember(selected) { mutableStateOf(RetailPriceStatus.Loading) }
+    var observedCoverage by remember(selected) { mutableStateOf<StorePriceCoverage?>(null) }
+    LaunchedEffect(lifecycle, selected, revisionRequest) {
+        if (selected == null || !BuildConfig.RETAIL_PRICES_ENABLED) return@LaunchedEffect
+        val area = selected.area
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            try {
-                val now = Instant.now()
-                val cached = container.priceSnapshots.read(regionId, now) ?: try {
-                    (container.retailPrices.load(selected.area.postalCode, now) as?
-                        com.zame.nutrinest.data.prices.RetailBatchPublication)?.snapshot
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    lookupFailed = true
-                    null
+            var expiry: Job? = null
+            fun show(batch: RetailBatchPublication) {
+                expiry?.cancel()
+                expiry = launch {
+                    while (Instant.now() < batch.snapshot.expiresAt) {
+                        val coverage = withContext(Dispatchers.Default) {
+                            batch.snapshot.coverageFor(selected, Instant.now())
+                        }
+                        observedCoverage = coverage
+                        publication = batch
+                        val deadline = coverage.nextChange ?: break
+                        delay(Duration.between(Instant.now(), deadline).toMillis().coerceAtLeast(1))
+                    }
+                    publication = null
+                    priceStatus = RetailPriceStatus.StaleData
                 }
-                snapshot = cached
-                if (cached != null) {
-                    delay(Duration.between(now, cached.expiresAt).toMillis().coerceAtLeast(1))
-                    snapshot = null
-                }
-                awaitCancellation()
-            } finally {
-                snapshot = null
             }
+
+            try {
+                priceStatus = RetailPriceStatus.Loading
+                publication = null
+                val now = Instant.now()
+                container.retailPrices.cached(area.postalCode, now)
+                    ?.takeIf { it.snapshot.regionId == area.regionId }?.let(::show)
+                when (val batch = container.retailPrices.load(area.postalCode, now)) {
+                    is RetailBatchPublication -> if (batch.snapshot.regionId == area.regionId) {
+                        show(batch)
+                    } else {
+                        expiry?.cancel()
+                        publication = null
+                        priceStatus = RetailPriceStatus.NoProviderCoverage
+                    }
+                    is RetailBatchUnavailable -> {
+                        expiry?.cancel()
+                        publication = null
+                        priceStatus = batch.presentation()
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                expiry?.cancel()
+                publication = null
+                priceStatus = if (error.isRetailNetworkFailure()) RetailPriceStatus.NetworkError
+                    else RetailPriceStatus.ProviderError
+            }
+            kotlinx.coroutines.awaitCancellation()
         }
     }
 
@@ -227,9 +268,10 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
                     value = query,
                     onValueChange = {
                         searchJob?.cancel()
+                        searching = false
                         clearNearby()
                         manualResults = null
-                        lookupFailed = false
+                        directoryFailure = null
                         query = it.take(80)
                     },
                     label = { Text(stringResource(R.string.supermarkets_manual_query)) },
@@ -240,28 +282,47 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
             items(history) { postal ->
                 TextButton(onClick = {
                     searchJob?.cancel()
+                    searching = false
                     clearNearby()
                     manualResults = null
                     selectedId = null
-                    lookupFailed = false
+                    directoryFailure = null
                     query = postal
                 }) { Text(postal) }
             }
             item {
                 Button(
-                    enabled = validSpanishPostalCode(query.trim()) || (query.isNotBlank() && query.none { it.isDigit() }),
+                    enabled = !searching && (validSpanishPostalCode(query.trim()) ||
+                        (query.isNotBlank() && query.none { it.isDigit() })),
                     onClick = {
                         clearNearby()
                         if (locationMessage == R.string.supermarkets_location_loading) locationMessage = null
                         searchJob?.cancel()
                         selectedId = null
                         manualResults = null
-                        lookupFailed = false
+                        directoryFailure = null
                         val area = query.trim()
                         container.areaPreferences.select(area)
                         history = container.areaPreferences.recent
+                        searching = true
                         searchJob = coroutineScope.launch {
-                            if (refreshDirectory()) manualResults = container.storeRepository.findByArea(area)
+                            try {
+                                val refreshed = refreshDirectory()
+                                val entries = container.storeRepository.findByArea(area)
+                                val saved = if (entries.isEmpty() && validSpanishPostalCode(area))
+                                    container.retailPrices.cached(area, Instant.now())?.localStores?.values
+                                else null
+                                manualFromCache = saved != null
+                                if (refreshed || entries.isNotEmpty() || saved != null) {
+                                    manualResults = saved?.map { NearbyStore(it, null) } ?: entries
+                                }
+                            } catch (error: Exception) {
+                                if (error is CancellationException) throw error
+                                directoryFailure = if (error.isRetailNetworkFailure()) RetailPriceStatus.NetworkError
+                                    else RetailPriceStatus.ProviderError
+                            } finally {
+                                if (isActive) searching = false
+                            }
                         }
                     }
                 ) { Text(stringResource(R.string.supermarkets_search)) }
@@ -305,16 +366,31 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
                 }
             }
             item {
-                if (lookupFailed) Text(stringResource(R.string.geo_lookup_failed))
+                if (searching) RetailStatusMessage(RetailPriceStatus.Loading)
+                directoryFailure?.let {
+                    if (it == RetailPriceStatus.ProviderError) RetailStatusMessage(it, R.string.geo_lookup_failed)
+                    else RetailStatusMessage(it)
+                }
                 results?.let { rows ->
+                    if (nearbyResults == null && manualFromCache) Text(stringResource(R.string.retail_cached))
                     container.geoResolver.coverage(rows).forEach { (provider, coverage) ->
-                        Text("$provider · ${coverage.name}")
+                        if (nearbyResults != null || !manualFromCache || coverage == GeoCoverage.FUENTE_NO_LOCALIZABLE) {
+                            val label = when (coverage) {
+                                GeoCoverage.COBERTURA -> R.string.geo_directory_covered
+                                GeoCoverage.SIN_COBERTURA -> R.string.geo_directory_uncovered
+                                GeoCoverage.FUENTE_NO_LOCALIZABLE -> R.string.geo_directory_unlocatable
+                            }
+                            Text(stringResource(label, provider))
+                        }
                     }
                 }
                 TextButton(onClick = { uriHandler.openUri("https://www.openstreetmap.org/copyright") }) {
                     Text(stringResource(R.string.supermarkets_map_attribution))
                 }
                 if (results?.isEmpty() == true) Text(stringResource(R.string.supermarkets_no_service))
+                if (results == null && !searching && directoryFailure == null && locationJob == null) {
+                    Text(stringResource(R.string.geo_choose_area))
+                }
                 if (!results.isNullOrEmpty()) {
                     Text(
                         stringResource(R.string.supermarkets_choose_store),
@@ -327,8 +403,28 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
                     selectedId = nearby.entry.store.id
                 }
             }
-            if (selected != null) {
-                item { PriceCoverage(snapshot.coverageFor(selected, Instant.now())) }
+            if (selected != null && BuildConfig.RETAIL_PRICES_ENABLED) {
+                item {
+                    TextButton(onClick = { revisionRequest++ }) {
+                        Text(stringResource(R.string.shopping_prices_refresh))
+                    }
+                    val batch = publication
+                    val coverage = observedCoverage
+                    if (batch == null || coverage == null) {
+                        RetailStatusMessage(priceStatus)
+                    } else {
+                        val hasObservations = coverage.atStore.isNotEmpty() || coverage.declaredAreas.isNotEmpty()
+                        RetailRefreshNotice(batch.fromCache && hasObservations, batch.refreshIssue)
+                        if (batch.simulated) Text(stringResource(R.string.retail_simulated))
+                        if (!batch.fromCache && !batch.simulated && hasObservations) {
+                            RetailStatusMessage(RetailPriceStatus.LiveData)
+                        }
+                        if (coverage.hasStaleObservations && !hasObservations) {
+                            RetailStatusMessage(RetailPriceStatus.StaleData)
+                        }
+                        PriceCoverage(coverage)
+                    }
+                }
             }
         }
     }
@@ -374,19 +470,20 @@ private fun PriceCoverage(coverage: StorePriceCoverage) {
         coverage.publishedAt?.let {
             Text(stringResource(R.string.supermarkets_snapshot_date, displayDate(it.atZone(ZoneId.systemDefault()).toLocalDate())))
         }
-        if (coverage.atStore.isEmpty()) {
-            Text(stringResource(R.string.supermarkets_no_store_prices))
-        } else {
-            coverage.atStore.forEach {
-                CoverageGroup(stringResource(R.string.supermarkets_store_scope), it)
-            }
+        if (coverage.atStore.isEmpty() && (!coverage.hasStaleObservations || coverage.declaredAreas.isNotEmpty())) {
+            RetailStatusMessage(RetailPriceStatus.NoPricesInArea, R.string.supermarkets_no_store_prices)
+        }
+        coverage.atStore.forEach {
+            CoverageGroup(stringResource(R.string.supermarkets_store_scope), it)
         }
         if (coverage.declaredAreas.isNotEmpty()) {
             Text(stringResource(R.string.supermarkets_declared_areas), style = MaterialTheme.typography.titleSmall)
             coverage.declaredAreas.forEach { group ->
                 val scopeLabel = if (group.scope is ObservationScope.Online) R.string.supermarkets_online_scope
                     else R.string.supermarkets_zone_scope
-                CoverageGroup(stringResource(scopeLabel, requireNotNull(group.zone).name), group)
+                val label = group.zone?.let { stringResource(scopeLabel, it.name) }
+                    ?: stringResource(R.string.supermarkets_online_unspecified)
+                CoverageGroup(label, group)
             }
         }
         Text(stringResource(R.string.supermarkets_stock_unverified))
@@ -401,7 +498,7 @@ private fun CoverageGroup(label: String, group: ScopedPriceCoverage) {
     Text(label, style = MaterialTheme.typography.titleSmall)
     Text(if (from == to) stringResource(R.string.supermarkets_observed_on, from)
         else stringResource(R.string.supermarkets_observed_range, from, to))
-    Text(group.source.attribution)
+    Text(stringResource(R.string.retail_source, group.source.name, group.source.attribution))
 }
 
 @Composable

@@ -244,8 +244,11 @@ fun IngredientDetailScreen(
         ) {
             item("header") { Header(state, spanish) }
             item("retail") {
-                if (onRetail != null) TextButton(onClick = { onRetail(ingredient.id) }) {
-                    Text(stringResource(R.string.retail_title))
+                if (onRetail != null) Column {
+                    TextButton(onClick = { onRetail(ingredient.id) }) {
+                        Text(stringResource(R.string.retail_title))
+                    }
+                    Text(stringResource(R.string.retail_detail_coverage), style = MaterialTheme.typography.bodySmall)
                 }
             }
 

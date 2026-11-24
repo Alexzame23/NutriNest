@@ -643,13 +643,13 @@
     <string name="retail_title">Compare supermarket prices</string>
     <string name="retail_postal_code">Spanish postal code</string>
     <string name="retail_search">Check prices</string>
-    <string name="retail_enter_area">Enter your postal code to check prices at covered supermarkets.</string>
+    <string name="retail_enter_area">Enter a postal code to check local prices. Location permission is optional.</string>
     <string name="retail_loading">Checking prices…</string>
     <string name="retail_no_matches">No verified commercial matches for this ingredient.</string>
-    <string name="retail_no_coverage">No price coverage for this ingredient and area.</string>
+    <string name="retail_no_coverage">The price provider has no coverage for this area.</string>
     <string name="retail_stale">Prices have expired. Check again for a current publication.</string>
-    <string name="retail_offline">No internet connection. Reconnect and check again.</string>
-    <string name="retail_error">Prices could not be loaded. Try again.</string>
+    <string name="retail_offline">Could not connect to update prices. Check your connection and try again.</string>
+    <string name="retail_error">The price source could not provide an update. Try again.</string>
     <string name="retail_results_area">Prices for postal code %1$s</string>
     <string name="retail_sort">Lowest normalized price first within each unit (kg, L or piece).</string>
     <string name="retail_warning">Rates use declared net contents or billed weight. Package prices are shown separately. Promotions are excluded and stock is unconfirmed.</string>
@@ -767,4 +767,23 @@
     <string name="retail_open_detail">Commercial details</string>
     <string name="retail_limited_evidence">Limited evidence for this price</string>
     <string name="retail_no_base_url" translatable="false">NO_BASE_URL</string>
+    <string name="retail_cached">Showing current prices saved on this device.</string>
+    <string name="retail_live_data">Current prices available</string>
+    <string name="retail_no_prices_in_area">No comparable prices for the selected area and stores.</string>
+    <string name="retail_user_provided">Price reported by an Open Prices contributor</string>
+    <string name="retail_store_only">Store %1$s</string>
+    <string name="retail_store_area">Store %1$s · %2$s</string>
+    <string name="retail_evidence_high">Price evidence level · high</string>
+    <string name="retail_evidence_medium">Price evidence level · medium</string>
+    <string name="retail_evidence_low">Price evidence level · low</string>
+    <string name="retailer_preferences_no_chains">Search an area to find supermarkets you can select.</string>
+    <string name="retailer_preferences_known_store">Store listed in the area directory</string>
+    <string name="retail_detail_coverage">Check prices and source details by postal code.</string>
+    <string name="retail_for_ingredient">Prices for %1$s</string>
+    <string name="geo_choose_area">Search by municipality or postal code. Approximate location is optional.</string>
+    <string name="geo_directory_covered">%1$s · stores in the directory for this area</string>
+    <string name="geo_directory_uncovered">%1$s · no stores listed in this area</string>
+    <string name="geo_directory_unlocatable">%1$s · store locations unavailable</string>
+    <string name="supermarkets_online_unspecified">Online · geographic area unspecified</string>
+    <string name="multi_visit_cost_source">Travel cost source supplied by you · %1$s</string>
 </resources>

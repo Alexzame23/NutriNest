@@ -1,6 +1,7 @@
 package com.zame.nutrinest.domain.stores
 
 import com.zame.nutrinest.domain.prices.CommercialId
+import com.zame.nutrinest.domain.prices.ComparisonPolicy
 import com.zame.nutrinest.domain.prices.ObservationScope
 import com.zame.nutrinest.domain.prices.PriceObservation
 import com.zame.nutrinest.domain.prices.PriceSnapshot
@@ -19,7 +20,9 @@ data class ScopedPriceCoverage(
 data class StorePriceCoverage(
     val publishedAt: Instant?,
     val atStore: List<ScopedPriceCoverage>,
-    val declaredAreas: List<ScopedPriceCoverage>
+    val declaredAreas: List<ScopedPriceCoverage>,
+    val hasStaleObservations: Boolean = false,
+    val nextChange: Instant? = null
 )
 
 /** Preserve the publisher's scope. Directory geography is never evidence of a commercial scope. */
@@ -33,11 +36,7 @@ fun PriceSnapshot?.coverageFor(entry: DirectoryStore, now: Instant): StorePriceC
     }.map { it.id }.toSet()
     val declaredZones = zones.associateBy { it.id }
     val declaredSources = sources.associateBy { it.id }
-    val observed = prices.filter { price ->
-        val record = price.record
-        val observedAt = record.observedAt ?: record.observedOn.atStartOfDay(ZoneOffset.UTC).toInstant()
-        observedAt <= now
-    }
+    val observed = prices.filter { it.record.observedInstant <= now }
     val groups = observed.groupBy { it.record.scope to it.record.origin.sourceId }
 
     fun coverage(scope: ObservationScope, sourceId: CommercialId, prices: List<PriceObservation>): ScopedPriceCoverage? {
@@ -47,13 +46,29 @@ fun PriceSnapshot?.coverageFor(entry: DirectoryStore, now: Instant): StorePriceC
                 null
             }
             is ObservationScope.InZone -> declaredZones.getValue(scope.zoneId)
-            is ObservationScope.Online -> declaredZones.getValue(scope.zoneId ?: return null)
+            is ObservationScope.Online -> scope.zoneId?.let(declaredZones::getValue)
             ObservationScope.Unknown -> return null
         }
         return ScopedPriceCoverage(scope, zone, declaredSources.getValue(sourceId), prices)
     }
 
-    val (local, areas) = groups.mapNotNull { (key, values) -> coverage(key.first, key.second, values) }
-        .partition { it.scope is ObservationScope.AtStore }
-    return StorePriceCoverage(generatedAt, local, areas)
+    val policy = ComparisonPolicy(now, ZoneOffset.UTC)
+    var hasStaleObservations = false
+    var nextChange = expiresAt
+    val current = groups.mapNotNull { (key, values) -> coverage(key.first, key.second, values) }
+        .mapNotNull { group ->
+            val observations = group.observations.filter {
+                val deadline = it.record.observedInstant.plus(policy.freshness)
+                if (now < deadline) {
+                    nextChange = minOf(nextChange, deadline)
+                    true
+                } else {
+                    hasStaleObservations = true
+                    false
+                }
+            }
+            group.copy(observations = observations).takeIf { observations.isNotEmpty() }
+        }
+    val (local, areas) = current.partition { it.scope is ObservationScope.AtStore }
+    return StorePriceCoverage(generatedAt, local, areas, hasStaleObservations, nextChange)
 }

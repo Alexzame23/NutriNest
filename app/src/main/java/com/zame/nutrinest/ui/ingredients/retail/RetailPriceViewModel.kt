@@ -12,7 +12,9 @@ import com.zame.nutrinest.data.prices.RetailHttpError
 import com.zame.nutrinest.data.prices.PriceDiagnostics
 import com.zame.nutrinest.data.prices.RetailPriceRepository
 import com.zame.nutrinest.data.prices.RetailResult
+import com.zame.nutrinest.data.prices.isRetailNetworkFailure
 import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
+import com.zame.nutrinest.domain.stores.validSpanishPostalCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,6 +31,7 @@ internal sealed interface RetailUiState {
     data object Loading : RetailUiState
     data object NoMatches : RetailUiState
     data object NoCoverage : RetailUiState
+    data object NoPricesInArea : RetailUiState
     data object NoBaseUrl : RetailUiState
     data object Stale : RetailUiState
     data object Offline : RetailUiState
@@ -63,6 +66,11 @@ internal class RetailPriceViewModel(
 
     fun search(input: String) {
         val postalCode = input.trim()
+        if (!validSpanishPostalCode(postalCode)) {
+            request?.cancel()
+            state.value = RetailUiState.EnterArea
+            return
+        }
         if (request?.isActive == true && state.value == RetailUiState.Loading && postalCode == lastPostalCode) return
         savedState["retailPostalCode"] = postalCode
         request?.cancel()
@@ -74,13 +82,15 @@ internal class RetailPriceViewModel(
                 state.value = when (error) {
                     is CancellationException -> throw error
                     is RetailHttpError -> RetailUiState.Error(error.status)
-                    else -> RetailUiState.Error()
+                    else -> if (error.isRetailNetworkFailure()) RetailUiState.Offline else RetailUiState.Error()
                 }
                 PriceDiagnostics.log { "stage=ingredient.ui state=Error offers=0 error=${error.javaClass.simpleName}" }
                 return@launch
             }
             state.value = when (result) {
                 RetailResult.NoCoverage -> RetailUiState.NoCoverage
+                RetailResult.NoPricesInArea -> RetailUiState.NoPricesInArea
+                RetailResult.ProviderError -> RetailUiState.Error()
                 RetailResult.NoBaseUrl -> RetailUiState.NoBaseUrl
                 RetailResult.NoMatches -> RetailUiState.NoMatches
                 RetailResult.Stale -> RetailUiState.Stale

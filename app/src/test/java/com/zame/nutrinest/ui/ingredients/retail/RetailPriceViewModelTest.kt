@@ -85,6 +85,9 @@ class RetailPriceViewModelTest {
         scenario(RetailPriceProvider { throw RetailHttpError(503) }) {
             assertEquals(RetailUiState.Error(503), it.uiState.value)
         }
+        scenario(RetailPriceProvider { throw java.net.SocketTimeoutException() }) {
+            assertEquals(RetailUiState.Offline, it.uiState.value)
+        }
         scenario(RetailPriceProvider { error("Unexpected request") }, online = false) {
             assertEquals(RetailUiState.Offline, it.uiState.value)
         }
@@ -97,7 +100,11 @@ class RetailPriceViewModelTest {
         val fixture = RetailPriceProvider { RetailPublication(snapshot(), true) }
         scenario(fixture) { assertEquals(RetailUiState.NoCoverage, it.uiState.value) }
         scenario(fixture, allowSimulated = true) {
-            assertTrue((it.uiState.value as RetailUiState.Content).result.simulated)
+            if (com.zame.nutrinest.BuildConfig.DEBUG) {
+                assertTrue((it.uiState.value as RetailUiState.Content).result.simulated)
+            } else {
+                assertEquals(RetailUiState.NoCoverage, it.uiState.value)
+            }
         }
     }
 
@@ -115,10 +122,10 @@ class RetailPriceViewModelTest {
         val offers = repository.compare(42, "28012", now) as RetailResult.Offers
         assertEquals(setOf(branch.id), offers.rows.map { it.store.store.id }.toSet())
         preferences = preferences.copy(selectedRetailers = emptySet())
-        assertEquals(RetailResult.NoCoverage, repository.compare(42, "28012", now))
+        assertEquals(RetailResult.NoPricesInArea, repository.compare(42, "28012", now))
         preferences = RetailerSelectionPreferences(setOf(branch.retailerId),
             mapOf(branch.retailerId to setOf(CommercialId("missing-store"))))
-        assertEquals(RetailResult.NoCoverage, repository.compare(42, "28012", now))
+        assertEquals(RetailResult.NoPricesInArea, repository.compare(42, "28012", now))
     }
 
     @Test fun debugDiagnosisFollowsTheRegionalRequestThroughTheViewModel() {
@@ -148,14 +155,14 @@ class RetailPriceViewModelTest {
                 }
             }
             checkState(PriceDiagnosis.EMPTY_SNAPSHOT) {
-                scenario(publication(sample.copy(prices = emptyList()))) { assertEquals(RetailUiState.NoCoverage, it.uiState.value) }
+                scenario(publication(sample.copy(prices = emptyList()))) { assertEquals(RetailUiState.NoPricesInArea, it.uiState.value) }
             }
             checkState(PriceDiagnosis.NO_PRODUCT_MATCH) {
                 scenario(publication(sample.copy(matches = emptyList()))) { assertEquals(RetailUiState.NoMatches, it.uiState.value) }
             }
             checkState(PriceDiagnosis.FILTERED_OUT) {
                 scenario(publication(sample.copy(prices = sample.prices.takeLast(1)))) {
-                    assertEquals(RetailUiState.NoCoverage, it.uiState.value)
+                    assertEquals(RetailUiState.NoPricesInArea, it.uiState.value)
                 }
             }
             checkState(PriceDiagnosis.STALE_DATA) {

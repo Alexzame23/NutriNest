@@ -36,6 +36,10 @@ internal fun RetailerSelectionScreen(
         title = { Text(stringResource(R.string.retailer_preferences_title)) },
         text = {
             LazyColumn(Modifier.heightIn(max = 400.dp)) {
+                item { ShoppingCoverageStatus(state) }
+                if (chains.isEmpty()) {
+                    item { Text(stringResource(R.string.retailer_preferences_no_chains)) }
+                }
                 if (preferences.selectedRetailers?.isEmpty() == true) {
                     item { Text(stringResource(R.string.shopping_basket_select_one)) }
                 }
@@ -47,7 +51,7 @@ internal fun RetailerSelectionScreen(
                     val priced = stores.any { it.id in state.pricedStores }
                     val name = state.chainNames[chain] ?: chain.value.replaceFirstChar { it.titlecase() }
                     RetailerChoice(name, selected) { comparison.selectRetailer(chain, it) }
-                    RetailerCoverage(available, priced)
+                    RetailerCoverage(state, available, priced)
 
                     if (selected && (stores.isNotEmpty() || restricted != null)) {
                         Column(Modifier.padding(start = 16.dp, bottom = 8.dp)) {
@@ -61,11 +65,11 @@ internal fun RetailerSelectionScreen(
                                     RetailerChoice(store.name, store.id in restricted) {
                                         comparison.selectStore(store, it)
                                     }
-                                    RetailerCoverage(store.id in state.availableStores, store.id in state.pricedStores)
+                                    RetailerCoverage(state, store.id in state.availableStores, store.id in state.pricedStores)
                                 }
                                 (restricted - stores.map { it.id }.toSet()).sortedBy { it.value }.forEach { id ->
                                     RetailerChoice(id.value, true) { comparison.removeStore(chain, id) }
-                                    RetailerCoverage(available = false, priced = false)
+                                    RetailerCoverage(state, available = false, priced = false)
                                 }
                             }
                         }
@@ -97,10 +101,14 @@ private fun RetailerChoice(label: String, checked: Boolean, onCheckedChange: (Bo
 }
 
 @Composable
-private fun RetailerCoverage(available: Boolean, priced: Boolean) {
+private fun RetailerCoverage(state: ShoppingComparisonUiState, available: Boolean, priced: Boolean) {
+    val publication = (state.status as? ShoppingComparisonStatus.Published)?.prices
+    if (!available && publication == null) return
     Text(stringResource(when {
         priced -> R.string.retailer_preferences_priced
-        available -> R.string.retailer_preferences_available
+        available && publication != null && publication.refreshIssue == null ->
+            R.string.retailer_preferences_available
+        available -> R.string.retailer_preferences_known_store
         else -> R.string.retailer_preferences_unavailable
     }), style = MaterialTheme.typography.bodySmall)
 }

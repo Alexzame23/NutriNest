@@ -10,6 +10,7 @@ import com.zame.nutrinest.data.prices.ShoppingBasketCatalog
 import com.zame.nutrinest.data.prices.ShoppingPriceDemand
 import com.zame.nutrinest.data.prices.ShoppingPriceRepository
 import com.zame.nutrinest.data.prices.ShoppingPrices
+import com.zame.nutrinest.data.prices.isRetailNetworkFailure
 import com.zame.nutrinest.domain.prices.CommercialId
 import com.zame.nutrinest.domain.prices.Store
 import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
@@ -234,7 +235,9 @@ internal class ShoppingComparison(
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 ensureActive()
-                quote.value = Quote(basis, ShoppingComparisonStatus.Error)
+                quote.value = Quote(basis, if (error.isRetailNetworkFailure()) {
+                    ShoppingComparisonStatus.Unavailable(RetailBatchUnavailable.Offline)
+                } else ShoppingComparisonStatus.Error)
                 return@launch
             }
             ensureActive()

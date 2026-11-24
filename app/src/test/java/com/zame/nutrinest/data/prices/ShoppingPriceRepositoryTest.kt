@@ -72,6 +72,19 @@ class ShoppingPriceRepositoryTest {
             absent.compare(listOf(first), "28012", now))
     }
 
+    @Test fun keepsCurrentCachedOptionsAndExposesTheRefreshFailure() = runTest {
+        for (issue in listOf(RetailBatchUnavailable.Offline, RetailBatchUnavailable.ProviderError)) {
+            val repository = RegionalShoppingPriceRepository(
+                load = { _, _ -> batch().copy(fromCache = true, refreshIssue = issue) },
+                keys = { ids -> ids.associateWith { RetailIngredientKeys(CommercialId("bedca.$it")) } }
+            )
+            val result = repository.compare(listOf(first), "28012", now) as ShoppingPrices.Published
+            assertEquals(issue, result.refreshIssue)
+            assertEquals(true, result.fromCache)
+            assertEquals(3, (result.rows.getValue(first.id) as ShoppingLinePrice.Options).values.size)
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test fun selectingUnpricedStoreImmediatelyRemovesThePricedStoreFromRowsAndCoverage() = runTest {
         val directory = PilotStoreDirectory.repository

@@ -204,7 +204,12 @@ fun AppNavigation(navController: NavHostController = rememberNavController()) {
                 }
             )
         ) {
-            CompareIngredientsScreen(onBack = { navController.popBackStack() })
+            CompareIngredientsScreen(
+                onBack = { navController.popBackStack() },
+                onRetail = if (BuildConfig.RETAIL_PRICES_ENABLED) {
+                    { id -> navController.navigate(Screen.IngredientRetail.of(id)) }
+                } else null
+            )
         }
 
         composable(Screen.Profiles.route) {

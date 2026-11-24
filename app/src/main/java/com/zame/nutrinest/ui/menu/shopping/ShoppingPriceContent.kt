@@ -22,10 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -38,10 +36,13 @@ import java.text.NumberFormat
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import com.zame.nutrinest.domain.prices.Confidence
 import com.zame.nutrinest.ui.components.PriceAction
-import com.zame.nutrinest.ui.components.PriceLoading
 import com.zame.nutrinest.ui.components.PriceMetadata
+import com.zame.nutrinest.ui.components.RetailOfferDetails
+import com.zame.nutrinest.ui.components.RetailPriceStatus
+import com.zame.nutrinest.ui.components.RetailRefreshNotice
+import com.zame.nutrinest.ui.components.RetailStatusMessage
+import com.zame.nutrinest.ui.components.presentation
 import com.zame.nutrinest.ui.components.rememberEuroFormat
 
 @Composable
@@ -76,26 +77,45 @@ internal fun ShoppingPriceControls(state: ShoppingComparisonUiState, comparison:
             enabled = state.eligibleCount > 0 && validSpanishPostalCode(state.postalCode.trim()) &&
                 state.status != ShoppingComparisonStatus.Loading
         )
-        Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
-            when (val status = state.status) {
-                ShoppingComparisonStatus.Idle -> if (state.eligibleCount > 0) {
-                    Text(stringResource(R.string.shopping_prices_idle))
-                } else Text(stringResource(R.string.shopping_prices_no_pending))
-                ShoppingComparisonStatus.Loading -> PriceLoading()
-                ShoppingComparisonStatus.Error -> Text(stringResource(R.string.retail_error))
-                is ShoppingComparisonStatus.Unavailable -> Text(stringResource(when (status.reason) {
-                    RetailBatchUnavailable.Offline -> R.string.retail_offline
-                    RetailBatchUnavailable.Stale -> R.string.retail_stale
-                    RetailBatchUnavailable.NoCoverage -> R.string.shopping_prices_no_coverage
-                    RetailBatchUnavailable.NoBaseUrl -> R.string.retail_no_base_url
-                }))
-                is ShoppingComparisonStatus.Published -> {
-                    val date = localizedDate().format(status.prices.publishedAt.atZone(ZoneId.of("Europe/Madrid")))
-                    if (status.prices.simulated) Text(stringResource(R.string.retail_simulated))
-                    Text(stringResource(R.string.shopping_prices_coverage, state.coveredCount, state.eligibleCount))
-                    PriceMetadata(stringResource(R.string.shopping_prices_publication, state.postalCode.trim(), date))
-                    Text(stringResource(R.string.shopping_prices_order))
+        ShoppingCoverageStatus(state)
+        val prices = (state.status as? ShoppingComparisonStatus.Published)?.prices
+        if (prices != null) {
+            val date = localizedDate().format(prices.publishedAt.atZone(ZoneId.of("Europe/Madrid")))
+            if (prices.simulated) Text(stringResource(R.string.retail_simulated))
+            Text(stringResource(R.string.shopping_prices_coverage, state.coveredCount, state.eligibleCount))
+            PriceMetadata(stringResource(R.string.shopping_prices_publication, state.postalCode.trim(), date))
+            if (state.coveredCount > 0) Text(stringResource(R.string.shopping_prices_order))
+        }
+    }
+}
+
+@Composable
+internal fun ShoppingCoverageStatus(state: ShoppingComparisonUiState) {
+    when (val status = state.status) {
+        ShoppingComparisonStatus.Idle -> when {
+            state.eligibleCount == 0 -> Text(stringResource(R.string.shopping_prices_no_pending))
+            !validSpanishPostalCode(state.postalCode.trim()) -> RetailStatusMessage(RetailPriceStatus.LocationRequired)
+            else -> Text(stringResource(R.string.shopping_prices_idle))
+        }
+        ShoppingComparisonStatus.Loading -> RetailStatusMessage(RetailPriceStatus.Loading)
+        ShoppingComparisonStatus.Error -> RetailStatusMessage(RetailPriceStatus.ProviderError)
+        is ShoppingComparisonStatus.Unavailable -> {
+            RetailStatusMessage(status.reason.presentation())
+            if (status.reason == RetailBatchUnavailable.NoBaseUrl) Text(stringResource(R.string.retail_no_base_url))
+        }
+        is ShoppingComparisonStatus.Published -> {
+            val prices = status.prices
+            RetailRefreshNotice(prices.fromCache && state.coveredCount > 0, prices.refreshIssue)
+            val rows = prices.rows.values
+            when {
+                state.eligibleCount == 0 -> Text(stringResource(R.string.shopping_prices_no_pending))
+                state.coveredCount > 0 -> {
+                    if (!prices.simulated && !prices.fromCache) RetailStatusMessage(RetailPriceStatus.LiveData)
                 }
+                rows.isNotEmpty() && rows.all { it == ShoppingLinePrice.NoEquivalent } ->
+                    RetailStatusMessage(RetailPriceStatus.NoProductMatch, R.string.shopping_prices_no_equivalent)
+                rows.any { it == ShoppingLinePrice.Stale } -> RetailStatusMessage(RetailPriceStatus.StaleData)
+                prices.refreshIssue == null -> RetailStatusMessage(RetailPriceStatus.NoPricesInArea)
             }
         }
     }
@@ -107,7 +127,7 @@ internal fun ShoppingPriceLine(line: ShoppingLinePrice, onRetail: () -> Unit) {
         when (line) {
             ShoppingLinePrice.NoEquivalent -> Text(stringResource(R.string.shopping_prices_no_equivalent))
             ShoppingLinePrice.NoPrice -> Text(stringResource(R.string.shopping_prices_no_comparable))
-            ShoppingLinePrice.Stale -> Text(stringResource(R.string.retail_stale))
+            ShoppingLinePrice.Stale -> RetailStatusMessage(RetailPriceStatus.StaleData)
             is ShoppingLinePrice.Options -> {
                 var expanded by rememberSaveable { mutableStateOf(false) }
                 Text(stringResource(R.string.shopping_prices_best), style = MaterialTheme.typography.labelLarge)
@@ -129,9 +149,10 @@ private fun ShoppingOption(option: ShoppingPriceOption) {
     val money = rememberEuroFormat()
     val locale = LocalConfiguration.current.locales[0]
     val numbers = remember(locale) { NumberFormat.getIntegerInstance(locale) }
-    val date = localizedDate().format(option.cost.observation.record.observedOn)
     Column(Modifier.padding(vertical = 4.dp)) {
-        Text(option.product.name, style = MaterialTheme.typography.titleSmall)
+        RetailOfferDetails(option.product, option.cost.pack, option.cost.observation, option.retailer.name,
+            option.store.store.name, option.store.area.postalCode, option.store.area.municipality, option.source,
+            simulated = option.source.id.value == "fake-prices")
         val checkout = option.cost.checkoutEur
         if (checkout != null) {
             Text(stringResource(R.string.shopping_prices_checkout,
@@ -140,13 +161,7 @@ private fun ShoppingOption(option: ShoppingPriceOption) {
         } else {
             Text(stringResource(R.string.shopping_prices_weighed))
         }
-        Text(stringResource(R.string.shopping_prices_store, option.retailer.name, option.store.store.name))
         PriceMetadata(stringResource(R.string.shopping_prices_proportional, money.format(option.proportionalEur)))
-        PriceMetadata(stringResource(R.string.retail_observed, date))
-        if (option.cost.observation.record.confidence != Confidence.HIGH) {
-            PriceMetadata(stringResource(R.string.retail_limited_evidence))
-        }
-        PriceMetadata(stringResource(R.string.retail_source, option.source.name, option.source.attribution))
     }
 }
 

@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -57,7 +58,8 @@ import com.zame.nutrinest.ui.theme.Sage
 @Composable
 fun CompareIngredientsScreen(
     onBack: () -> Unit,
-    viewModel: CompareIngredientsViewModel = viewModel(factory = CompareIngredientsViewModel.Factory)
+    viewModel: CompareIngredientsViewModel = viewModel(factory = CompareIngredientsViewModel.Factory),
+    onRetail: ((Long) -> Unit)? = null
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val spanish = rememberIsSpanish()
@@ -140,6 +142,17 @@ fun CompareIngredientsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            if (onRetail != null) item("retail") {
+                Column {
+                    Text(stringResource(R.string.retail_title), style = MaterialTheme.typography.titleSmall)
+                    state.ingredients.forEach { ingredient ->
+                        TextButton(onClick = { onRetail(ingredient.id) }) {
+                            Text(stringResource(R.string.retail_for_ingredient, ingredient.displayName(spanish)))
+                        }
+                    }
+                }
             }
 
             item("macros") {

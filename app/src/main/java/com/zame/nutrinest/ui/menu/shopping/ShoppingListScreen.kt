@@ -278,7 +278,8 @@ fun ShoppingListScreen(
                         }
                         basketResult?.alternatives?.forEach { alternative ->
                             item(key = "basket_${alternative.retailer.id.value}") {
-                                ShoppingBasketAlternative(alternative, namesById)
+                                ShoppingBasketAlternative(alternative, namesById,
+                                    basketRequest.catalog.snapshot.sources.associateBy { it.id })
                             }
                         }
                     } else if (quoted?.basketCatalog?.retailers?.isEmpty() == true && comparison.eligibleCount > 0) {

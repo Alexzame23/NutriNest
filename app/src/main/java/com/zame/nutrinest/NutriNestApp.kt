@@ -97,7 +97,8 @@ class AppContainer(app: Application, private val database: NutriNestDatabase = N
             provider = publisher,
             pricesEnabled = BuildConfig.RETAIL_PRICES_ENABLED,
             hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null },
-            selection = { retailerSelectionRepository.preferences.value }
+            selection = { retailerSelectionRepository.preferences.value },
+            cache = priceCache
         )
     }
 

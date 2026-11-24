@@ -53,20 +53,31 @@ class StoreDiscoveryTest {
         val storePrice = quote("store", ObservationScope.AtStore(local.id))
         val zonePrice = quote("zone-price", ObservationScope.InZone(zone.id))
         val onlinePrice = quote("online", ObservationScope.Online(zone.id))
+        val onlineWithoutArea = quote("online-no-area", ObservationScope.Online(null))
         val snapshot = PriceSnapshot(
             1, lavapies.area.regionId, 1, now.minusSeconds(60), now.plusSeconds(60),
             listOf(PriceSource(sourceId, "Provider", SourceKind.OPEN_DATA, "license", "Attribution")),
             listOf(retailer), listOf(local, neighboring, legacy), listOf(zone), listOf(product), listOf(pack), emptyList(),
             listOf(storePrice, zonePrice, onlinePrice, quote("other-store", ObservationScope.AtStore(neighboring.id)),
                 quote("legacy-store", ObservationScope.AtStore(legacy.id)), quote("unknown", ObservationScope.Unknown),
-                quote("online-no-area", ObservationScope.Online(null)),
+                onlineWithoutArea,
                 quote("future", ObservationScope.AtStore(local.id), "2026-11-19")), emptyList()
         )
 
         val coverage = snapshot.coverageFor(lavapies, now)
         assertEquals(listOf(storePrice), coverage.atStore.single().observations)
-        assertEquals(listOf(zonePrice, onlinePrice), coverage.declaredAreas.flatMap { it.observations })
-        assertTrue(coverage.declaredAreas.all { it.zone == zone })
+        assertEquals(listOf(zonePrice, onlinePrice),
+            coverage.declaredAreas.filter { it.zone == zone }.flatMap { it.observations })
+        assertEquals(listOf(onlineWithoutArea), coverage.declaredAreas.single { it.zone == null }.observations)
+        val expired = snapshot.copy(prices = listOf(quote("old", ObservationScope.AtStore(local.id), "2026-10-01")))
+            .coverageFor(lavapies, now)
+        assertTrue(expired.hasStaleObservations)
+        assertTrue(expired.atStore.isEmpty())
+        val observationDeadline = Instant.parse("2026-11-18T00:00:00Z")
+        val endingSoon = snapshot.copy(generatedAt = observationDeadline.minusSeconds(60),
+            prices = listOf(quote("soon", ObservationScope.AtStore(local.id), "2026-10-19")))
+            .coverageFor(lavapies, observationDeadline.minusSeconds(1))
+        assertEquals(observationDeadline, endingSoon.nextChange)
         assertTrue(snapshot.coverageFor(directory.findByArea("28012")[1].entry, now).atStore.isEmpty())
         assertNull(snapshot.coverageFor(lavapies, snapshot.expiresAt).publishedAt)
         assertNull(snapshot.copy(regionId = CommercialId("other-region")).coverageFor(lavapies, now).publishedAt)

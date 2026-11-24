@@ -12,12 +12,15 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -28,6 +31,15 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.zame.nutrinest.R
+import com.zame.nutrinest.data.prices.RetailBatchUnavailable
+import com.zame.nutrinest.data.prices.RetailOffer
+import com.zame.nutrinest.data.prices.RetailResult
+import com.zame.nutrinest.domain.prices.*
+import com.zame.nutrinest.domain.stores.DirectoryStore
+import com.zame.nutrinest.domain.stores.DiscoveryArea
+import java.math.BigDecimal
+import java.time.Instant
+import java.time.LocalDate
 import com.zame.nutrinest.ui.ingredients.retail.RetailPriceContent
 import com.zame.nutrinest.ui.ingredients.retail.RetailUiState
 import org.junit.Assert.assertEquals
@@ -106,6 +118,83 @@ class RetailPriceExperienceTest {
         compose.onNodeWithContentDescription(localized.getString(R.string.action_back)).performClick()
         compose.runOnIdle { assertEquals(true, back.value) }
     }
+    @Test fun missingCoverageEquivalenceAreaAndPostalCodeHaveDifferentAccessibleMessages() {
+        val state = mutableStateOf<RetailUiState>(RetailUiState.EnterArea)
+        val cases = listOf(
+            RetailUiState.EnterArea to R.string.retail_enter_area,
+            RetailUiState.NoCoverage to R.string.retail_no_coverage,
+            RetailUiState.NoMatches to R.string.retail_no_matches,
+            RetailUiState.NoPricesInArea to R.string.retail_no_prices_in_area
+        )
+        compose.setContent { MaterialTheme { RetailPriceContent(state.value, "", {}, {}) } }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        for ((value, message) in cases) {
+            compose.runOnIdle { state.value = value }
+            compose.onNodeWithText(context.getString(message)).assertIsDisplayed()
+            compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+                .assertExists()
+            compose.onAllNodesWithText("0 €", substring = true).assertCountEquals(0)
+        }
+    }
+
+    @Test fun currentOfferAndOfflineCacheKeepTheirProvenanceInEnglish() {
+        val result = offer()
+        val state = mutableStateOf<RetailUiState>(RetailUiState.Content(result))
+        compose.setContent {
+            val context = LocalContext.current
+            val configuration = LocalConfiguration.current
+            val english = remember(configuration) {
+                Configuration(configuration).apply { setLocale(Locale.US) }
+            }
+            val resources = remember(context, english) { context.createConfigurationContext(english).resources }
+            CompositionLocalProvider(LocalConfiguration provides english, LocalResources provides resources) {
+                MaterialTheme { RetailPriceContent(state.value, "28012", {}, {}) }
+            }
+        }
+        fun assertScrolledText(label: String, substring: Boolean = false) {
+            compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+                .performScrollToNode(hasText(label, substring = substring))
+            compose.onNodeWithText(label, substring = substring).assertIsDisplayed()
+        }
+        assertScrolledText("Current prices available")
+        assertScrolledText("Example apples")
+        assertScrolledText("Orchard brand", substring = true)
+        assertScrolledText("Store Example branch · 28012 Madrid")
+        assertScrolledText("500", substring = true)
+        assertScrolledText("Normalized", substring = true)
+        assertScrolledText("Observed on Nov 19, 2026")
+        assertScrolledText("Source Open Prices · Open Prices contributors")
+        assertScrolledText("Price reported by an Open Prices contributor")
+        assertScrolledText("Price evidence level · low")
+        compose.runOnIdle {
+            state.value = RetailUiState.Content(result.copy(fromCache = true, refreshIssue = RetailBatchUnavailable.Offline))
+        }
+        assertScrolledText("Could not connect to update prices.", substring = true)
+        assertScrolledText("Price reported by an Open Prices contributor")
+        compose.onNodeWithText("Current prices available").assertDoesNotExist()
+    }
+
+    private fun offer(): RetailResult.Offers {
+        val source = PriceSource(CommercialId("open-prices"), "Open Prices", SourceKind.OPEN_DATA,
+            "ODbL", "Open Prices contributors")
+        val origin = ProviderRecord(source.id, "sample")
+        val retailer = Retailer(CommercialId("chain"), origin, "Example supermarket")
+        val store = Store(CommercialId("branch"), origin, retailer.id, "Example branch", "28012")
+        val date = LocalDate.of(2026, 11, 19)
+        val area = DiscoveryArea(CommercialId("region"), "Madrid", "28012", date)
+        val product = CommercialProduct(CommercialId("apples"), origin, "Example apples", "Orchard brand")
+        val pack = ProductPackage(CommercialId("bag"), origin, product.id, null, WeightMode.FIXED,
+            SaleUnit.PACKAGE, NetContent(BigDecimal("500"), ContentUnit.G), 1)
+        val observed = ObservationRecord(origin, 1, retailer.id, pack.id, ObservationScope.AtStore(store.id),
+            date, null, Confidence.LOW)
+        val price = PriceObservation(observed, Money(BigDecimal("2.49"), Currency.EUR),
+            SaleUnit.PACKAGE, PriceKind.REGULAR, null, null)
+        val match = IngredientProductMatch(origin, CommercialId("apple"), 1, pack.id, MatchKind.EXACT, Confidence.HIGH)
+        val row = RetailOffer(product, retailer, DirectoryStore(store, area, "", null, null), pack, price,
+            source, match, EuroRatio(BigDecimal("4.98"), BigDecimal.ONE), PriceDenominator.KG)
+        return RetailResult.Offers(listOf(row), Instant.parse("2026-11-20T00:00:00Z"), simulated = false)
+    }
+
     @Test fun disabledRouteShowsEnglishExplanationWithoutSearch() {
         compose.setContent {
             val context = LocalContext.current

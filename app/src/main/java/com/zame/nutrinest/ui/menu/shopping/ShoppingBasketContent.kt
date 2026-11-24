@@ -25,12 +25,17 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
 import com.zame.nutrinest.domain.prices.BasketMissingReason
-import com.zame.nutrinest.domain.prices.ContentUnit
 import com.zame.nutrinest.domain.prices.MatchKind
 import com.zame.nutrinest.domain.prices.SingleStoreBasket
 import com.zame.nutrinest.domain.prices.SingleStoreBasketResult
 import java.text.NumberFormat
+import com.zame.nutrinest.domain.prices.CommercialId
+import com.zame.nutrinest.domain.prices.PriceSource
+import com.zame.nutrinest.ui.components.PriceMetadata
+import com.zame.nutrinest.ui.components.RetailOfferDetails
 import com.zame.nutrinest.ui.components.rememberEuroFormat
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 @Composable
 internal fun ShoppingBasketControls(
@@ -58,10 +63,17 @@ internal fun ShoppingBasketControls(
 }
 
 @Composable
-internal fun ShoppingBasketAlternative(basket: SingleStoreBasket, itemNames: Map<Long, String>) {
+internal fun ShoppingBasketAlternative(
+    basket: SingleStoreBasket,
+    itemNames: Map<Long, String>,
+    sources: Map<CommercialId, PriceSource>
+) {
     val locale = LocalConfiguration.current.locales[0]
     val money = rememberEuroFormat()
     val quantity = remember(locale) { NumberFormat.getNumberInstance(locale) }
+    val date = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
+    val observations = basket.lines.flatMap { line -> line.purchases.map { it.price.record } }
+    val bySource = observations.groupBy { it.origin.sourceId }
     var expanded by rememberSaveable(basket.store?.id?.value) { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -77,6 +89,15 @@ internal fun ShoppingBasketAlternative(basket: SingleStoreBasket, itemNames: Map
                     style = MaterialTheme.typography.titleMedium)
             }
             basket.proportionalEur?.let { Text(stringResource(R.string.shopping_basket_proportional, money.format(it))) }
+            bySource.forEach { (id, records) ->
+                val source = sources.getValue(id)
+                PriceMetadata(stringResource(R.string.retail_source, source.name, source.attribution))
+                val dates = records.map { it.observedOn }
+                val first = date.format(dates.min())
+                val last = date.format(dates.max())
+                PriceMetadata(if (first == last) stringResource(R.string.retail_observed, first)
+                    else stringResource(R.string.supermarkets_observed_range, first, last))
+            }
             if (basket.unconfirmedStockCount > 0) Text(stringResource(R.string.shopping_basket_stock_unconfirmed))
             TextButton(onClick = { expanded = !expanded }) {
                 Text(stringResource(if (expanded) R.string.shopping_basket_hide else R.string.shopping_basket_details))
@@ -91,16 +112,15 @@ internal fun ShoppingBasketAlternative(basket: SingleStoreBasket, itemNames: Map
                     Text(line.itemIds.mapNotNull(itemNames::get).joinToString(" · "),
                         style = MaterialTheme.typography.labelLarge)
                     for (purchase in line.purchases) {
-                        val name = if (purchase.match.kind == MatchKind.ALTERNATIVE)
-                            stringResource(R.string.shopping_basket_substitute, purchase.product.name) else purchase.product.name
-                        val net = requireNotNull(purchase.pack.netContent)
-                        val format = stringResource(when (net.unit) {
-                            ContentUnit.G -> R.string.shopping_basket_grams
-                            ContentUnit.ML -> R.string.shopping_basket_millilitres
-                            ContentUnit.UNIT -> R.string.shopping_basket_units
-                        }, quantity.format(net.amount))
-                        Text(stringResource(R.string.shopping_basket_pack, quantity.format(purchase.count), name, format,
-                            money.format(purchase.checkoutEur)))
+                        val store = requireNotNull(basket.store)
+                        val source = sources.getValue(purchase.price.record.origin.sourceId)
+                        RetailOfferDetails(purchase.product, purchase.pack, purchase.price, basket.retailer.name,
+                            store.name, store.postalCode, null, source, simulated = source.id.value == "fake-prices")
+                        if (purchase.match.kind == MatchKind.ALTERNATIVE) {
+                            Text(stringResource(R.string.retail_alternative))
+                        }
+                        Text(stringResource(R.string.shopping_prices_checkout,
+                            quantity.format(purchase.count), money.format(purchase.checkoutEur)))
                     }
                 }
             }

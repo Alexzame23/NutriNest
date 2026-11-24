@@ -14,6 +14,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.zame.nutrinest.R
+import com.zame.nutrinest.ui.components.RetailOfferDetails
+import com.zame.nutrinest.ui.components.RetailObservationMetadata
 import com.zame.nutrinest.ui.components.rememberEuroFormat
 import com.zame.nutrinest.domain.prices.*
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +76,7 @@ internal fun MultiStoreBasketContent(request: ShoppingBasketRequest, names: Map<
                             checkCancellation = { ensureActive() })
                     }
                 }
-                result?.let { MultiStoreSummary(it, names) } ?: Text(stringResource(R.string.shopping_basket_loading))
+                result?.let { MultiStoreSummary(it, names, catalog.snapshot) } ?: Text(stringResource(R.string.shopping_basket_loading))
             }
         }
     }
@@ -90,9 +92,11 @@ private fun Selection(label: String, checked: Boolean, change: (Boolean) -> Unit
 }
 
 @Composable
-private fun MultiStoreSummary(result: MultiStoreBasketResult, names: Map<Long, String>) {
+private fun MultiStoreSummary(result: MultiStoreBasketResult, names: Map<Long, String>, snapshot: PriceSnapshot) {
     val money = rememberEuroFormat()
     val plan = result.plan
+    val sources = remember(snapshot) { snapshot.sources.associateBy { it.id } }
+    val retailers = remember(snapshot) { snapshot.retailers.associateBy { it.id } }
     val covered = plan.lines.sumOf { it.itemIds.size }
     Text(stringResource(if (result.exact) R.string.multi_exact else R.string.multi_heuristic))
     if (plan.travelMode == TravelMode.MISSING_COSTS) Text(stringResource(R.string.multi_missing_costs))
@@ -100,19 +104,30 @@ private fun MultiStoreSummary(result: MultiStoreBasketResult, names: Map<Long, S
     plan.checkoutEur?.let { Text(stringResource(R.string.multi_checkout, money.format(it)),
         style = MaterialTheme.typography.titleMedium) }
     plan.totalWithVisitsEur?.let { Text(stringResource(R.string.multi_total, money.format(it))) }
-    if (result.singleStoreReference != null) {
-        Text(stringResource(R.string.multi_reference, result.singleStoreReference.visits.single().store.name))
+    val reference = result.singleStoreReference
+    if (reference != null) {
+        val visit = reference.visits.single()
+        Text(stringResource(R.string.multi_reference, visit.store.name))
         Text(stringResource(R.string.multi_gross, money.format(result.grossSavingsEur)))
+        visit.purchases.map { it.price }.distinctBy { it.record.origin.sourceId to it.record.observedOn }
+            .forEach { RetailObservationMetadata(it, sources.getValue(it.record.origin.sourceId)) }
     } else Text(stringResource(R.string.multi_no_reference))
     Text(result.netSavingsEur?.let { stringResource(R.string.multi_net, money.format(it)) }
         ?: stringResource(R.string.multi_net_unknown))
     for (visit in plan.visits) {
         Text(stringResource(R.string.multi_shop, visit.store.name, money.format(visit.checkoutEur)),
             style = MaterialTheme.typography.titleSmall)
-        visit.fee?.let { Text(stringResource(R.string.multi_visit_cost, money.format(it.eur))) }
+        visit.fee?.let {
+            Text(stringResource(R.string.multi_visit_cost, money.format(it.eur)))
+            Text(stringResource(R.string.multi_visit_cost_source, it.evidence))
+        }
         for (purchase in visit.purchases) {
-            Text(stringResource(R.string.multi_product, purchase.count.toString(), purchase.product.name,
-                purchase.pack.id.value, money.format(purchase.checkoutEur)))
+            val source = sources.getValue(purchase.price.record.origin.sourceId)
+            RetailOfferDetails(purchase.product, purchase.pack, purchase.price,
+                retailers.getValue(visit.store.retailerId).name, visit.store.name, visit.store.postalCode,
+                null, source, simulated = source.id.value == "fake-prices")
+            Text(stringResource(R.string.shopping_prices_checkout, purchase.count.toString(),
+                money.format(purchase.checkoutEur)))
         }
     }
     if (plan.lines.any { it.hasUnconfirmedStock }) Text(stringResource(R.string.shopping_basket_stock_unconfirmed))

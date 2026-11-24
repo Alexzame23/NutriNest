@@ -28,7 +28,9 @@ internal sealed interface ShoppingPrices {
         val expiresAt: Instant,
         val simulated: Boolean,
         val basketCatalog: ShoppingBasketCatalog? = null,
-        val pricedAt: Instant = publishedAt
+        val pricedAt: Instant = publishedAt,
+        val fromCache: Boolean = false,
+        val refreshIssue: RetailBatchUnavailable? = null
     ) : ShoppingPrices
 }
 
@@ -152,6 +154,7 @@ internal class RegionalShoppingPriceRepository(
         }
         val catalog = ShoppingBasketCatalog(snapshot, publication.localStores.keys, demands, policy,
             publication.localStores.mapValues { (_, entry) -> entry.store })
-        return ShoppingPrices.Published(rows, snapshot.generatedAt, snapshot.expiresAt, publication.simulated, catalog, now)
+        return ShoppingPrices.Published(rows, snapshot.generatedAt, snapshot.expiresAt, publication.simulated, catalog, now,
+            publication.fromCache, publication.refreshIssue)
     }
 }
