@@ -766,4 +766,5 @@
     <string name="retail_disabled">Commercial prices are disabled in this version.</string>
     <string name="retail_open_detail">Commercial details</string>
     <string name="retail_limited_evidence">Limited evidence for this price</string>
+    <string name="retail_no_base_url" translatable="false">NO_BASE_URL</string>
 </resources>

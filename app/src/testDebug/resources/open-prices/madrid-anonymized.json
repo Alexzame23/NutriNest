@@ -1,0 +1,33 @@
+{
+  "items": [
+    {
+      "id": 11,
+      "type": "PRODUCT",
+      "product_code": "4006381333931",
+      "product": {"id": 21, "code": "4006381333931", "product_name": "Producto de prueba"},
+      "location_id": 31,
+      "location": {
+        "id": 31,
+        "type": "OSM",
+        "osm_id": 41,
+        "osm_type": "NODE",
+        "osm_tag_key": "shop",
+        "osm_name": "Comercio de prueba",
+        "osm_brand": "Marca de prueba",
+        "osm_address_city": "Madrid",
+        "osm_address_country_code": "es"
+      },
+      "proof_id": 51,
+      "proof": {"id": 51, "type": "PRICE_TAG"},
+      "date": "2026-11-02",
+      "price": 1.69,
+      "price_per": null,
+      "price_is_discounted": false,
+      "currency": "EUR"
+    }
+  ],
+  "page": 1,
+  "pages": 1,
+  "size": 10,
+  "total": 1
+}

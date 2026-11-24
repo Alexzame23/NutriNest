@@ -52,6 +52,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.R
+import com.zame.nutrinest.BuildConfig
+import com.zame.nutrinest.data.prices.PriceDiagnostics
 import com.zame.nutrinest.data.stores.ApproximateLocation
 import com.zame.nutrinest.domain.prices.CommercialId
 import com.zame.nutrinest.domain.prices.ObservationScope
@@ -142,7 +144,9 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
                     locationMessage = R.string.geo_no_coordinates
                 } else if (point != null && radiusAvailable && !lookupFailed && location.hasPermission()) {
                     selectedId = null
-                    nearbyResults = container.storeRepository.findNearby(point, radius.toDouble())
+                    nearbyResults = container.storeRepository.findNearby(point, radius.toDouble()).also {
+                        PriceDiagnostics.log { "stage=discovery.radius before=${container.storeRepository.knownStores().size} after=${it.size}" }
+                    }
                 }
             }
             locationJob = null
@@ -359,6 +363,12 @@ private fun StoreOption(nearby: NearbyStore, selected: Boolean, onSelect: () -> 
 
 @Composable
 private fun PriceCoverage(coverage: StorePriceCoverage) {
+    if (BuildConfig.DEBUG) LaunchedEffect(coverage) {
+        PriceDiagnostics.log {
+            "stage=discovery.ui atStore=${coverage.atStore.sumOf { it.observations.size }} " +
+                "declaredAreas=${coverage.declaredAreas.sumOf { it.observations.size }}"
+        }
+    }
     Column(Modifier.padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.supermarkets_price_coverage), style = MaterialTheme.typography.titleMedium)
         coverage.publishedAt?.let {

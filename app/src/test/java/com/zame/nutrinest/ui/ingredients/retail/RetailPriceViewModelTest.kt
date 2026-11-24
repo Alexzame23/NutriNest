@@ -121,8 +121,57 @@ class RetailPriceViewModelTest {
         assertEquals(RetailResult.NoCoverage, repository.compare(42, "28012", now))
     }
 
+    @Test fun debugDiagnosisFollowsTheRegionalRequestThroughTheViewModel() {
+        org.junit.Assume.assumeTrue(com.zame.nutrinest.BuildConfig.DEBUG)
+        val messages = mutableListOf<String>()
+        val previous = PriceDiagnostics.sink
+        fun checkState(expected: PriceDiagnosis, action: () -> Unit) {
+            messages.clear()
+            action()
+            assertTrue("$expected missing in $messages", messages.any { "state=$expected" in it })
+        }
+        val sample = snapshot()
+        fun publication(data: PriceSnapshot) = RetailPriceProvider { RetailPublication(data, false) }
+        try {
+            PriceDiagnostics.sink = { messages.add(it) }
+            checkState(PriceDiagnosis.NO_BASE_URL) {
+                scenario(null) { assertEquals(RetailUiState.NoBaseUrl, it.uiState.value) }
+            }
+            checkState(PriceDiagnosis.NO_REGION) {
+                scenario(RetailPriceProvider { error("unexpected HTTP") }, postalCode = "08001") {
+                    assertEquals(RetailUiState.NoCoverage, it.uiState.value)
+                }
+            }
+            checkState(PriceDiagnosis.NO_NETWORK) {
+                scenario(RetailPriceProvider { error("unexpected HTTP") }, online = false) {
+                    assertEquals(RetailUiState.Offline, it.uiState.value)
+                }
+            }
+            checkState(PriceDiagnosis.EMPTY_SNAPSHOT) {
+                scenario(publication(sample.copy(prices = emptyList()))) { assertEquals(RetailUiState.NoCoverage, it.uiState.value) }
+            }
+            checkState(PriceDiagnosis.NO_PRODUCT_MATCH) {
+                scenario(publication(sample.copy(matches = emptyList()))) { assertEquals(RetailUiState.NoMatches, it.uiState.value) }
+            }
+            checkState(PriceDiagnosis.FILTERED_OUT) {
+                scenario(publication(sample.copy(prices = sample.prices.takeLast(1)))) {
+                    assertEquals(RetailUiState.NoCoverage, it.uiState.value)
+                }
+            }
+            checkState(PriceDiagnosis.STALE_DATA) {
+                scenario(publication(sample.copy(expiresAt = now))) { assertEquals(RetailUiState.Stale, it.uiState.value) }
+            }
+            checkState(PriceDiagnosis.SUCCESS) {
+                scenario(publication(sample)) { assertEquals(3, (it.uiState.value as RetailUiState.Content).result.rows.size) }
+                assertTrue(messages.contains("stage=ingredient.ui state=Content offers=3"))
+            }
+        } finally {
+            PriceDiagnostics.sink = previous
+        }
+    }
+
     private fun scenario(
-        provider: RetailPriceProvider,
+        provider: RetailPriceProvider?,
         online: Boolean = true,
         postalCode: String = "28012",
         allowSimulated: Boolean = false,

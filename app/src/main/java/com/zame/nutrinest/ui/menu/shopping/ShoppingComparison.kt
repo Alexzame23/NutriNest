@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.prices.RetailBatchUnavailable
 import com.zame.nutrinest.data.prices.ShoppingLinePrice
+import com.zame.nutrinest.data.prices.PriceDiagnostics
 import com.zame.nutrinest.data.prices.ShoppingBasketCatalog
 import com.zame.nutrinest.data.prices.ShoppingPriceDemand
 import com.zame.nutrinest.data.prices.ShoppingPriceRepository
@@ -127,6 +128,19 @@ internal class ShoppingComparison(
         } else status
         val covered = (visible as? ShoppingComparisonStatus.Published)?.prices?.rows?.values
             ?.count { it is ShoppingLinePrice.Options } ?: 0
+        PriceDiagnostics.log {
+            fun optionCount(lines: Collection<ShoppingLinePrice>) =
+                lines.filterIsInstance<ShoppingLinePrice.Options>().sumOf { it.values.size }
+            val visibleRows = (visible as? ShoppingComparisonStatus.Published)?.prices?.rows.orEmpty()
+            val reason = (visible as? ShoppingComparisonStatus.Unavailable)?.reason
+            val afterRetailer = rows.values.filterIsInstance<ShoppingLinePrice.Options>().sumOf { line ->
+                line.values.count { preferences.selectedRetailers?.contains(it.store.store.retailerId) != false }
+            }
+            "stage=shopping.ui state=${reason ?: visible.javaClass.simpleName} items=${current.items.size} eligible=${eligible.size} " +
+                "optionsBefore=${optionCount(prices?.rows.orEmpty().values)} afterPurchased=${optionCount(rows.values)} " +
+                "retailers=${preferences.selectedRetailers?.map { it.value } ?: "all"} restrictedChains=${preferences.selectedStores.size} " +
+                "afterRetailer=$afterRetailer optionsAfterSelection=${optionCount(visibleRows.values)} covered=$covered"
+        }
         ShoppingComparisonUiState(postal, exclude, visible, eligible.size, covered, preferences,
             availableStores = directory?.findByArea(postal.trim()).orEmpty()
                 .map { it.entry.store.id }.toSet() + prices?.basketCatalog?.let { catalog ->

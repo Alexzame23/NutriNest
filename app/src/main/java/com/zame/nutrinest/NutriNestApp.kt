@@ -1,6 +1,9 @@
 package com.zame.nutrinest
 
 import android.app.Application
+import android.util.Log
+import com.zame.nutrinest.data.prices.PriceDiagnostics
+import com.zame.nutrinest.data.prices.configurationDiagnosis
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import com.zame.nutrinest.data.local.NutriNestDatabase
@@ -73,12 +76,26 @@ class AppContainer(app: Application, private val database: NutriNestDatabase = N
             .metaData?.getString("com.zame.nutrinest.RETAIL_PRICE_BASE_URL").orEmpty().trim()
     }
 
+    internal val priceConfiguration get() = configurationDiagnosis(BuildConfig.RETAIL_PRICES_ENABLED, baseUrl.isNotBlank())
+
+    init {
+        if (BuildConfig.DEBUG) {
+            PriceDiagnostics.sink = { Log.d("NutriNestPrices", it) }
+            PriceDiagnostics.log {
+                "stage=config enabled=${BuildConfig.RETAIL_PRICES_ENABLED} hasBaseUrl=${baseUrl.isNotBlank()} " +
+                    "provider=${if (priceConfiguration == null) "HttpsRetailPriceProvider" else "none"} " +
+                    "state=${priceConfiguration ?: "CONFIGURED"}"
+            }
+        }
+    }
+
     internal val retailPrices by lazy {
         RegionalRetailPriceRepository(
             ingredientKey = { id -> retailKeys(setOf(id))[id] },
             stores = storeRepository,
             rememberArea = areaPreferences::select,
             provider = publisher,
+            pricesEnabled = BuildConfig.RETAIL_PRICES_ENABLED,
             hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null },
             selection = { retailerSelectionRepository.preferences.value }
         )

@@ -28,10 +28,22 @@ internal class RoomPriceSnapshotCache(private val database: NutriNestDatabase) :
     private val dao = database.priceSnapshotDao()
 
     override suspend fun read(regionId: CommercialId, now: Instant): PriceSnapshot? {
-        val cached = dao.find(regionId.value) ?: return null
-        val payload = cached.payload ?: return null
-        if (cached.expiresAtMillis <= now.toEpochMilli()) return null
-        return withContext(Dispatchers.Default) { SnapshotJson.snapshot(payload) }
+        val cached = dao.find(regionId.value)
+        val payload = cached?.payload
+        if (cached == null || payload == null || cached.expiresAtMillis <= now.toEpochMilli()) {
+            PriceDiagnostics.log {
+                val reason = when {
+                    cached == null -> "miss"
+                    payload == null -> "withdrawn_or_pruned"
+                    else -> "expired"
+                }
+                "stage=room.read region=${regionId.value} reason=$reason observations=0"
+            }
+            return null
+        }
+        return withContext(Dispatchers.Default) { SnapshotJson.snapshot(payload) }.also {
+            PriceDiagnostics.log { "stage=room.read region=${regionId.value} revision=${it.revision} observations=${it.prices.size}" }
+        }
     }
 
     /** Installs a complete, authenticated-transport snapshot or leaves the current cache intact. */
@@ -40,7 +52,7 @@ internal class RoomPriceSnapshotCache(private val database: NutriNestDatabase) :
         require(snapshotJson.size == manifest.byteLength)
         val bytes = snapshotJson.copyOf()
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        require(hash == manifest.sha256) { "Price snapshot digest mismatch" }
+        verifySnapshotDigest(hash, manifest.sha256)
         val snapshot = SnapshotJson.snapshot(bytes)
         require(snapshot.regionId == manifest.regionId && snapshot.revision == manifest.revision &&
             snapshot.contractVersion == manifest.contractVersion &&
@@ -51,7 +63,10 @@ internal class RoomPriceSnapshotCache(private val database: NutriNestDatabase) :
     /** Caller has validated these exact bytes against the manifest over HTTPS. */
     internal suspend fun installVerified(snapshot: PriceSnapshot, bytes: ByteArray, hash: String, now: Instant): Boolean {
         val expiresAtMillis = snapshot.expiresAt.toEpochMilli()
-        if (expiresAtMillis <= now.toEpochMilli()) return false
+        if (expiresAtMillis <= now.toEpochMilli()) {
+            PriceDiagnostics.log { "stage=room.install reason=expired saved=0" }
+            return false
+        }
         return database.withTransaction {
             val cached = dao.find(snapshot.regionId.value)
             if (cached != null && cached.revision >= snapshot.revision) {
@@ -62,6 +77,8 @@ internal class RoomPriceSnapshotCache(private val database: NutriNestDatabase) :
             }
             dao.put(CachedPriceSnapshot(snapshot.regionId.value, snapshot.revision, expiresAtMillis, hash, bytes))
             true
+        }.also { installed ->
+            PriceDiagnostics.log { "stage=room.install region=${snapshot.regionId.value} revision=${snapshot.revision} saved=${if (installed) snapshot.prices.size else 0} installed=$installed" }
         }
     }
 

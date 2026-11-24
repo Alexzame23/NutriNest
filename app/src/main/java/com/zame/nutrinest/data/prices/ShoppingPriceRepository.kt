@@ -106,6 +106,15 @@ internal class RegionalShoppingPriceRepository(
             val scope = quote.record.scope as? ObservationScope.AtStore
             scope != null && scope.storeId in publication.localStores
         }
+        PriceDiagnostics.log {
+            val requested = identities.values.toSet()
+            val matching = snapshot.matches.filter { it.ingredientKey in requested }
+            val packs = matching.map { it.packageId }.toSet()
+            "stage=shopping.filters inputs=${items.size} resolved=${identities.size} keys=${requested.map { it.value }} " +
+                "matchesBefore=${snapshot.matches.size} matchesAfter=${matching.size} prices=${snapshot.prices.size} " +
+                "physical=${snapshot.prices.count { it.record.scope is ObservationScope.AtStore }} local=${localPrices.size} " +
+                "localMatched=${localPrices.count { it.record.packageId in packs }}"
+        }
         val evidence = snapshot.reviewedMassContents().groupBy { it.match.ingredientKey }
         val policy = ComparisonPolicy(now, ZoneId.of("Europe/Madrid"))
         val compared = PriceComparisonEngine.compareBatch(demands.mapNotNull { (id, demand) ->
@@ -128,6 +137,18 @@ internal class RegionalShoppingPriceRepository(
                 comparison?.excluded?.any { it.error == ComparisonError.STALE_PRICE } == true -> ShoppingLinePrice.Stale
                 else -> ShoppingLinePrice.NoPrice
             }
+        }
+        PriceDiagnostics.log {
+            val options = compared.values.sumOf { it.options.size }
+            val exclusions = compared.values.flatMap { it.excluded }.groupingBy { it.error }.eachCount()
+            val outcome = when {
+                options > 0 -> PriceDiagnosis.SUCCESS
+                snapshot.prices.isEmpty() -> PriceDiagnosis.EMPTY_SNAPSHOT
+                rows.values.all { it == ShoppingLinePrice.NoEquivalent } -> PriceDiagnosis.NO_PRODUCT_MATCH
+                rows.values.any { it == ShoppingLinePrice.Stale } -> PriceDiagnosis.STALE_DATA
+                else -> PriceDiagnosis.FILTERED_OUT
+            }
+            "stage=shopping.result state=$outcome rows=${rows.size} options=$options excluded=$exclusions"
         }
         val catalog = ShoppingBasketCatalog(snapshot, publication.localStores.keys, demands, policy,
             publication.localStores.mapValues { (_, entry) -> entry.store })

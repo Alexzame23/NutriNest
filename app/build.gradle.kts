@@ -102,6 +102,7 @@ dependencies {
     // Room's migration JSON runtime uses serialization 1.8.1. AGP aligns the test
     // APK to the tested APK's core version; keep debug core compatible with JSON.
     debugImplementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1")
+    debugImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

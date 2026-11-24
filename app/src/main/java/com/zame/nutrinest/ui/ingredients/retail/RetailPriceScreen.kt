@@ -133,6 +133,7 @@ internal fun RetailPriceContent(
                             RetailUiState.Loading -> R.string.retail_loading
                             RetailUiState.NoMatches -> R.string.retail_no_matches
                             RetailUiState.NoCoverage -> R.string.retail_no_coverage
+                            RetailUiState.NoBaseUrl -> R.string.retail_no_base_url
                             RetailUiState.Stale -> R.string.retail_stale
                             RetailUiState.Offline -> R.string.retail_offline
                             is RetailUiState.Error -> R.string.retail_error

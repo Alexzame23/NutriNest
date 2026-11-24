@@ -87,6 +87,7 @@ internal fun ShoppingPriceControls(state: ShoppingComparisonUiState, comparison:
                     RetailBatchUnavailable.Offline -> R.string.retail_offline
                     RetailBatchUnavailable.Stale -> R.string.retail_stale
                     RetailBatchUnavailable.NoCoverage -> R.string.shopping_prices_no_coverage
+                    RetailBatchUnavailable.NoBaseUrl -> R.string.retail_no_base_url
                 }))
                 is ShoppingComparisonStatus.Published -> {
                     val date = localizedDate().format(status.prices.publishedAt.atZone(ZoneId.of("Europe/Madrid")))

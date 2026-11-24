@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.zame.nutrinest.NutriNestApp
 import com.zame.nutrinest.data.prices.RetailHttpError
+import com.zame.nutrinest.data.prices.PriceDiagnostics
 import com.zame.nutrinest.data.prices.RetailPriceRepository
 import com.zame.nutrinest.data.prices.RetailResult
 import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
@@ -28,6 +29,7 @@ internal sealed interface RetailUiState {
     data object Loading : RetailUiState
     data object NoMatches : RetailUiState
     data object NoCoverage : RetailUiState
+    data object NoBaseUrl : RetailUiState
     data object Stale : RetailUiState
     data object Offline : RetailUiState
     data class Error(val httpStatus: Int? = null) : RetailUiState
@@ -74,10 +76,12 @@ internal class RetailPriceViewModel(
                     is RetailHttpError -> RetailUiState.Error(error.status)
                     else -> RetailUiState.Error()
                 }
+                PriceDiagnostics.log { "stage=ingredient.ui state=Error offers=0 error=${error.javaClass.simpleName}" }
                 return@launch
             }
             state.value = when (result) {
                 RetailResult.NoCoverage -> RetailUiState.NoCoverage
+                RetailResult.NoBaseUrl -> RetailUiState.NoBaseUrl
                 RetailResult.NoMatches -> RetailUiState.NoMatches
                 RetailResult.Stale -> RetailUiState.Stale
                 RetailResult.Offline -> RetailUiState.Offline
@@ -86,9 +90,14 @@ internal class RetailPriceViewModel(
                     else RetailUiState.Content(result)
                 }
             }
+            PriceDiagnostics.log {
+                val visible = state.value
+                "stage=ingredient.ui state=${visible.javaClass.simpleName} offers=${(visible as? RetailUiState.Content)?.result?.rows?.size ?: 0}"
+            }
             if (state.value is RetailUiState.Content && result is RetailResult.Offers) {
                 delay(Duration.between(clock.instant(), result.validUntil).toMillis().coerceAtLeast(0))
                 state.value = RetailUiState.Stale
+                PriceDiagnostics.log { "stage=ingredient.ui state=Stale offers=0" }
             }
         }
     }
