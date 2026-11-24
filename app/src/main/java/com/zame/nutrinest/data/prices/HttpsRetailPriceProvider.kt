@@ -23,6 +23,10 @@ internal class HttpsRetailPriceProvider(
             rawQuery == null && rawFragment == null)
     }
 
+    suspend fun directory() = withContext(Dispatchers.IO) {
+        get("/v1/geo/directory", setOf(404))?.let(SnapshotJson::directory)
+    }
+
     override suspend fun publication(region: CommercialId): RetailPublication? = withContext(Dispatchers.IO) {
         val path = "/v1/price-regions/${region.value}"
         val manifestBytes = get("$path/manifest", setOf(404)) ?: return@withContext null

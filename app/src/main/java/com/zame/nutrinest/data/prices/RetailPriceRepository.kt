@@ -1,6 +1,7 @@
 package com.zame.nutrinest.data.prices
 
 import com.zame.nutrinest.domain.prices.*
+import com.zame.nutrinest.domain.stores.validSpanishPostalCode
 import com.zame.nutrinest.domain.stores.DirectoryStore
 import com.zame.nutrinest.domain.stores.StoreRepository
 import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
@@ -53,14 +54,13 @@ internal class RegionalRetailPriceRepository(
     private val allowSimulated: Boolean = false,
     private val hasNetwork: () -> Boolean = { true },
     private val selection: () -> RetailerSelectionPreferences = { RetailerSelectionPreferences() },
-    private val comparisonDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val comparisonDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val rememberArea: (String) -> Unit = {}
 ) : RetailPriceRepository {
     override suspend fun compare(ingredientId: Long, postalCode: String, now: Instant): RetailResult {
-        if (!postalCode.matches(Regex("[0-9]{5}"))) return RetailResult.NoCoverage
-        val available = stores.findByArea(postalCode).map { it.entry }
-        val region = available.map { it.area.regionId }.distinct().singleOrNull() ?: return RetailResult.NoCoverage
+        if (!validSpanishPostalCode(postalCode)) return RetailResult.NoCoverage
         val key = ingredientKey(ingredientId) ?: return RetailResult.NoMatches
-        val data = when (val result = load(available, region, now)) {
+        val data = when (val result = load(postalCode, now)) {
             is RetailBatchPublication -> result
             RetailBatchUnavailable.Offline -> return RetailResult.Offline
             RetailBatchUnavailable.Stale -> return RetailResult.Stale
@@ -119,16 +119,13 @@ internal class RegionalRetailPriceRepository(
     }
 
     suspend fun load(postalCode: String, now: Instant): RetailBatch {
-        if (!postalCode.matches(Regex("[0-9]{5}"))) return RetailBatchUnavailable.NoCoverage
-        val available = stores.findByArea(postalCode).map { it.entry }
-        val region = available.map { it.area.regionId }.distinct().singleOrNull()
-            ?: return RetailBatchUnavailable.NoCoverage
-        return load(available, region, now)
-    }
-
-    private suspend fun load(available: List<DirectoryStore>, region: CommercialId, now: Instant): RetailBatch {
+        if (!validSpanishPostalCode(postalCode)) return RetailBatchUnavailable.NoCoverage
+        rememberArea(postalCode)
         val configuredProvider = provider ?: return RetailBatchUnavailable.NoCoverage
         if (!hasNetwork()) return RetailBatchUnavailable.Offline
+        stores.refresh()
+        val available = stores.findByArea(postalCode).map { it.entry }
+        val region = available.map { it.area.regionId }.distinct().singleOrNull() ?: return RetailBatchUnavailable.NoCoverage
         val publication = try {
             configuredProvider.publication(region)
         } catch (error: IOException) {
@@ -142,7 +139,8 @@ internal class RegionalRetailPriceRepository(
         if (now >= snapshot.expiresAt) return RetailBatchUnavailable.Stale
         val localStores = snapshot.stores.mapNotNull { store ->
             available.singleOrNull {
-                it.store.id == store.id || (store.osmRef != null && it.store.osmRef == store.osmRef)
+                (store.postalCode == null || store.postalCode == postalCode) &&
+                    (it.store.id == store.id || (store.osmRef != null && it.store.osmRef == store.osmRef))
             }?.let { store.id to it }
         }.toMap()
 

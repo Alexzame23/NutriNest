@@ -9,7 +9,8 @@ import com.zame.nutrinest.data.prices.RoomPriceSnapshotCache
 import com.zame.nutrinest.data.prices.HttpsRetailPriceProvider
 import com.zame.nutrinest.data.prices.RegionalRetailPriceRepository
 import com.zame.nutrinest.data.prices.RegionalShoppingPriceRepository
-import com.zame.nutrinest.data.stores.PilotStoreDirectory
+import com.zame.nutrinest.domain.stores.GeoResolver
+import com.zame.nutrinest.data.stores.AreaPreferences
 import com.zame.nutrinest.data.stores.RetailerSelectionRepository
 import com.zame.nutrinest.data.repository.FoodReferenceRepository
 import com.zame.nutrinest.data.repository.IngredientRepository
@@ -48,7 +49,13 @@ class AppContainer(app: Application, private val database: NutriNestDatabase = N
 
     internal val retailerSelectionRepository = RetailerSelectionRepository(app)
 
-    val storeRepository: StoreRepository = PilotStoreDirectory.repository
+    internal val areaPreferences = AreaPreferences(app)
+    private val publisher by lazy {
+        baseUrl.takeIf { BuildConfig.RETAIL_PRICES_ENABLED && it.isNotBlank() }?.let { HttpsRetailPriceProvider(it, priceCache) }
+    }
+    internal val publisherConfigured get() = publisher != null
+    internal val geoResolver = GeoResolver({ checkNotNull(publisher) { "Price publisher unavailable" }.directory() })
+    val storeRepository: StoreRepository = geoResolver
 
     private val retailBindings by lazy {
         app.assets.open("retail-canonical-profiles.json").bufferedReader().use {
@@ -60,15 +67,18 @@ class AppContainer(app: Application, private val database: NutriNestDatabase = N
         ids.chunked(900).flatMap { database.ingredientDao().retailCanonicalRows(it) }
             .mapNotNull { row -> retailBindings.resolve(row)?.let { row.ingredientId to it } }.toMap()
 
-    internal val retailPrices by lazy {
+    private val baseUrl by lazy {
         @Suppress("DEPRECATION")
-        val baseUrl = app.packageManager.getApplicationInfo(app.packageName, PackageManager.GET_META_DATA)
+        app.packageManager.getApplicationInfo(app.packageName, PackageManager.GET_META_DATA)
             .metaData?.getString("com.zame.nutrinest.RETAIL_PRICE_BASE_URL").orEmpty().trim()
+    }
+
+    internal val retailPrices by lazy {
         RegionalRetailPriceRepository(
             ingredientKey = { id -> retailKeys(setOf(id))[id] },
             stores = storeRepository,
-            provider = baseUrl.takeIf { BuildConfig.RETAIL_PRICES_ENABLED && it.isNotBlank() }
-                ?.let { HttpsRetailPriceProvider(it, priceCache) },
+            rememberArea = areaPreferences::select,
+            provider = publisher,
             hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null },
             selection = { retailerSelectionRepository.preferences.value }
         )

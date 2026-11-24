@@ -1,5 +1,7 @@
 package com.zame.nutrinest.data.prices
 
+import com.zame.nutrinest.domain.stores.*
+import java.time.ZoneOffset
 import android.util.JsonReader
 import android.util.JsonToken
 import com.zame.nutrinest.domain.prices.*
@@ -11,6 +13,22 @@ import java.time.LocalDate
 
 /** NutriNest's public wire format; provider DTOs belong in their backend adapters. */
 internal object SnapshotJson {
+    fun directory(bytes: ByteArray): GeoDirectory = parse(bytes).run {
+        val region = id("regionId")
+        val date = instant("generatedAt").atZone(ZoneOffset.UTC).toLocalDate()
+        val entries = objects("stores") {
+            val cp = string("postalCode")
+            val store = Store(id("id"), origin(), id("retailerId"), string("name"), cp, optionalString("osmRef"))
+            val lat = optionalString("latitude")?.toDoubleOrNull()
+            val lon = optionalString("longitude")?.toDoubleOrNull()
+            val point = if (lat != null && lon != null && lat in -90.0..90.0 && lon in -180.0..180.0)
+                GeoPoint(lat, lon) else null
+            DirectoryStore(store, DiscoveryArea(region, optionalString("municipality").orEmpty(), cp, date,
+                optionalString("province").orEmpty()), "", point, store.osmRef?.let { "https://www.openstreetmap.org/$it" })
+        }.filter { validSpanishPostalCode(it.area.postalCode) }
+        GeoDirectory(entries, instant("expiresAt"), id("provider"))
+    }
+
     fun manifest(bytes: ByteArray): SnapshotManifest = parse(bytes).run {
         SnapshotManifest(
             int("contractVersion"), id("regionId"), long("revision"), instant("generatedAt"),

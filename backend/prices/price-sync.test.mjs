@@ -356,3 +356,27 @@ test('republishes the still-fresh subset during backoff without extending the ba
     assert.equal(store.read().lastSuccessAt, lastSuccess);
     assert.ok(Date.parse(snapshot.expiresAt) <= lastSuccess + policy.snapshotMs);
 });
+test('geo directory exposes only stores with physical observations in the active live revision', () => {
+    const sample = JSON.parse(readFileSync(new URL('./fixtures/madrid-r4.snapshot.json', import.meta.url)));
+    const shop = sample.stores[0];
+    sample.stores.push({ ...shop, id: 'unobserved', postalCode: '15001' });
+    sample.prices.push({ ...sample.prices[0], record: { ...sample.prices[0].record,
+        scope: { type: 'ZONE', zoneId: 'regional' } } });
+    const now = Date.parse(sample.generatedAt);
+    const policy = syncPolicy({ ...realConfig, regionId: sample.regionId }, userAgent);
+    const store = { publicationView: () => ({
+        latest_revision: sample.revision, snapshot: JSON.stringify(sample),
+        manifest: JSON.stringify({ revision: sample.revision }), expires_at: Date.parse(sample.expiresAt),
+        data: JSON.stringify({ scopeKey: policy.scopeKey }),
+    }) };
+    const get = at => priceResponse(store, policy, { method: 'GET', path: '/v1/geo/directory' }, at);
+    const response = get(now);
+    assert.equal(response.status, 200);
+    const result = JSON.parse(response.body);
+    assert.equal(result.provider, 'open-prices');
+    assert.equal(result.regionId, sample.regionId);
+    assert.deepEqual(result.stores, [shop]);
+    assert.equal(get(Date.parse(sample.expiresAt)).status, 404);
+    sample.dataKind = 'simulated';
+    assert.equal(get(now).status, 404);
+});

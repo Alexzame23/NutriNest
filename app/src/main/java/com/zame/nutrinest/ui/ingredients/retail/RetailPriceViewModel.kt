@@ -97,7 +97,9 @@ internal class RetailPriceViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp
-                RetailPriceViewModel(createSavedStateHandle(), app.container.retailPrices,
+                val state = createSavedStateHandle()
+                if (state.get<String>("postalCode").isNullOrEmpty()) state["postalCode"] = app.container.areaPreferences.recent.firstOrNull()
+                RetailPriceViewModel(state, app.container.retailPrices,
                     preferences = app.container.retailerSelectionRepository.preferences)
             }
         }

@@ -24,6 +24,9 @@ export function syncPolicy(config, userAgent) {
         check(config.approvedPilot === true && zonedExpiry && Number.isFinite(rightsUntil) &&
             Array.isArray(config.plan?.stores) && Array.isArray(config.plan?.products), 'approved internal pilot plan and expiry');
         check(isLabel(userAgent) && /^[\x20-\x7e]{1,200}$/.test(userAgent), 'backend User-Agent');
+        if (config.plan.transport === 'location-api') {
+            check(config.plan.stores.length <= requestsPer24Hours, 'location requests within daily budget');
+        }
         check([undefined, 'location-api'].includes(config.plan.transport), 'Open Prices transport');
     }
     return {

@@ -31,6 +31,17 @@ class LivePricePublisherTest {
                 val container = AppContainer(app, db)
                 assertNull(container.priceSnapshots.read(region, Instant.now()))
                 val batch = container.retailPrices.load("28012", Instant.now()) as RetailBatchPublication
+                val geo = container.geoResolver
+                val samples = args.getString("geoPostcodes") ?: "28012,15001,41001"
+                for (cp in samples.split(",")) {
+                    val rows = geo.findByArea(cp)
+                    val expectedCoverage = if (batch.snapshot.stores.any { it.postalCode == cp })
+                        com.zame.nutrinest.domain.stores.GeoCoverage.COBERTURA
+                    else com.zame.nutrinest.domain.stores.GeoCoverage.SIN_COBERTURA
+                    assertEquals(expectedCoverage, geo.coverage(rows)["open-prices"])
+                    assertEquals(com.zame.nutrinest.domain.stores.GeoCoverage.FUENTE_NO_LOCALIZABLE,
+                        geo.coverage(rows)["Superfudis"])
+                }
                 assertFalse(batch.simulated)
                 assertTrue(batch.localStores.isNotEmpty())
                 val sql = db.openHelper.readableDatabase

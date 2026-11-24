@@ -1,5 +1,6 @@
 package com.zame.nutrinest.ui.menu.shopping
 
+import com.zame.nutrinest.domain.stores.validSpanishPostalCode
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,7 +73,7 @@ internal fun ShoppingPriceControls(state: ShoppingComparisonUiState, comparison:
                 else -> R.string.shopping_prices_refresh
             }),
             onClick = comparison::refresh,
-            enabled = state.eligibleCount > 0 && state.postalCode.trim().matches(Regex("[0-9]{5}")) &&
+            enabled = state.eligibleCount > 0 && validSpanishPostalCode(state.postalCode.trim()) &&
                 state.status != ShoppingComparisonStatus.Loading
         )
         Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {

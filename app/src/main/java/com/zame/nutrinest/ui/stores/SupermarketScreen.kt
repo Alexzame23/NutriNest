@@ -1,5 +1,7 @@
 package com.zame.nutrinest.ui.stores
 
+import com.zame.nutrinest.domain.stores.validSpanishPostalCode
+import kotlinx.coroutines.CancellationException
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -71,7 +73,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val NEARBY_RADIUS_KM = 5.0
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +85,12 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val coroutineScope = rememberCoroutineScope()
 
-    var query by remember { mutableStateOf("") }
+    var history by remember { mutableStateOf(container.areaPreferences.recent) }
+    var query by remember { mutableStateOf(history.firstOrNull().orEmpty()) }
+    var radius by remember { mutableStateOf(5) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+    var radiusAvailable by remember { mutableStateOf(container.geoResolver.hasGeolocatedStores()) }
+    var lookupFailed by remember { mutableStateOf(false) }
     var manualResults by remember { mutableStateOf<List<NearbyStore>?>(null) }
     var nearbyResults by remember { mutableStateOf<List<NearbyStore>?>(null) }
     var selectedId by remember { mutableStateOf<CommercialId?>(null) }
@@ -108,7 +115,21 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
         granted = allowed
     }
 
+    suspend fun refreshDirectory(): Boolean = try {
+        container.storeRepository.refresh()
+        radiusAvailable = container.geoResolver.hasGeolocatedStores()
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        lookupFailed = true
+        false
+    }
+
     fun locate() {
+        searchJob?.cancel()
+        manualResults = null
+        lookupFailed = false
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
         clearNearby()
         locationMessage = R.string.supermarkets_location_loading
@@ -117,9 +138,11 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
             updatePermission()
             if (granted) {
                 locationMessage = if (point == null) R.string.supermarkets_location_unavailable else null
-                if (point != null) {
+                if (point != null && refreshDirectory() && location.hasPermission() && !radiusAvailable) {
+                    locationMessage = R.string.geo_no_coordinates
+                } else if (point != null && radiusAvailable && !lookupFailed && location.hasPermission()) {
                     selectedId = null
-                    nearbyResults = container.storeRepository.findNearby(point, NEARBY_RADIUS_KM)
+                    nearbyResults = container.storeRepository.findNearby(point, radius.toDouble())
                 }
             }
             locationJob = null
@@ -154,13 +177,21 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
     val selected = results?.firstOrNull { it.entry.store.id == selectedId }?.entry
     val regionId = selected?.area?.regionId
     var snapshot by remember { mutableStateOf<PriceSnapshot?>(null) }
-    LaunchedEffect(lifecycle, regionId) {
+    LaunchedEffect(lifecycle, selected) {
         snapshot = null
         if (regionId == null) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             try {
                 val now = Instant.now()
-                val cached = container.priceSnapshots.read(regionId, now)
+                val cached = container.priceSnapshots.read(regionId, now) ?: try {
+                    (container.retailPrices.load(selected.area.postalCode, now) as?
+                        com.zame.nutrinest.data.prices.RetailBatchPublication)?.snapshot
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    lookupFailed = true
+                    null
+                }
                 snapshot = cached
                 if (cached != null) {
                     delay(Duration.between(now, cached.expiresAt).toMillis().coerceAtLeast(1))
@@ -190,26 +221,58 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
             item {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it.take(80) },
+                    onValueChange = {
+                        searchJob?.cancel()
+                        clearNearby()
+                        manualResults = null
+                        lookupFailed = false
+                        query = it.take(80)
+                    },
                     label = { Text(stringResource(R.string.supermarkets_manual_query)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+            items(history) { postal ->
+                TextButton(onClick = {
+                    searchJob?.cancel()
+                    clearNearby()
+                    manualResults = null
+                    selectedId = null
+                    lookupFailed = false
+                    query = postal
+                }) { Text(postal) }
+            }
             item {
                 Button(
-                    enabled = query.isNotBlank(),
+                    enabled = validSpanishPostalCode(query.trim()) || (query.isNotBlank() && query.none { it.isDigit() }),
                     onClick = {
                         clearNearby()
                         if (locationMessage == R.string.supermarkets_location_loading) locationMessage = null
-                        manualResults = container.storeRepository.findByArea(query)
+                        searchJob?.cancel()
                         selectedId = null
+                        manualResults = null
+                        lookupFailed = false
+                        val area = query.trim()
+                        container.areaPreferences.select(area)
+                        history = container.areaPreferences.recent
+                        searchJob = coroutineScope.launch {
+                            if (refreshDirectory()) manualResults = container.storeRepository.findByArea(area)
+                        }
                     }
                 ) { Text(stringResource(R.string.supermarkets_search)) }
             }
             item {
                 Column {
                     Text(stringResource(R.string.supermarkets_location_explainer))
+                    if (radiusAvailable) Row {
+                        listOf(5, 10, 25).forEach { km ->
+                            TextButton(enabled = radius != km, onClick = {
+                                radius = km
+                                if (nearbyResults != null || locationJob != null) locate()
+                            }) { Text("$km km") }
+                        }
+                    }
                     TextButton(
                         enabled = locationJob == null,
                         onClick = {
@@ -238,7 +301,12 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
                 }
             }
             item {
-                Text(stringResource(R.string.supermarkets_pilot_coverage))
+                if (lookupFailed) Text(stringResource(R.string.geo_lookup_failed))
+                results?.let { rows ->
+                    container.geoResolver.coverage(rows).forEach { (provider, coverage) ->
+                        Text("$provider · ${coverage.name}")
+                    }
+                }
                 TextButton(onClick = { uriHandler.openUri("https://www.openstreetmap.org/copyright") }) {
                     Text(stringResource(R.string.supermarkets_map_attribution))
                 }
@@ -276,15 +344,15 @@ private fun StoreOption(nearby: NearbyStore, selected: Boolean, onSelect: () -> 
             RadioButton(selected = selected, onClick = null)
             Column(Modifier.weight(1f)) {
                 Text(entry.store.name, style = MaterialTheme.typography.titleMedium)
-                Text("${entry.address} · ${entry.area.postalCode} ${entry.area.municipality}")
+                Text(listOf(entry.address, entry.area.postalCode, entry.area.municipality).filter { it.isNotBlank() }.joinToString(" · "))
                 nearby.distanceKm?.let {
                     Text(stringResource(R.string.supermarkets_distance, it))
                 }
             }
         }
         Text(stringResource(R.string.supermarkets_verified, displayDate(entry.area.verifiedOn)))
-        TextButton(onClick = { uriHandler.openUri(entry.directoryUrl) }) {
-            Text(stringResource(R.string.supermarkets_source_link, entry.store.name))
+        entry.directoryUrl?.let { url ->
+            TextButton(onClick = { uriHandler.openUri(url) }) { Text(stringResource(R.string.supermarkets_source_link, entry.store.name)) }
         }
     }
 }

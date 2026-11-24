@@ -33,6 +33,22 @@ export function priceResponse(store, policy, { method, path, ifNoneMatch }, now)
     if (path === `/internal/price-regions/${policy.regionId}/quotes` && hasRights(policy, now)) {
         return json(200, { regionId: policy.regionId, quotes: cachedQuotes(store.read(), policy, now) });
     }
+    if (path === '/v1/geo/directory') {
+        const manifest = readPublication(store, policy, now);
+        if (manifest.status !== 200 || manifest.dataKind !== 'live') return { status: 404 };
+        const publication = readPublication(store, policy, now, JSON.parse(manifest.body).revision);
+        if (publication.status !== 200 || publication.dataKind !== 'live') return { status: 404 };
+        const snapshot = JSON.parse(publication.body);
+        const ids = new Set(snapshot.prices.filter(p => p.record.scope.type === 'STORE' &&
+            p.record.origin.sourceId === policy.sourceId).map(p => p.record.scope.storeId));
+        const result = json(200, {
+            provider: policy.sourceId, regionId: snapshot.regionId,
+            generatedAt: snapshot.generatedAt, expiresAt: snapshot.expiresAt,
+            stores: snapshot.stores.filter(s => ids.has(s.id) && s.postalCode),
+        });
+        result.headers['X-NutriNest-Price-Data'] = 'live';
+        return result;
+    }
     const manifest = path === `/v1/price-regions/${policy.regionId}/manifest`;
     const match = /^\/v1\/price-regions\/([^/]+)\/snapshots\/([1-9][0-9]{0,15})$/.exec(path);
     const revision = Number(match?.[2]);

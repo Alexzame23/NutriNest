@@ -618,9 +618,9 @@
     <string name="catalog_review_required">Identidad pendiente de revisión · no intercambiable</string>
     <string name="supermarkets_title">Supermercados</string>
     <string name="supermarkets_home_subtitle">Encuentra tiendas y consulta la cobertura de precios</string>
-    <string name="supermarkets_manual_query">Código postal o municipio de España</string>
+    <string name="supermarkets_manual_query">Código postal, municipio o provincia de España</string>
     <string name="supermarkets_search">Buscar zona</string>
-    <string name="supermarkets_location_explainer">La ubicación aproximada es opcional. El dispositivo busca en un radio de 5 km.</string>
+    <string name="supermarkets_location_explainer">La ubicación aproximada es opcional. El dispositivo busca en el radio seleccionado.</string>
     <string name="supermarkets_use_location">Usar ubicación aproximada</string>
     <string name="supermarkets_clear_location">Dejar de usar la ubicación</string>
     <string name="supermarkets_permission_settings">Gestionar permiso de ubicación</string>
@@ -628,12 +628,13 @@
     <string name="supermarkets_location_unavailable">No se pudo obtener la ubicación aproximada. Busca por código postal o municipio.</string>
     <string name="supermarkets_location_denied">Se ha denegado el permiso de ubicación. Puedes buscar manualmente.</string>
     <string name="supermarkets_location_revoked">Se ha retirado el permiso de ubicación. Puedes buscar manualmente.</string>
-    <string name="supermarkets_pilot_coverage">Directorio piloto de dos tiendas en Madrid (28012).</string>
+    <string name="geo_no_coordinates">Ninguna tienda publicada tiene coordenadas para buscar por distancia.</string>
+    <string name="geo_lookup_failed">No se pudo consultar el directorio.</string>
     <string name="supermarkets_map_attribution">© colaboradores de OpenStreetMap</string>
     <string name="supermarkets_no_service">El directorio no tiene cobertura para esta búsqueda.</string>
     <string name="supermarkets_choose_store">Selecciona un establecimiento</string>
     <string name="supermarkets_distance">Aprox. %1$.1f km en línea recta</string>
-    <string name="supermarkets_verified">Ficha de tienda consultada el %1$s</string>
+    <string name="supermarkets_verified">Directorio publicado el %1$s</string>
     <string name="supermarkets_source_link">Ficha oficial de %1$s</string>
     <string name="supermarkets_price_coverage">Cobertura de precios</string>
     <string name="supermarkets_snapshot_date">Publicación de precios del %1$s</string>

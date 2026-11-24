@@ -1,5 +1,6 @@
 package com.zame.nutrinest.ui.menu.shopping
 
+import com.zame.nutrinest.domain.stores.validSpanishPostalCode
 import androidx.lifecycle.SavedStateHandle
 import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.prices.RetailBatchUnavailable
@@ -208,7 +209,7 @@ internal class ShoppingComparison(
         val postal = postalCode.value.trim()
         val current = week.value
         val basis = current.priceBasis()
-        if (!postal.matches(Regex("[0-9]{5}")) ||
+        if (!validSpanishPostalCode(postal) ||
             current.items.none { !excludePurchased.value || !it.purchased } ||
             quote.value?.let { it.status == ShoppingComparisonStatus.Loading && it.basis == basis } == true) return
         request?.cancel()

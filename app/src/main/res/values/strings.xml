@@ -612,9 +612,9 @@
     <string name="catalog_review_required">Identity pending review · not interchangeable</string>
     <string name="supermarkets_title">Supermarkets</string>
     <string name="supermarkets_home_subtitle">Find stores and check price coverage</string>
-    <string name="supermarkets_manual_query">Spanish postcode or municipality</string>
+    <string name="supermarkets_manual_query">Spanish postcode, municipality or province</string>
     <string name="supermarkets_search">Search area</string>
-    <string name="supermarkets_location_explainer">Optional approximate location searches a 5 km radius on this device.</string>
+    <string name="supermarkets_location_explainer">Optional approximate location searches the selected radius on this device.</string>
     <string name="supermarkets_use_location">Use approximate location</string>
     <string name="supermarkets_clear_location">Stop using location</string>
     <string name="supermarkets_permission_settings">Manage location permission</string>
@@ -622,12 +622,13 @@
     <string name="supermarkets_location_unavailable">Approximate location is unavailable. Search by postcode or municipality.</string>
     <string name="supermarkets_location_denied">Location permission was denied. You can search manually.</string>
     <string name="supermarkets_location_revoked">Location permission was removed. You can search manually.</string>
-    <string name="supermarkets_pilot_coverage">Pilot directory: two stores in Madrid (28012).</string>
+    <string name="geo_no_coordinates">No published stores have coordinates for a distance search.</string>
+    <string name="geo_lookup_failed">Could not reach the directory.</string>
     <string name="supermarkets_map_attribution">© OpenStreetMap contributors</string>
     <string name="supermarkets_no_service">The directory has no coverage for this search.</string>
     <string name="supermarkets_choose_store">Choose a store</string>
     <string name="supermarkets_distance">Approx. %1$.1f km in a straight line</string>
-    <string name="supermarkets_verified">Store listing checked %1$s</string>
+    <string name="supermarkets_verified">Directory published %1$s</string>
     <string name="supermarkets_source_link">Official listing for %1$s</string>
     <string name="supermarkets_price_coverage">Price coverage</string>
     <string name="supermarkets_snapshot_date">Price publication dated %1$s</string>

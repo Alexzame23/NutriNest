@@ -1,5 +1,6 @@
 package com.zame.nutrinest.ui.ingredients.retail
 
+import com.zame.nutrinest.domain.stores.validSpanishPostalCode
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -106,7 +107,7 @@ internal fun RetailPriceContent(
                         is RetailUiState.Content -> R.string.shopping_prices_refresh
                         else -> R.string.retail_retry
                     }),
-                    enabled = postalCode.trim().matches(Regex("[0-9]{5}")) && current != RetailUiState.Loading,
+                    enabled = validSpanishPostalCode(postalCode.trim()) && current != RetailUiState.Loading,
                     onClick = { onSearch(postalCode.trim()) }
                 )
             }

@@ -4,10 +4,23 @@ import { PriceProvider, fixedProduct, gtinKey, isDate, isId, isLabel, regularSto
 import { ProviderError, requireField } from './provider-error.mjs';
 
 // Server-side port of R2's Location query. Only reviewed packages at the configured OSM shop qualify.
-export async function loadLocationPage(plan, { beforeRequest, now, userAgent, fetchImpl }) {
-    requireField(plan.stores.length === 1 && plan.products.length > 0 && plan.products.length <= 20,
+export async function loadLocationPage(plan, options) {
+    requireField(Array.isArray(plan.stores) && plan.stores.length >= 1 && plan.stores.length <= 3 &&
+        new Set(plan.stores.map(shop => shop.locationId)).size === plan.stores.length,
+        'one to three distinct reviewed locations', 'INVALID_CONFIGURATION');
+    const batches = [];
+    for (const shop of plan.stores) batches.push(await loadShop(plan, shop, options));
+    const metadata = batches.map(batch => batch.metadata);
+    const retailers = new Map(metadata.flatMap(row => row.retailers).map(retailer => [retailer.id, retailer]));
+    return new PriceProvider({
+        ...metadata[0], retailers: [...retailers.values()], stores: metadata.flatMap(row => row.stores),
+        inputs: metadata.flatMap(row => row.inputs),
+    }, batches[0].catalog, batches.flatMap(batch => batch.prices));
+}
+
+async function loadShop(plan, shop, { beforeRequest, now, userAgent, fetchImpl }) {
+    requireField(plan.products.length > 0 && plan.products.length <= 20,
         'location pilot scope', 'INVALID_CONFIGURATION');
-    const [shop] = plan.stores;
     requireField(Number.isSafeInteger(shop.locationId) && shop.locationId > 0 && Number.isSafeInteger(shop.osmId) &&
         shop.osmId > 0 && ['NODE', 'WAY', 'RELATION'].includes(shop.osmType) && isId(shop.retailerKey) &&
         shop.retailerKey.length <= 80 && isLabel(shop.name) && isLabel(shop.retailerName) &&
@@ -43,6 +56,13 @@ export async function loadLocationPage(plan, { beforeRequest, now, userAgent, fe
             location.osm_tag_key === 'shop' && location.osm_brand === shop.retailerName &&
             location.osm_address_country_code === 'ES' && location.osm_address_postcode === shop.postalCode,
             'Open Prices location');
+        store.municipality = location.osm_address_city ?? undefined;
+        if (location.osm_lat != null && location.osm_lon != null &&
+            Number.isFinite(Number(location.osm_lat)) && Number.isFinite(Number(location.osm_lon)) &&
+            String(location.osm_lat).trim() && String(location.osm_lon).trim()) {
+            store.latitude = String(location.osm_lat);
+            store.longitude = String(location.osm_lon);
+        }
         const item = byCode.get(row.product_code);
         if (!item || row.type !== 'PRODUCT' || row.currency !== 'EUR' || row.price_is_discounted !== false ||
             row.duplicate_of !== null || (row.price_per !== null && row.price_per !== '') ||
@@ -57,12 +77,12 @@ export async function loadLocationPage(plan, { beforeRequest, now, userAgent, fe
         if (Number.isSafeInteger(row.proof_id) && row.proof_id > 0) price.record.proofId = row.proof_id;
         prices.push(price);
     }
-    return new PriceProvider({
+    return { metadata: {
         source: { id: sourceId, name: 'Open Prices', kind: 'OPEN_DATA',
             licenseRef: 'https://opendatacommons.org/licenses/odbl/1-0/',
             attribution: 'Open Prices and Open Food Facts contributors; location data © OpenStreetMap contributors (ODbL 1.0)' },
         simulated: fetchImpl !== undefined, verifiedLocationPage: fetchImpl === undefined,
         retailers: [retailer], stores: [store],
         inputs: [{ url: url.href, sha256: createHash('sha256').update(file.bytes).digest('hex'), byteLength: file.bytes.length }],
-    }, catalog, prices);
+    }, catalog, prices };
 }

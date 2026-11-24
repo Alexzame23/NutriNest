@@ -153,8 +153,10 @@ class ShoppingListViewModel internal constructor(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as NutriNestApp
+                val state = createSavedStateHandle()
+                if (!state.contains("shoppingPricePostal")) state["shoppingPricePostal"] = app.container.areaPreferences.recent.firstOrNull()
                 ShoppingListViewModel(app.container.menuRepository, app.container.ingredientRepository,
-                    app.container.shoppingPrices, createSavedStateHandle(),
+                    app.container.shoppingPrices, state,
                     app.container.retailerSelectionRepository, app.container.storeRepository)
             }
         }

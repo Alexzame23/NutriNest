@@ -36,19 +36,21 @@ data class DiscoveryArea(
     val regionId: CommercialId,
     val municipality: String,
     val postalCode: String,
-    val verifiedOn: LocalDate
+    val verifiedOn: LocalDate,
+    val province: String = ""
 )
 
 data class DirectoryStore(
     val store: Store,
     val area: DiscoveryArea,
     val address: String,
-    val point: GeoPoint,
-    val directoryUrl: String
+    val point: GeoPoint?,
+    val directoryUrl: String?
 )
 
 data class NearbyStore(val entry: DirectoryStore, val distanceKm: Double?)
 interface StoreRepository {
+    suspend fun refresh() {}
     fun knownStores(): List<Store> = emptyList()
     fun findByArea(postalCodeOrMunicipality: String): List<NearbyStore>
     fun findNearby(origin: GeoPoint, radiusKm: Double): List<NearbyStore>
@@ -59,15 +61,19 @@ internal class LocalStoreRepository(private val entries: List<DirectoryStore>) :
 
     override fun findByArea(postalCodeOrMunicipality: String): List<NearbyStore> {
         val query = normalize(postalCodeOrMunicipality)
+        if (query.isBlank()) return emptyList()
+        val provinceCode = provinces.indexOfFirst { names -> names.split('/').any { normalize(it) == query } }
+            .takeIf { it >= 0 }?.let { (it + 1).toString().padStart(2, '0') }
         val matches = entries.filter {
-            it.area.postalCode == query || normalize(it.area.municipality) == query
+            it.area.postalCode == query || normalize(it.area.municipality) == query || normalize(it.area.province) == query ||
+                (provinceCode != null && it.area.postalCode.startsWith(provinceCode))
         }
         return matches.sortedBy { it.store.name }.map { NearbyStore(it, null) }
     }
 
     override fun findNearby(origin: GeoPoint, radiusKm: Double): List<NearbyStore> {
         require(radiusKm.isFinite() && radiusKm > 0)
-        return entries.map { NearbyStore(it, origin.distanceKm(it.point)) }
+        return entries.mapNotNull { entry -> entry.point?.let { NearbyStore(entry, origin.distanceKm(it)) } }
             .filter { requireNotNull(it.distanceKm) <= radiusKm }
             .sortedWith(compareBy<NearbyStore> { it.distanceKm }.thenBy { it.entry.store.id.value })
     }
@@ -77,3 +83,14 @@ internal class LocalStoreRepository(private val entries: List<DirectoryStore>) :
             .replace(Regex("\\p{M}+"), "")
             .lowercase(Locale.ROOT)
 }
+
+// INE province codes 01–52, used only to search published physical addresses.
+private val provinces = listOf(
+    "Araba/Álava", "Albacete", "Alicante/Alacant", "Almería", "Ávila", "Badajoz", "Illes Balears/Baleares",
+    "Barcelona", "Burgos", "Cáceres", "Cádiz", "Castellón/Castelló", "Ciudad Real", "Córdoba", "A Coruña",
+    "Cuenca", "Girona", "Granada", "Guadalajara", "Gipuzkoa", "Huelva", "Huesca", "Jaén", "León", "Lleida",
+    "La Rioja", "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Ourense", "Asturias", "Palencia",
+    "Las Palmas", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife", "Cantabria", "Segovia", "Sevilla",
+    "Soria", "Tarragona", "Teruel", "Toledo", "Valencia/València", "Valladolid", "Bizkaia", "Zamora",
+    "Zaragoza", "Ceuta", "Melilla"
+)
