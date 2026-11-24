@@ -47,8 +47,12 @@ class AppContainer(app: Application, private val database: NutriNestDatabase = N
     val menuRepository: MenuRepository =
         LocalMenuRepository(database)
 
-    private val priceCache = RoomPriceSnapshotCache(database)
-    val priceSnapshots: PriceSnapshotReader = priceCache
+    internal val priceCacheSource by lazy {
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(baseUrl.trimEnd('/').encodeToByteArray()).joinToString("") { "%02x".format(it) }
+    }
+    private val priceCache by lazy { RoomPriceSnapshotCache(database, priceCacheSource) }
+    val priceSnapshots: PriceSnapshotReader get() = priceCache
 
     internal val retailerSelectionRepository = RetailerSelectionRepository(app)
 
@@ -95,15 +99,15 @@ class AppContainer(app: Application, private val database: NutriNestDatabase = N
             stores = storeRepository,
             rememberArea = areaPreferences::select,
             provider = publisher,
+            cache = priceCache,
             pricesEnabled = BuildConfig.RETAIL_PRICES_ENABLED,
             hasNetwork = { app.getSystemService(ConnectivityManager::class.java).activeNetwork != null },
-            selection = { retailerSelectionRepository.preferences.value },
-            cache = priceCache
+            selection = { retailerSelectionRepository.preferences.value }
         )
     }
 
     internal val shoppingPrices by lazy {
-        RegionalShoppingPriceRepository(retailPrices::load, ::retailKeys)
+        RegionalShoppingPriceRepository(retailPrices::load, ::retailKeys, retailPrices::cached)
     }
 }
 

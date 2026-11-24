@@ -131,7 +131,9 @@ internal fun SupermarketScreen(onBack: () -> Unit) {
     suspend fun refreshDirectory(): Boolean = try {
         container.storeRepository.refresh()
         radiusAvailable = container.geoResolver.hasGeolocatedStores()
-        true
+        container.storeRepository.hasCurrentDirectory().also { available ->
+            if (!available) directoryFailure = RetailPriceStatus.NoProviderCoverage
+        }
     } catch (e: CancellationException) {
         throw e
     } catch (error: Exception) {

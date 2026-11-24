@@ -31,9 +31,11 @@ internal fun responseDiagnosis(manifest: Boolean, status: Int, liveHeader: Strin
     else -> null
 }
 
+internal class InvalidPriceDigest : IllegalArgumentException("Price snapshot digest mismatch")
+
 internal fun verifySnapshotDigest(actual: String, expected: String) {
     val valid = actual == expected
     PriceDiagnostics.log { if (valid) "stage=hash validated=true sha256=$actual" else "stage=hash validated=false" }
     if (!valid) PriceDiagnostics.state("hash", PriceDiagnosis.HASH_MISMATCH)
-    require(valid) { "Price snapshot digest mismatch" }
+    if (!valid) throw InvalidPriceDigest()
 }

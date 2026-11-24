@@ -50,7 +50,8 @@ data class DirectoryStore(
 
 data class NearbyStore(val entry: DirectoryStore, val distanceKm: Double?)
 interface StoreRepository {
-    suspend fun refresh() {}
+    suspend fun refresh(force: Boolean = false) {}
+    fun hasCurrentDirectory(): Boolean = false
     fun knownStores(): List<Store> = emptyList()
     fun findByArea(postalCodeOrMunicipality: String): List<NearbyStore>
     fun findNearby(origin: GeoPoint, radiusKm: Double): List<NearbyStore>

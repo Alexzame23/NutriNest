@@ -102,7 +102,7 @@ class ProductionUpgradeTest {
             }
             context.deleteDatabase(name)
             archive.copyTo(file)
-            val reference = helper.createDatabase("qa24-reference.db", 11).use { indexes(it) }
+            val reference = helper.createDatabase("qa24-reference.db", 12).use { indexes(it) }
             var firstCounts = emptyMap<String, Long>()
             var firstMap = emptyList<String>()
             repeat(2) { pass ->
@@ -110,7 +110,7 @@ class ProductionUpgradeTest {
                 try {
                     val db = room.openHelper.writableDatabase
                     assertTrue("import deferred on v$version", FoodDatabaseImporter.importIfNeeded(context, db))
-                    healthy(db, 11)
+                    healthy(db, 12)
                     assertEquals(1L, scalar(db, "PRAGMA foreign_keys"))
                     assertEquals(reference, indexes(db))
                     val after = CatalogTestFixtures.snapshot(db, before.keys.toList(), projections, predicates)

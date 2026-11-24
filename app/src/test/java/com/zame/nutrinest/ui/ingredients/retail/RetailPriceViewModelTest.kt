@@ -69,6 +69,40 @@ class RetailPriceViewModelTest {
         }
     }
 
+    @Test fun showsVerifiedCacheWhileRefreshingAndClearsItOnPostalChange() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val pending = kotlinx.coroutines.CompletableDeferred<RetailResult>()
+        val backing = RegionalRetailPriceRepository(
+            { RetailIngredientKeys(key) }, PilotStoreDirectory.repository,
+            RetailPriceProvider { RetailPublication(snapshot(), false) }, comparisonDispatcher = StandardTestDispatcher(testScheduler)
+        )
+        val saved = (backing.compare(42, "28012", now) as RetailResult.Offers).copy(fromCache = true)
+        val repo = object : RetailPriceRepository {
+            override suspend fun cached(ingredientId: Long, postalCode: String, now: Instant) =
+                saved.takeIf { postalCode == "28012" }
+
+            override suspend fun compare(ingredientId: Long, postalCode: String, now: Instant) =
+                if (postalCode == "28012") pending.await() else RetailResult.NoCoverage
+        }
+        val model = RetailPriceViewModel(SavedStateHandle(mapOf("ingredientId" to 42L)), repo,
+            Clock.fixed(now, ZoneOffset.UTC))
+        try {
+            model.search("28012")
+            runCurrent()
+            assertEquals(RetailUiState.Content(saved), model.uiState.value)
+            assertFalse(pending.isCompleted)
+            model.search("15001")
+            assertEquals(RetailUiState.Loading, model.uiState.value)
+            runCurrent()
+            pending.complete(saved)
+            runCurrent()
+            assertEquals(RetailUiState.NoCoverage, model.uiState.value)
+        } finally {
+            model.viewModelScope.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test fun absentMatchesAndCoverageHaveSeparateStates() {
         scenario(RetailPriceProvider { RetailPublication(snapshot().copy(matches = emptyList()), false) }) {
             assertEquals(RetailUiState.NoMatches, it.uiState.value)

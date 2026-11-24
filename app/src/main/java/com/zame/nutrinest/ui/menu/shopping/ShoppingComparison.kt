@@ -102,6 +102,7 @@ internal class ShoppingComparison(
     private val chainNames = MutableStateFlow<Map<CommercialId, String>>(emptyMap())
     private val quote = MutableStateFlow<Quote?>(null)
     private var request: Job? = null
+    private var expiry: Job? = null
 
     private data class Quote(
         val basis: PriceBasis,
@@ -217,6 +218,7 @@ internal class ShoppingComparison(
     fun reset() {
         request?.cancel()
         request = null
+        expiry?.cancel()
         quote.value = null
     }
 
@@ -226,15 +228,22 @@ internal class ShoppingComparison(
         val basis = current.priceBasis()
         if (!validSpanishPostalCode(postal) ||
             current.items.none { !excludePurchased.value || !it.purchased } ||
-            quote.value?.let { it.status == ShoppingComparisonStatus.Loading && it.basis == basis } == true) return
+            request?.isActive == true && quote.value?.basis == basis) return
         request?.cancel()
-        quote.value = Quote(basis, ShoppingComparisonStatus.Loading)
+        if (quote.value?.let { it.basis == basis && it.status is ShoppingComparisonStatus.Published } != true) {
+            expiry?.cancel()
+            quote.value = Quote(basis, ShoppingComparisonStatus.Loading)
+        }
         request = scope.launch {
             val result = try {
+                val cached = repository.cached(basis.items, postal, clock.instant())
+                ensureActive()
+                if (cached != null) show(basis, cached)
                 repository.compare(basis.items, postal, clock.instant())
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 ensureActive()
+                expiry?.cancel()
                 quote.value = Quote(basis, if (error.isRetailNetworkFailure()) {
                     ShoppingComparisonStatus.Unavailable(RetailBatchUnavailable.Offline)
                 } else ShoppingComparisonStatus.Error)
@@ -242,35 +251,42 @@ internal class ShoppingComparison(
             }
             ensureActive()
             when (result) {
-                is ShoppingPrices.Unavailable ->
+                is ShoppingPrices.Unavailable -> {
+                    expiry?.cancel()
                     quote.value = Quote(basis, ShoppingComparisonStatus.Unavailable(result.reason))
-                is ShoppingPrices.Published -> {
-                    result.basketCatalog?.let { catalog ->
-                        val names = catalog.retailers.associate { it.id to it.name }
-                        val localStores = catalog.snapshot.stores.filter { it.id in catalog.stores }
-                            .map { published ->
-                                val store = catalog.directoryStores[published.id] ?: published
-                                store to names.getValue(published.retailerId)
-                            }
-                        chainNames.value = chainNames.value + localStores.associate { (store, name) ->
-                            store.retailerId to name
-                        }
-                        knownStores.value = (knownStores.value + localStores.map { it.first }).distinctBy { it.id }
-                    }
-                    var published: ShoppingPrices.Published = result
-                    while (clock.instant() < published.expiresAt) {
-                        val now = clock.instant()
-                        published = published.copy(rows = published.rows.mapValues { (_, row) -> row.validAt(now) },
-                            pricedAt = now)
-                        quote.value = Quote(basis, ShoppingComparisonStatus.Published(published))
-                        val nextExpiry = published.rows.values.filterIsInstance<ShoppingLinePrice.Options>()
-                            .flatMap { it.values }.minOfOrNull { it.expiresAt } ?: published.expiresAt
-                        val nextBasketChange = published.basketCatalog?.nextChange(now) ?: published.expiresAt
-                        delay(Duration.between(clock.instant(), minOf(nextExpiry, nextBasketChange)).toMillis().coerceAtLeast(1))
-                    }
-                    quote.value = Quote(basis, ShoppingComparisonStatus.Unavailable(RetailBatchUnavailable.Stale))
                 }
+                is ShoppingPrices.Published -> show(basis, result)
             }
+        }
+    }
+
+    private fun show(basis: PriceBasis, result: ShoppingPrices.Published) {
+        expiry?.cancel()
+        result.basketCatalog?.let { catalog ->
+            val names = catalog.retailers.associate { it.id to it.name }
+            val localStores = catalog.snapshot.stores.filter { it.id in catalog.stores }
+                .map { published ->
+                    val store = catalog.directoryStores[published.id] ?: published
+                    store to names.getValue(published.retailerId)
+                }
+            chainNames.value = chainNames.value + localStores.associate { (store, name) ->
+                store.retailerId to name
+            }
+            knownStores.value = (knownStores.value + localStores.map { it.first }).distinctBy { it.id }
+        }
+        expiry = scope.launch {
+            var published: ShoppingPrices.Published = result
+            while (clock.instant() < published.expiresAt) {
+                val now = clock.instant()
+                published = published.copy(rows = published.rows.mapValues { (_, row) -> row.validAt(now) },
+                    pricedAt = now)
+                quote.value = Quote(basis, ShoppingComparisonStatus.Published(published))
+                val nextExpiry = published.rows.values.filterIsInstance<ShoppingLinePrice.Options>()
+                    .flatMap { it.values }.minOfOrNull { it.expiresAt } ?: published.expiresAt
+                val nextBasketChange = published.basketCatalog?.nextChange(now) ?: published.expiresAt
+                delay(Duration.between(clock.instant(), minOf(nextExpiry, nextBasketChange)).toMillis().coerceAtLeast(1))
+            }
+            quote.value = Quote(basis, ShoppingComparisonStatus.Unavailable(RetailBatchUnavailable.Stale))
         }
     }
 

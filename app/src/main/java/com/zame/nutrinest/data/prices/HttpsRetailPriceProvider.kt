@@ -8,8 +8,10 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.security.MessageDigest
-import java.time.Instant
+import java.time.Clock
 import javax.net.ssl.HttpsURLConnection
+
+internal class EmptyRetailPublication : Exception("Empty price publication")
 
 internal class RetailHttpError(val status: Int) : Exception("HTTP $status")
 
@@ -17,6 +19,7 @@ internal class RetailHttpError(val status: Int) : Exception("HTTP $status")
 internal class HttpsRetailPriceProvider(
     baseUrl: String,
     private val cache: RoomPriceSnapshotCache? = null,
+    private val clock: Clock = Clock.systemUTC(),
     private val openConnection: (URI) -> HttpsURLConnection = { it.toURL().openConnection() as HttpsURLConnection }
 ) : RetailPriceProvider {
     private val base = URI(baseUrl.trimEnd('/')).apply {
@@ -47,7 +50,11 @@ internal class HttpsRetailPriceProvider(
                 snapshot.generatedAt == manifest.generatedAt && snapshot.expiresAt == manifest.expiresAt)
         }
         val simulated = snapshot.sources.any { it.id.value == "fake-prices" }
-        val now = Instant.now()
+        val now = clock.instant()
+        if (cache != null && snapshot.prices.isEmpty()) {
+            PriceDiagnostics.state("snapshot", PriceDiagnosis.EMPTY_SNAPSHOT)
+            throw EmptyRetailPublication()
+        }
         if (cache != null && !simulated && now >= snapshot.generatedAt && now < snapshot.expiresAt &&
             !cache.installVerified(snapshot, bytes, digest, now)) {
             // A concurrent install or withdrawal may already have advanced the region's revision.

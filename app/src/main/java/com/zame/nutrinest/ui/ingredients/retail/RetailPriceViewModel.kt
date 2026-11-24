@@ -18,6 +18,7 @@ import com.zame.nutrinest.domain.stores.validSpanishPostalCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,6 +50,7 @@ internal class RetailPriceViewModel(
     private val state = MutableStateFlow<RetailUiState>(RetailUiState.EnterArea)
     val uiState = state.asStateFlow()
     private var request: Job? = null
+    private var expiry: Job? = null
     private val initialArea = savedState.get<String>("postalCode").orEmpty()
 
     val lastPostalCode: String get() = savedState.get<String>("retailPostalCode") ?: initialArea
@@ -68,17 +70,27 @@ internal class RetailPriceViewModel(
         val postalCode = input.trim()
         if (!validSpanishPostalCode(postalCode)) {
             request?.cancel()
+            expiry?.cancel()
             state.value = RetailUiState.EnterArea
             return
         }
-        if (request?.isActive == true && state.value == RetailUiState.Loading && postalCode == lastPostalCode) return
+        if (request?.isActive == true && postalCode == lastPostalCode) return
+        val previousPostal = lastPostalCode
         savedState["retailPostalCode"] = postalCode
         request?.cancel()
-        state.value = RetailUiState.Loading
+        if (postalCode != previousPostal || state.value !is RetailUiState.Content) {
+            expiry?.cancel()
+            state.value = RetailUiState.Loading
+        }
         request = viewModelScope.launch {
             val result = try {
+                val cached = repository.cached(ingredientId, postalCode, clock.instant())
+                ensureActive()
+                if (cached is RetailResult.Offers) show(cached)
                 repository.compare(ingredientId, postalCode, clock.instant())
             } catch (error: Exception) {
+                ensureActive()
+                expiry?.cancel()
                 state.value = when (error) {
                     is CancellationException -> throw error
                     is RetailHttpError -> RetailUiState.Error(error.status)
@@ -87,6 +99,8 @@ internal class RetailPriceViewModel(
                 PriceDiagnostics.log { "stage=ingredient.ui state=Error offers=0 error=${error.javaClass.simpleName}" }
                 return@launch
             }
+            ensureActive()
+            expiry?.cancel()
             state.value = when (result) {
                 RetailResult.NoCoverage -> RetailUiState.NoCoverage
                 RetailResult.NoPricesInArea -> RetailUiState.NoPricesInArea
@@ -104,11 +118,20 @@ internal class RetailPriceViewModel(
                 val visible = state.value
                 "stage=ingredient.ui state=${visible.javaClass.simpleName} offers=${(visible as? RetailUiState.Content)?.result?.rows?.size ?: 0}"
             }
-            if (state.value is RetailUiState.Content && result is RetailResult.Offers) {
-                delay(Duration.between(clock.instant(), result.validUntil).toMillis().coerceAtLeast(0))
-                state.value = RetailUiState.Stale
-                PriceDiagnostics.log { "stage=ingredient.ui state=Stale offers=0" }
-            }
+            if (result is RetailResult.Offers) show(result)
+        }
+    }
+
+    private fun show(result: RetailResult.Offers) {
+        expiry?.cancel()
+        if (clock.instant() >= result.validUntil) {
+            state.value = RetailUiState.Stale
+            return
+        }
+        state.value = RetailUiState.Content(result)
+        expiry = viewModelScope.launch {
+            delay(Duration.between(clock.instant(), result.validUntil).toMillis().coerceAtLeast(0))
+            state.value = RetailUiState.Stale
         }
     }
 

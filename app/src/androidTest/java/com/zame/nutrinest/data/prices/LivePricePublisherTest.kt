@@ -63,7 +63,7 @@ class LivePricePublisherTest {
             assertTrue(downloaded.prices.all { it.record.origin.sourceId.value == "open-prices" })
             val reopened = open()
             try {
-                val row = requireNotNull(reopened.priceSnapshotDao().find(region.value))
+                val row = requireNotNull(reopened.priceSnapshotDao().findPostal(AppContainer(app, reopened).priceCacheSource, "28012", Instant.now().toEpochMilli()).singleOrNull())
                 val digest = MessageDigest.getInstance("SHA-256").digest(requireNotNull(row.payload))
                 assertEquals(expected, digest.joinToString("") { "%02x".format(it) })
                 assertEquals(expected, row.sha256)

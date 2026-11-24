@@ -16,6 +16,7 @@ import java.time.ZoneId
 
 internal fun interface ShoppingPriceRepository {
     suspend fun compare(items: List<ShoppingPriceDemand>, postalCode: String, now: Instant): ShoppingPrices
+    suspend fun cached(items: List<ShoppingPriceDemand>, postalCode: String, now: Instant): ShoppingPrices.Published? = null
 }
 
 internal data class ShoppingPriceDemand(val id: Long, val ingredientId: Long, val grams: Double)
@@ -51,7 +52,7 @@ internal data class ShoppingBasketCatalog(
 
     private val changes = (snapshot.prices.map { it.record } + snapshot.availability.map { it.record })
         .filter { (it.scope as? ObservationScope.AtStore)?.storeId in stores }
-        .flatMap { listOf(it.observedInstant, it.observedInstant.plus(policy.freshness)) }
+        .flatMap { listOf(it.observedInstant, it.observedInstant.plus(policy.freshnessFor(it.origin.sourceId))) }
         .distinct().sorted()
 
     fun nextChange(now: Instant): Instant = minOf(snapshot.expiresAt, changes.firstOrNull { it > now } ?: snapshot.expiresAt)
@@ -77,13 +78,21 @@ internal data class ShoppingPriceOption(
 
 internal class RegionalShoppingPriceRepository(
     private val load: suspend (String, Instant) -> RetailBatch,
-    private val keys: suspend (Set<Long>) -> Map<Long, RetailIngredientKeys>
+    private val keys: suspend (Set<Long>) -> Map<Long, RetailIngredientKeys>,
+    private val readCached: suspend (String, Instant) -> RetailBatchPublication? = { _, _ -> null }
 ) : ShoppingPriceRepository {
     override suspend fun compare(items: List<ShoppingPriceDemand>, postalCode: String, now: Instant): ShoppingPrices {
         val publication = when (val batch = load(postalCode, now)) {
             is RetailBatchUnavailable -> return ShoppingPrices.Unavailable(batch)
             is RetailBatchPublication -> batch
         }
+        return priced(items, publication, maxOf(now, publication.checkedAt ?: now))
+    }
+
+    override suspend fun cached(items: List<ShoppingPriceDemand>, postalCode: String, now: Instant) =
+        readCached(postalCode, now)?.let { priced(items, it, now) }
+
+    private suspend fun priced(items: List<ShoppingPriceDemand>, publication: RetailBatchPublication, now: Instant): ShoppingPrices.Published {
         val published = publication.snapshot.matches.mapNotNull { it.canonicalIngredientId }.toSet()
         val identities = keys(items.map { it.ingredientId }.toSet()).mapNotNull { (id, keys) ->
             keys.select(published)?.let { id to it }
@@ -118,7 +127,7 @@ internal class RegionalShoppingPriceRepository(
                 "localMatched=${localPrices.count { it.record.packageId in packs }}"
         }
         val evidence = snapshot.reviewedMassContents().groupBy { it.match.ingredientKey }
-        val policy = ComparisonPolicy(now, ZoneId.of("Europe/Madrid"))
+        val policy = ComparisonPolicy(now, ZoneId.of("Europe/Madrid"), freshnessBySource = retailSourceFreshness)
         val compared = PriceComparisonEngine.compareBatch(demands.mapNotNull { (id, demand) ->
             demand?.let { id to it }
         }.toMap(), snapshot, policy, localPrices, evidence, checkCancellation = { ensureActive() })
@@ -131,7 +140,7 @@ internal class RegionalShoppingPriceRepository(
                 val scope = record.scope as ObservationScope.AtStore
                 ShoppingPriceOption(option, products.getValue(option.pack.productId),
                     retailers.getValue(record.retailerId), publication.localStores.getValue(scope.storeId),
-                    sources.getValue(record.origin.sourceId), minOf(snapshot.expiresAt, observed.plus(policy.freshness)))
+                    sources.getValue(record.origin.sourceId), minOf(snapshot.expiresAt, observed.plus(policy.freshnessFor(record.origin.sourceId))))
             }
             item.id to when {
                 options.isNotEmpty() -> ShoppingLinePrice.Options(options)

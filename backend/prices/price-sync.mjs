@@ -166,6 +166,11 @@ export function syncPrices(store, policy, { now = Date.now, load = options => lo
             const completed = now();
             if (!hasRights(policy, completed)) throw new ProviderError('DISABLED', 'Source authorization is inactive');
             const batch = catalogAndPrices(provider, policy, completed);
+            if (policy.source === 'open-prices' && batch.prices.size === 0 &&
+                state.scopeKey === policy.scopeKey && store.publication()?.expires_at > completed) {
+                throw new ProviderError('EMPTY_BATCH', 'Open Prices returned no observations during an active publication',
+                    { retryable: true });
+            }
             const revalidation = provider.getRevalidation?.() ?? null;
             store.transaction(() => {
                 state.quotes = mergeQuotes(store, state, batch, policy, completed);

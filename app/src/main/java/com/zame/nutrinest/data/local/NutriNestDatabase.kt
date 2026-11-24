@@ -45,6 +45,8 @@ import com.zame.nutrinest.data.local.entity.ShoppingItemEntity
 import com.zame.nutrinest.data.local.entity.WeeklyMenuEntity
 import com.zame.nutrinest.data.local.entity.WeightEntryEntity
 import com.zame.nutrinest.data.prices.CachedPriceSnapshot
+import com.zame.nutrinest.data.prices.CachedPricePostal
+import com.zame.nutrinest.data.prices.PriceSnapshotSync
 import com.zame.nutrinest.util.TextNormalizer
 
 @Database(
@@ -75,9 +77,11 @@ import com.zame.nutrinest.util.TextNormalizer
         IngredientCatalogStatusEntity::class,
         ConversionEvidenceEntity::class,
         IngredientUnitOptionEntity::class,
-        CachedPriceSnapshot::class
+        CachedPriceSnapshot::class,
+        CachedPricePostal::class,
+        PriceSnapshotSync::class
     ],
-    version = 11,
+    version = 12,
     autoMigrations = [AutoMigration(from = 10, to = 11)],
     exportSchema = true
 )
@@ -749,6 +753,34 @@ abstract class NutriNestDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE price_snapshot_cache RENAME TO price_snapshot_cache_v11")
+                db.execSQL("""
+                    CREATE TABLE price_snapshot_cache (
+                        source TEXT NOT NULL, regionId TEXT NOT NULL, revision INTEGER NOT NULL,
+                        expiresAtMillis INTEGER NOT NULL, sha256 TEXT NOT NULL, payload BLOB,
+                        PRIMARY KEY(source, regionId))
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO price_snapshot_cache (source, regionId, revision, expiresAtMillis, sha256, payload)
+                    SELECT 'legacy', regionId, revision, expiresAtMillis, sha256, payload FROM price_snapshot_cache_v11
+                """.trimIndent())
+                db.execSQL("DROP TABLE price_snapshot_cache_v11")
+                db.execSQL("""
+                    CREATE TABLE price_snapshot_postal (
+                        source TEXT NOT NULL, regionId TEXT NOT NULL, postalCode TEXT NOT NULL,
+                        PRIMARY KEY(source, regionId, postalCode))
+                """.trimIndent())
+                db.execSQL("CREATE INDEX index_price_snapshot_postal_source_postalCode ON price_snapshot_postal(source, postalCode)")
+                db.execSQL("""
+                    CREATE TABLE price_snapshot_sync (
+                        source TEXT NOT NULL, regionId TEXT NOT NULL, lastAttemptMillis INTEGER NOT NULL,
+                        lastSuccessMillis INTEGER, error TEXT, PRIMARY KEY(source, regionId))
+                """.trimIndent())
+            }
+        }
+
         fun get(context: Context): NutriNestDatabase =
             instance ?: synchronized(this) {
                 instance ?: build(context.applicationContext).also { instance = it }
@@ -760,7 +792,7 @@ abstract class NutriNestDatabase : RoomDatabase() {
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
                     MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                    MIGRATION_9_10
+                    MIGRATION_9_10, MIGRATION_11_12
                 )
                 .addCallback(FoodImportCallback(appContext))
                 .build()

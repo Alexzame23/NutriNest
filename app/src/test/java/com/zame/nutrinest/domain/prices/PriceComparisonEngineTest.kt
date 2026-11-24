@@ -112,6 +112,18 @@ class PriceComparisonEngineTest {
         assertEquals(ComparisonError.EXPIRED_PROMOTION, error(snap.copy(prices = listOf(expired))))
     }
 
+    @Test fun sourceTtlCanExpireOneSourceBeforeThePublication() {
+        val old = price.copy(record = price.record.copy(
+            observedAt = now.minusSeconds(2 * 86400), observedOn = today.minusDays(2)
+        ))
+        val snapshot = snap.copy(prices = listOf(old))
+        assertTrue(PriceComparisonEngine.compare(demand(), snapshot, policy).options.isNotEmpty())
+        val shorter = policy.copy(freshnessBySource = mapOf(old.record.origin.sourceId to java.time.Duration.ofDays(1)))
+        val result = PriceComparisonEngine.compare(demand(), snapshot, shorter)
+        assertTrue(result.options.isEmpty())
+        assertEquals(ComparisonError.STALE_PRICE, result.excluded.single().error)
+    }
+
     @Test fun ambiguousMappingsCannotPriceAnIngredientRegardlessOfMappingOrder() {
         val competing = match.copy(origin = ProviderRecord(key, "competing"), mappingVersion = 2)
         val unrelated = match.copy(origin = ProviderRecord(key, "unrelated"), ingredientKey = CommercialId("other"))

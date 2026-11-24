@@ -75,9 +75,14 @@ internal fun payablePacks(count: BigInteger, promotion: VerifiedPromotion?): Big
 
 data class ComparisonPolicy(
     val now: Instant, val saleZone: ZoneId, val freshness: Duration = Duration.ofDays(30),
-    val loyaltyRetailers: Set<CommercialId> = emptySet()
+    val loyaltyRetailers: Set<CommercialId> = emptySet(),
+    val freshnessBySource: Map<CommercialId, Duration> = emptyMap()
 ) {
-    init { require(!freshness.isNegative && !freshness.isZero && freshness <= Duration.ofDays(30)) }
+    init {
+        require((freshnessBySource.values + freshness).all { it > Duration.ZERO && it <= Duration.ofDays(30) })
+    }
+
+    fun freshnessFor(source: CommercialId): Duration = minOf(freshness, freshnessBySource[source] ?: freshness)
 }
 
 enum class ComparisonError {

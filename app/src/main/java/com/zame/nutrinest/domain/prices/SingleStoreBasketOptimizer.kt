@@ -74,7 +74,7 @@ object SingleStoreBasketOptimizer {
         val prices = snapshot.prices.filter { it.record.storeId in eligibleStores }
         val stock = snapshot.availability.filter {
             it.record.storeId in eligibleStores && it.record.observedInstant <= policy.now &&
-                it.record.observedInstant > policy.now.minus(policy.freshness)
+                it.record.observedInstant > policy.now.minus(policy.freshnessFor(it.record.origin.sourceId))
         }.groupBy { it.record.storeId to it.record.packageId }.mapValues { (_, observations) ->
             observations.maxWith(compareBy<AvailabilityObservation> { it.record.observedInstant }
                 .thenBy { stockCaution(it.state) }).state

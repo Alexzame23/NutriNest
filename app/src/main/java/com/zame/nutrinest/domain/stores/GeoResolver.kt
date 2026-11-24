@@ -26,10 +26,10 @@ internal class GeoResolver(
     @Volatile private var cached: GeoDirectory? = null
     private var refreshAt = Instant.MIN
 
-    override suspend fun refresh() {
+    override suspend fun refresh(force: Boolean) {
         lock.withLock {
             val now = clock.instant()
-            if (now < refreshAt) return
+            if (!force && now < refreshAt) return
             val directory = fetch()?.takeIf { it.expires > clock.instant() }
             cached = directory
             refreshAt = minOf(directory?.expires ?: Instant.MAX, now.plusSeconds(if (directory == null) 30 else 300))
@@ -37,6 +37,7 @@ internal class GeoResolver(
     }
 
     private fun current() = cached?.takeIf { clock.instant() < it.expires }
+    override fun hasCurrentDirectory() = current() != null
     private fun directory() = LocalStoreRepository(current()?.entries.orEmpty())
     override fun knownStores(): List<Store> = directory().knownStores()
     override fun findByArea(postalCodeOrMunicipality: String) = directory().findByArea(postalCodeOrMunicipality)

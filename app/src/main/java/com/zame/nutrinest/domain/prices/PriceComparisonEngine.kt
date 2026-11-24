@@ -144,7 +144,7 @@ object PriceComparisonEngine {
         val observed = record.observedInstant
         if (record.scope == ObservationScope.Unknown) return ComparisonError.UNKNOWN_SCOPE
         if (observed > policy.now) return ComparisonError.FUTURE_PRICE
-        if (observed <= policy.now.minus(policy.freshness)) return ComparisonError.STALE_PRICE
+        if (observed <= policy.now.minus(policy.freshnessFor(record.origin.sourceId))) return ComparisonError.STALE_PRICE
         if (price.kind == PriceKind.REGULAR)
             return if (terms == null) null else ComparisonError.UNVERIFIED_PROMOTION
         val until = price.validUntil ?: return ComparisonError.UNVERIFIED_PROMOTION

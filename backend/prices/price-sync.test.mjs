@@ -380,3 +380,28 @@ test('geo directory exposes only stores with physical observations in the active
     sample.dataKind = 'simulated';
     assert.equal(get(now).status, 404);
 });
+
+test('empty Open Prices sync retains the active verified publication and reports a retry', async t => {
+    const config = JSON.parse(readFileSync(new URL('./madrid-pilot.json', import.meta.url)));
+    const sample = JSON.parse(readFileSync(new URL('./fixtures/madrid-r4.snapshot.json', import.meta.url)));
+    const policy = syncPolicy(config, userAgent);
+    const store = openTestDatabase(t, policy).open();
+    let time = Date.parse(sample.generatedAt);
+    const metadata = { source: sample.sources[0], retailers: sample.retailers, stores: sample.stores,
+        simulated: false, verifiedLocationPage: true, inputs: [] };
+    const catalog = [{ product: sample.products[0], package: sample.packages[0] }];
+    const load = prices => async () => new PriceProvider(metadata, catalog, prices);
+    assert.equal((await syncPrices(store, policy, { now: () => time, load: load(sample.prices) })).status, 'SUCCEEDED');
+    const initial = store.publication();
+    assert.equal(JSON.parse(initial.snapshot).prices.length, 1);
+    time += DAY;
+    const result = await syncPrices(store, policy, { now: () => time, load: load([]) });
+    assert.equal(result.error, 'EMPTY_BATCH');
+    assert.deepEqual(store.publication(), initial);
+    assert.equal(store.read().quotes.length, 1);
+    assert.equal(store.read().lastSuccessAt, Date.parse(sample.generatedAt));
+    const manifest = priceResponse(store, policy, {
+        method: 'GET', path: '/v1/price-regions/' + policy.regionId + '/manifest',
+    }, time);
+    assert.equal(manifest.headers['X-NutriNest-Price-Data'], 'live');
+});

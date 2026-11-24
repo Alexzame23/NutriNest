@@ -4,12 +4,14 @@ import com.zame.nutrinest.BuildConfig
 import com.zame.nutrinest.domain.prices.*
 import com.zame.nutrinest.domain.stores.validSpanishPostalCode
 import com.zame.nutrinest.domain.stores.DirectoryStore
+import com.zame.nutrinest.domain.stores.DiscoveryArea
 import com.zame.nutrinest.domain.stores.StoreRepository
 import com.zame.nutrinest.domain.stores.RetailerSelectionPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
+import java.time.Clock
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,6 +28,7 @@ internal data class RetailPublication(val snapshot: PriceSnapshot, val simulated
 
 internal fun interface RetailPriceRepository {
     suspend fun compare(ingredientId: Long, postalCode: String, now: Instant): RetailResult
+    suspend fun cached(ingredientId: Long, postalCode: String, now: Instant): RetailResult? = null
 }
 
 internal sealed interface RetailResult {
@@ -53,7 +56,7 @@ internal data class RetailOffer(
     val denominator: PriceDenominator
 )
 
-private val freshness = Duration.ofDays(30)
+internal val retailSourceFreshness = mapOf(CommercialId("open-prices") to Duration.ofDays(30))
 private val thousand = BigDecimal("1000")
 
 internal class RegionalRetailPriceRepository(
@@ -66,7 +69,8 @@ internal class RegionalRetailPriceRepository(
     private val comparisonDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val pricesEnabled: Boolean = true,
     private val rememberArea: (String) -> Unit = {},
-    private val cache: PriceSnapshotReader? = null
+    private val cache: RoomPriceSnapshotCache? = null,
+    private val clock: Clock = Clock.systemUTC()
 ) : RetailPriceRepository {
     override suspend fun compare(ingredientId: Long, postalCode: String, now: Instant): RetailResult {
         if (!validSpanishPostalCode(postalCode)) return RetailResult.NoCoverage
@@ -80,6 +84,12 @@ internal class RegionalRetailPriceRepository(
             is RetailBatchPublication -> result
             is RetailBatchUnavailable -> return result.ingredientResult()
         }
+        return offers(data, key, effectiveTime(now))
+    }
+
+    override suspend fun cached(ingredientId: Long, postalCode: String, now: Instant): RetailResult? {
+        val data = cached(postalCode, now) ?: return null
+        val key = ingredientKey(ingredientId) ?: return null
         return offers(data, key, now)
     }
 
@@ -89,6 +99,8 @@ internal class RegionalRetailPriceRepository(
             ?: return data.refreshIssue?.ingredientResult() ?: RetailResult.NoMatches
         return withContext(comparisonDispatcher) { compareLoaded(data, selected, now) }
     }
+
+    private fun effectiveTime(now: Instant) = if (cache == null) now else maxOf(now, clock.instant())
 
     private fun compareLoaded(data: RetailBatchPublication, key: CommercialId, now: Instant): RetailResult {
         val snapshot = data.snapshot
@@ -127,10 +139,10 @@ internal class RegionalRetailPriceRepository(
             counts?.apply { matched++ }
             if (price.kind != PriceKind.REGULAR) return@mapNotNull null
             counts?.apply { regular++ }
-            val observed = record.observedAt ?: record.observedOn.atStartOfDay(ZoneOffset.UTC).toInstant()
+            val observed = record.observedInstant
             if (observed > now) return@mapNotNull null
             counts?.apply { observedByNow++ }
-            val expires = observed.plus(freshness)
+            val expires = observed.plus(retailSourceFreshness[record.origin.sourceId] ?: Duration.ofDays(30))
             if (expires <= now) {
                 stale = true
                 return@mapNotNull null
@@ -183,28 +195,51 @@ internal class RegionalRetailPriceRepository(
         }
         if (!hasNetwork()) {
             PriceDiagnostics.state("network", PriceDiagnosis.NO_NETWORK)
-            return fallback(postalCode, now, null, RetailBatchUnavailable.Offline)
+            return cached(postalCode, effectiveTime(now))?.copy(refreshIssue = RetailBatchUnavailable.Offline)
+                ?: RetailBatchUnavailable.Offline
         }
         var region: CommercialId? = null
+        val started = effectiveTime(now)
         val publication = try {
-            stores.refresh()
+            stores.refresh(force = cache != null)
             val entries = stores.findByArea(postalCode)
-            val target = entries.map { it.entry.area.regionId }.distinct().singleOrNull()
+            region = entries.map { it.entry.area.regionId }.distinct().singleOrNull()
+            val target = region ?: if (!stores.hasCurrentDirectory()) cached(postalCode, effectiveTime(now))?.snapshot?.regionId else null
             if (target == null) {
                 PriceDiagnostics.state("area", PriceDiagnosis.NO_REGION)
                 return RetailBatchUnavailable.NoCoverage
             }
             region = target
-            configuredProvider.publication(target)
+            val result = configuredProvider.publication(target)
+            if (cache != null) {
+                val completed = effectiveTime(now)
+                val failure = when {
+                    result == null -> "PUBLICATION_UNAVAILABLE"
+                    result.simulated -> "UNVERIFIED_PUBLICATION"
+                    completed < result.snapshot.generatedAt || completed >= result.snapshot.expiresAt -> "PUBLICATION_NOT_CURRENT"
+                    else -> null
+                }
+                cache.recordSync(target, started, completed, failure)
+                cache.pruneExpired(effectiveTime(now))
+            }
+            result
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             coroutineContext.ensureActive()
+            cache?.recordSync(region, started, effectiveTime(now), when (error) {
+                is RetailHttpError -> "HTTP_${error.status}"
+                is EmptyRetailPublication -> "EMPTY_SNAPSHOT"
+                is InvalidPriceDigest -> "HASH_MISMATCH"
+                is java.net.SocketTimeoutException -> "TIMEOUT"
+                is IOException -> "IO"
+                else -> "INVALID_PUBLICATION"
+            })
             val issue = if (error.isRetailNetworkFailure() || !hasNetwork()) RetailBatchUnavailable.Offline
                 else RetailBatchUnavailable.ProviderError
-            cached(postalCode, now, region)?.let { return it.copy(refreshIssue = issue) }
+            cached(postalCode, effectiveTime(now), region)?.let { return it.copy(refreshIssue = issue) }
             if (issue == RetailBatchUnavailable.Offline) return issue
             throw error
-        } ?: return fallback(postalCode, now, region, RetailBatchUnavailable.NoCoverage)
+        } ?: return fallback(postalCode, effectiveTime(now), region, RetailBatchUnavailable.NoCoverage)
         val available = stores.findByArea(postalCode).map { it.entry }
         val snapshot = publication.snapshot
         PriceDiagnostics.log { "stage=snapshot region=${region.value} revision=${snapshot.revision} observations=${snapshot.prices.size}" }
@@ -214,15 +249,16 @@ internal class RegionalRetailPriceRepository(
             PriceDiagnostics.log { "stage=snapshot rejected=simulated" }
             return RetailBatchUnavailable.NoCoverage
         }
-        if (now < snapshot.generatedAt) {
+        if (effectiveTime(now) < snapshot.generatedAt) {
             PriceDiagnostics.log { "stage=snapshot rejected=future" }
-            return fallback(postalCode, now, region, RetailBatchUnavailable.ProviderError)
+            return fallback(postalCode, effectiveTime(now), region, RetailBatchUnavailable.ProviderError)
         }
-        if (now >= snapshot.expiresAt) {
+        if (effectiveTime(now) >= snapshot.expiresAt) {
             PriceDiagnostics.state("snapshot", PriceDiagnosis.STALE_DATA)
-            return fallback(postalCode, now, region, RetailBatchUnavailable.Stale)
+            return fallback(postalCode, effectiveTime(now), region, RetailBatchUnavailable.Stale)
         }
         return batch(snapshot, postalCode, available, publication.simulated, fromCache = false)
+            .copy(checkedAt = effectiveTime(now))
     }
 
     private suspend fun fallback(
@@ -237,7 +273,8 @@ internal class RegionalRetailPriceRepository(
         val available = stores.findByArea(postalCode).map { it.entry }
         val regions = available.map { it.area.regionId }.distinct()
         val target = region ?: regions.singleOrNull()
-        val snapshot = target?.let { cache.read(it, now) }
+        val snapshot = if (target != null) cache.read(target, now)
+            else if (regions.isEmpty() && !stores.hasCurrentDirectory()) cache.readPostal(postalCode, now) else null
         return snapshot?.takeUnless { saved -> saved.sources.any { it.id.value == "fake-prices" } }
             ?.let { batch(it, postalCode, available, simulated = false, fromCache = true) }
             ?.takeIf { it.localStores.isNotEmpty() }
@@ -252,7 +289,11 @@ internal class RegionalRetailPriceRepository(
             val entry = available.singleOrNull {
                 it.area.regionId == snapshot.regionId &&
                     (it.store.id == store.id || (store.osmRef != null && it.store.osmRef == store.osmRef))
-            }
+            } ?: if (cache != null && store.postalCode == postalCode) DirectoryStore(
+                store, DiscoveryArea(snapshot.regionId, "", postalCode,
+                    snapshot.generatedAt.atZone(ZoneOffset.UTC).toLocalDate()), "", null,
+                store.osmRef?.let { "https://www.openstreetmap.org/$it" }
+            ) else null
             entry?.let { store.id to it }
         }.toMap()
         return RetailBatchPublication(snapshot, localStores, simulated, fromCache)
@@ -276,6 +317,7 @@ internal data class RetailBatchPublication(
     val localStores: Map<CommercialId, DirectoryStore>,
     val simulated: Boolean,
     val fromCache: Boolean = false,
+    val checkedAt: Instant? = null,
     val refreshIssue: RetailBatchUnavailable? = null
 ) : RetailBatch
 

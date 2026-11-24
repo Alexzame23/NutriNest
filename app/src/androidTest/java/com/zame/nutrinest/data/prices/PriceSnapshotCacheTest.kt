@@ -113,6 +113,26 @@ class PriceSnapshotCacheTest {
     }
 
     @Test
+    fun upgrade11To12PreservesCacheHistoryAndUserTables() {
+        val name = "price-cache-v11-test"
+        migration.createDatabase(name, 11).use { db ->
+            db.execSQL("INSERT INTO food_dataset_meta (`key`, value) VALUES ('fixture', 'existing')")
+            db.execSQL("INSERT INTO price_snapshot_cache VALUES ('fixture-region', 7, 1, 'fixture-hash', X'AB')")
+        }
+        migration.runMigrationsAndValidate(name, 12, true, NutriNestDatabase.MIGRATION_11_12).use { db ->
+            db.query("SELECT revision, hex(payload) FROM price_snapshot_cache WHERE source='legacy'").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(7L, it.getLong(0))
+                assertEquals("AB", it.getString(1))
+            }
+            db.query("SELECT value FROM food_dataset_meta WHERE `key`='fixture'").use {
+                assertTrue(it.moveToFirst())
+                assertEquals("existing", it.getString(0))
+            }
+        }
+    }
+
+    @Test
     fun upgrade10To11KeepsExistingRowsAndCreatesEmptyIndexedCache() {
         val name = "price-cache-migration-test"
         migration.createDatabase(name, 10).use { db ->
